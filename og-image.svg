@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b0d14" />
+      <stop offset="0.55" stop-color="#141733" />
+      <stop offset="1" stop-color="#241640" />
+    </linearGradient>
+    <radialGradient id="glow" cx="0.82" cy="0.12" r="0.75">
+      <stop offset="0" stop-color="#7b88ff" stop-opacity="0.5" />
+      <stop offset="1" stop-color="#7b88ff" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="mark" x1="0.06" y1="0" x2="0.94" y2="1">
+      <stop offset="0" stop-color="#7b88ff" />
+      <stop offset="1" stop-color="#a855f7" />
+    </linearGradient>
+    <linearGradient id="rule" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7b88ff" />
+      <stop offset="1" stop-color="#a855f7" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="art" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e2a78" />
+      <stop offset="0.42" stop-color="#7b3fa0" />
+      <stop offset="0.62" stop-color="#f0913c" />
+      <stop offset="1" stop-color="#f6d365" />
+    </linearGradient>
+    <clipPath id="artClip">
+      <rect x="16" y="66" width="420" height="338" rx="14" />
+    </clipPath>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <rect width="1200" height="630" fill="url(#glow)" />
+
+  <!-- logo tile -->
+  <g transform="translate(90 96)">
+    <rect width="132" height="132" rx="34" fill="url(#mark)" />
+    <g
+      transform="translate(66 66) scale(3.25) translate(-11.7 -12.7)"
+      fill="none"
+      stroke="#ffffff"
+      stroke-width="3.6"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M9.1 11.9l8-8.1a2.85 2.85 0 0 1 4.05 4.05l-8.1 8.05" />
+      <path d="M7.05 14.95a3 3 0 0 0-3 3c0 1.35-2.5 1.5-2 2 1.1 1.1 2.5 2 4 2a4 4 0 0 0 4-4 3 3 0 0 0-3-3z" />
+    </g>
+  </g>
+
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#ffffff">
+    <text x="90" y="330" font-size="88" font-weight="700" letter-spacing="-2">
+      Paint<tspan fill="#a9b0c7" font-weight="400"> Studio</tspan>
+    </text>
+    <text x="92" y="394" font-size="32" fill="#c3c9db">
+      Image editor in your browser.
+    </text>
+    <text x="92" y="442" font-size="32" fill="#c3c9db">
+      Layers, retouching, filters.
+    </text>
+  </g>
+
+  <rect x="92" y="500" width="360" height="4" rx="2" fill="url(#rule)" />
+
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="26" fill="#8d93a8">
+    <text x="92" y="566">robertlib.github.io/paint</text>
+  </g>
+
+  <!-- a miniature of the editor window so the frame reads as an app, not a logo -->
+  <g transform="translate(658 105)">
+    <rect
+      width="452"
+      height="420"
+      rx="26"
+      fill="#11131d"
+      stroke="#ffffff"
+      stroke-opacity="0.12"
+      stroke-width="1.5"
+    />
+    <rect x="16" y="16" width="420" height="34" rx="11" fill="#ffffff" fill-opacity="0.06" />
+    <g fill="#ffffff" fill-opacity="0.35">
+      <circle cx="36" cy="33" r="5" />
+      <circle cx="54" cy="33" r="5" />
+      <circle cx="72" cy="33" r="5" />
+    </g>
+    <rect x="96" y="25" width="120" height="16" rx="8" fill="#ffffff" fill-opacity="0.12" />
+    <rect x="380" y="24" width="42" height="18" rx="9" fill="#7b88ff" fill-opacity="0.85" />
+
+    <g clip-path="url(#artClip)">
+      <rect x="16" y="66" width="420" height="338" fill="url(#art)" />
+      <circle cx="330" cy="150" r="34" fill="#fffbe8" fill-opacity="0.95" />
+      <path d="M16 320L120 214l104 106z" fill="#141a2e" />
+      <path d="M150 320L268 186l168 134z" fill="#1d2440" />
+      <rect x="16" y="318" width="420" height="86" fill="#0d1120" />
+    </g>
+    <rect
+      x="16"
+      y="66"
+      width="420"
+      height="338"
+      rx="14"
+      fill="none"
+      stroke="#ffffff"
+      stroke-opacity="0.1"
+    />
+  </g>
+</svg>

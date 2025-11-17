@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Primary Meta Tags -->
+    <title>Paint Studio — Online Image Editor &amp; Drawing App</title>
+    <meta name="title" content="Paint Studio — Online Image Editor &amp; Drawing App" />
+    <meta
+      name="description"
+      content="Free online image editor and drawing app. Layers, blend modes, selections, brushes, retouching, filters and photo adjustments — all in your browser, no upload needed."
+    />
+    <meta
+      name="keywords"
+      content="paint, online photo editor, image editor, drawing app, layers, filters, photo adjustments, canvas editor, free paint, retouch"
+    />
+    <meta name="author" content="Paint Studio" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://robertlib.github.io/paint/" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://robertlib.github.io/paint/" />
+    <meta property="og:title" content="Paint Studio — Online Image Editor &amp; Drawing App" />
+    <meta
+      property="og:description"
+      content="Layers, selections, brushes, retouching and photo filters in one fast browser-based editor. Your images never leave your device."
+    />
+    <meta property="og:image" content="https://robertlib.github.io/paint/og-image.png" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://robertlib.github.io/paint/" />
+    <meta property="twitter:title" content="Paint Studio — Online Image Editor" />
+    <meta
+      property="twitter:description"
+      content="Layers, selections, brushes, retouching and photo filters — free, in your browser."
+    />
+    <meta property="twitter:image" content="https://robertlib.github.io/paint/og-image.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="./favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.json" />
+
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+    <meta name="msapplication-TileColor" content="#7b88ff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <link rel="stylesheet" href="./css/tokens.css" />
+    <link rel="stylesheet" href="./css/layout.css" />
+    <link rel="stylesheet" href="./css/components.css" />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Paint Studio",
+        "description": "Free online image editor and drawing application with layers, selections, retouching tools and photo filters.",
+        "url": "https://robertlib.github.io/paint/",
+        "applicationCategory": "DesignApplication",
+        "operatingSystem": "Any",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "browserRequirements": "Requires JavaScript. Requires HTML5.",
+        "softwareVersion": "2.0.0",
+        "featureList": [
+          "Layers with blend modes and opacity",
+          "Brush, pencil, airbrush and eraser",
+          "Rectangular, elliptical, lasso and magic wand selections",
+          "Blur, sharpen, smudge and clone stamp retouching",
+          "Photo adjustments and creative filters",
+          "Crop, resize, rotate and flip",
+          "Unlimited undo history",
+          "PNG, JPEG and WebP export"
+        ],
+        "author": { "@type": "Organization", "name": "Paint Studio" }
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Do my images get uploaded anywhere?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. Paint Studio has no server-side component at all. Images are decoded into an HTML canvas inside your own browser tab and every operation runs there. Nothing is transmitted, stored remotely or shared with a third party, which makes the editor safe for photographs, screenshots and documents you would not want to hand to an online service."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is it free?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, completely, with no account, no trial period, no watermark on exports and no feature held back behind a paywall. The project is open source and released under the MIT licence."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does it work offline?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "After the first visit, yes. A service worker caches the application shell, so the editor keeps loading without a connection and can be installed to your home screen or dock as a progressive web app."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does it work on a phone or tablet?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "The interface adapts to small screens and the canvas responds to touch and stylus input. A tablet with a pen is a genuinely comfortable way to draw; a phone is better suited to quick crops, adjustments and filters than to detailed retouching."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How large an image can it handle?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Documents up to 8000 × 8000 pixels can be created directly. The practical ceiling depends on how much memory your browser will give the tab, since every layer is a full canvas buffer — a handful of layers at print resolution is fine on a normal laptop."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I use it instead of Photoshop or GIMP?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "For layered compositing, retouching, colour correction, cropping and export, it covers the same ground. What it deliberately does not do is CMYK output, colour management, RAW development or scripting, so it complements a desktop suite for quick work rather than replacing one in a print production pipeline."
+            }
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <!-- ───────────────────────── icon sprite ───────────────────────── -->
+    <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true">
+      <defs>
+        <symbol id="i-brush" viewBox="0 0 24 24"><path d="M9.1 11.9l8-8.1a2.85 2.85 0 0 1 4.05 4.05l-8.1 8.05"/><path d="M7.05 14.95a3 3 0 0 0-3 3c0 1.35-2.5 1.5-2 2 1.1 1.1 2.5 2 4 2a4 4 0 0 0 4-4 3 3 0 0 0-3-3z"/></symbol>
+        <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></symbol>
+        <symbol id="i-spray" viewBox="0 0 24 24"><path d="M10 4h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M10 4V2h4v2"/><path d="M20 6h.01M20 10h.01M20 14h.01M23 8h.01M23 12h.01"/></symbol>
+        <symbol id="i-eraser" viewBox="0 0 24 24"><path d="M20 20H7l-4-4 10-10 8 8-1 6z"/><path d="M10 10l4 4"/></symbol>
+        <symbol id="i-bucket" viewBox="0 0 24 24"><path d="M18.5 11L11 3.5 3 11.5a1.8 1.8 0 0 0 0 2.6l4.9 4.9a1.8 1.8 0 0 0 2.6 0L18.5 11z"/><path d="M5.5 2.5L9 6M2.5 13h15"/><path d="M22 19.5a2 2 0 1 1-4 0c0-1.5 1.7-2.3 2-3.8.3 1.5 2 2.3 2 3.8z"/></symbol>
+        <symbol id="i-gradient" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 20L20 4M9 20l11-11M4 15L15 4"/></symbol>
+        <symbol id="i-blur" viewBox="0 0 24 24"><path d="M12 2.7l4.95 4.95a7 7 0 1 1-9.9 0L12 2.7z"/><path d="M9 13h.01M12 15h.01M15 13h.01M12 11h.01"/></symbol>
+        <symbol id="i-sharpen" viewBox="0 0 24 24"><path d="M12 3l9 18H3z"/><path d="M12 9v8"/></symbol>
+        <symbol id="i-smudge" viewBox="0 0 24 24"><path d="M3 15c3-4 6 4 9 0s6-4 9 0"/><path d="M6 8.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M14 7h6"/></symbol>
+        <symbol id="i-clone" viewBox="0 0 24 24"><path d="M6 16h12l-1.5-5.5h-9L6 16z"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/><path d="M12 16v6M9 22h6"/></symbol>
+        <symbol id="i-line" viewBox="0 0 24 24"><path d="M5 19L19 5"/></symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 19L19 5"/><path d="M12 5h7v7"/></symbol>
+        <symbol id="i-rect" viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/></symbol>
+        <symbol id="i-ellipse" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></symbol>
+        <symbol id="i-polygon" viewBox="0 0 24 24"><path d="M12 3l8.5 6.2-3.25 10h-10.5L3.5 9.2z"/></symbol>
+        <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.9 6.3.7-4.7 4.3 1.3 6.2L12 17l-5.6 3.1 1.3-6.2L3 9.6l6.3-.7z"/></symbol>
+        <symbol id="i-text" viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><path d="M12 4v16M8.5 20h7"/></symbol>
+        <symbol id="i-select-rect" viewBox="0 0 24 24"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></symbol>
+        <symbol id="i-select-ellipse" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" stroke-dasharray="4 3"/></symbol>
+        <symbol id="i-lasso" viewBox="0 0 24 24"><path d="M9 19.5c-1.6-.6-2.5-1.7-2.5-2.9 0-1 .6-1.7 1.5-2.1"/><path d="M12 3.5c4.7 0 8.5 2.6 8.5 5.9 0 3.2-3.8 5.8-8.5 5.8S3.5 12.6 3.5 9.4C3.5 6.1 7.3 3.5 12 3.5z"/><circle cx="8.5" cy="20.5" r="1.6"/></symbol>
+        <symbol id="i-wand" viewBox="0 0 24 24"><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8l1.4 1.4M17.8 6.2l1.4-1.4M12.2 6.2l-1.4-1.4"/><path d="M3.5 20.5L14 10"/></symbol>
+        <symbol id="i-move" viewBox="0 0 24 24"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></symbol>
+        <symbol id="i-crop" viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></symbol>
+        <symbol id="i-eyedropper" viewBox="0 0 24 24"><path d="M11 7l6 6"/><path d="M20.4 3.6a2.3 2.3 0 0 1 0 3.25l-1.7 1.7-3.25-3.25 1.7-1.7a2.3 2.3 0 0 1 3.25 0z"/><path d="M15.5 8.5L7 17v4h4l8.5-8.5"/></symbol>
+        <symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6.5a1.75 1.75 0 0 0-3.5 0"/><path d="M14.5 10V4.5a1.75 1.75 0 0 0-3.5 0V10"/><path d="M11 10.5V6a1.75 1.75 0 0 0-3.5 0v8"/><path d="M18 8.5a1.75 1.75 0 0 1 3.5 0V14a8 8 0 0 1-8 8h-1.6c-2.5 0-4-.8-5.4-2.2l-3.2-3.3a1.8 1.8 0 0 1 2.5-2.5L7.5 15.5"/></symbol>
+        <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="7"/><path d="M20.5 20.5l-5-5M7.5 10.5h6M10.5 7.5v6"/></symbol>
+        <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-5"/></symbol>
+        <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h5"/></symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+        <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13M9.5 7V4h5v3"/></symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24"><path d="M9 9h11v11H9z"/><path d="M15 5.5V4H4v11h1.5"/></symbol>
+        <symbol id="i-merge" viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4M4 20h16"/></symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M10.6 6.2A9.9 9.9 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-2.6 3.3M6.6 7.6A17 17 0 0 0 2 12s3.6 6 10 6a9.6 9.6 0 0 0 4-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></symbol>
+        <symbol id="i-lock" viewBox="0 0 24 24"><path d="M5 11h14v10H5z"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+        <symbol id="i-image" viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></symbol>
+        <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></symbol>
+        <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></symbol>
+        <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3M8 17h8"/></symbol>
+        <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+        <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></symbol>
+        <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2A2.5 2.5 0 1 1 13 11.5c-.7.4-1 .9-1 1.7M12 17h.01"/></symbol>
+        <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+        <symbol id="i-flip-h" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M8 7l-4 5 4 5M16 7l4 5-4 5"/></symbol>
+        <symbol id="i-flip-v" viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M7 8l5-4 5 4M7 16l5 4 5-4"/></symbol>
+        <symbol id="i-rotate-cw" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v5h-5"/></symbol>
+        <symbol id="i-rotate-ccw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 2.6-6.4"/><path d="M3 3v5h5"/></symbol>
+        <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 2.5l9 4.75-9 4.75-9-4.75 9-4.75z"/><path d="M3 12l9 4.75L21 12M3 16.75L12 21.5l9-4.75"/></symbol>
+        <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.2"/><circle cx="15" cy="17" r="2.2"/></symbol>
+        <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M11 3l1.8 4.7L17.5 9.5l-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8z"/><path d="M18.5 14.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/></symbol>
+        <symbol id="i-fit" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></symbol>
+        <symbol id="i-grid" viewBox="0 0 24 24"><path d="M3 4h18v16H3z"/><path d="M3 9.33h18M3 14.67h18M9 4v16M15 4v16"/></symbol>
+        <symbol id="i-paste" viewBox="0 0 24 24"><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3"/><path d="M9 2.5h6V6H9z"/></symbol>
+        <symbol id="i-swap" viewBox="0 0 24 24"><path d="M16 3l4 4-4 4M20 7H9M8 21l-4-4 4-4M4 17h11"/></symbol>
+        <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v5h5"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol>
+        <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/><path d="M14 3v5h5"/></symbol>
+        <symbol id="i-frame" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16M8 4v16M16 4v16"/></symbol>
+        <symbol id="i-panel" viewBox="0 0 24 24"><path d="M3 4h18v16H3z"/><path d="M15 4v16"/></symbol>
+      </defs>
+    </svg>
+
+    <!-- ───────────────────── about · indexable landing copy ───────────────────── -->
+    <section id="about" class="about" aria-labelledby="aboutTitle">
+      <div class="about-inner">
+        <header class="about-head">
+          <span class="brand-mark lg" aria-hidden="true">
+            <svg class="icon"><use href="#i-brush" /></svg>
+          </span>
+          <h1 id="aboutTitle">Paint Studio — a full image editor that runs in your browser</h1>
+          <p class="about-lead">
+            Paint Studio is a complete raster image editor built entirely from web technology.
+            There is nothing to install, no account to create and no upload step: you open the
+            page, drop in a photo or start from a blank canvas, and every stroke, selection,
+            adjustment and export is computed locally on your own machine. It works in any modern
+            desktop or mobile browser and can be installed as a progressive web app for offline use.
+          </p>
+          <button type="button" class="btn btn-primary about-cta" id="aboutLaunch">
+            <svg class="icon"><use href="#i-brush" /></svg><span>Open the editor</span>
+          </button>
+        </header>
+
+        <div class="about-grid">
+          <article>
+            <h2>Layers and blend modes</h2>
+            <p>
+              Build an image the way you would in a desktop editor. Stack as many layers as a
+              document needs, reorder them by dragging, rename them, lock them, hide them and set
+              opacity per layer. Sixteen blend modes — multiply, screen, overlay, soft light,
+              colour dodge, difference, hue, luminosity and the rest — let you composite without
+              touching the pixels underneath. When a stack is finished you can merge a layer down
+              into the one below it or flatten the whole document into a single layer.
+            </p>
+          </article>
+
+          <article>
+            <h2>Selections that behave like a mask</h2>
+            <p>
+              Rectangular, elliptical, free-hand lasso and magic wand selections constrain
+              everything that happens next. Paint, fill, delete or run a filter and the change stops
+              at the selection edge. A selection can be inverted, cleared, promoted to its own layer
+              or used to crop the canvas, so isolating a subject and editing only that area takes a
+              couple of clicks rather than a mask-building ritual.
+            </p>
+          </article>
+
+          <article>
+            <h2>Brushes, shapes and text</h2>
+            <p>
+              The tool rail covers the whole drawing workflow: a pressure-friendly brush with
+              adjustable size and hardness, a hard-edged pencil, an airbrush, an eraser, a paint
+              bucket and a gradient tool. For structured work there are line, arrow, rectangle,
+              ellipse, polygon and star shapes plus a text tool, and an eyedropper for sampling any
+              colour already on the canvas.
+            </p>
+          </article>
+
+          <article>
+            <h2>Retouching tools</h2>
+            <p>
+              Four retouching brushes handle the repair work that separates a snapshot from a
+              finished image: blur for softening a distracting background, sharpen for recovering
+              local detail, smudge for pushing pixels around, and a clone stamp for copying one part
+              of the image over another. Each one respects the active selection and the active
+              layer.
+            </p>
+          </article>
+
+          <article>
+            <h2>Photo adjustments and filters</h2>
+            <p>
+              Fifteen adjustment sliders cover tone (exposure, brightness, contrast, highlights,
+              shadows, gamma), colour (saturation, vibrance, temperature, tint, hue shift) and
+              detail (clarity, softness, grain, vignette). All of them preview live on the active
+              layer before you commit. On top of that sits a filter gallery with grayscale, noir,
+              sepia, invert, vivid, fade, warm, cool, vintage, duotone, posterize, threshold,
+              solarize, emboss, edge detect, pencil sketch, bloom, pixelate and vignette presets.
+            </p>
+          </article>
+
+          <article>
+            <h2>Canvas geometry</h2>
+            <p>
+              Resize the image or the canvas independently, with an anchor grid that decides where
+              the existing pixels land. Crop to a selection, trim transparent edges automatically,
+              rotate by 90 degrees in either direction or by 180, and flip horizontally or
+              vertically. Every one of these operations goes through the same unlimited undo history
+              as a brush stroke.
+            </p>
+          </article>
+
+          <article>
+            <h2>Opening and exporting files</h2>
+            <p>
+              Open a PNG, JPEG, WebP, GIF or SVG by dropping it onto the window, picking it from
+              disk, or pasting it straight from the clipboard. Export back out as PNG, JPEG or WebP
+              with control over quality and output scale. Work in progress can be saved as a
+              <code>.paint</code> project file that preserves the full layer stack, so you can close
+              the tab and pick the document up later.
+            </p>
+          </article>
+
+          <article>
+            <h2>Built for keyboard-driven work</h2>
+            <p>
+              The shortcut map follows the conventions you already know from other editors — single
+              keys for tools, the usual modifiers for undo, redo, select all, copy and paste, space
+              plus drag to pan and scroll to zoom. Press <kbd>?</kbd> at any time for the full list.
+              A dark and a light theme are both available and the choice is remembered between
+              visits.
+            </p>
+          </article>
+        </div>
+
+        <section class="about-faq">
+          <h2>Frequently asked questions</h2>
+
+          <h3>Do my images get uploaded anywhere?</h3>
+          <p>
+            No. Paint Studio has no server-side component at all. Images are decoded into an HTML
+            canvas inside your own browser tab and every operation runs there. Nothing is
+            transmitted, stored remotely or shared with a third party, which makes the editor safe
+            for photographs, screenshots and documents you would not want to hand to an online
+            service.
+          </p>
+
+          <h3>Is it free?</h3>
+          <p>
+            Yes, completely, with no account, no trial period, no watermark on exports and no
+            feature held back behind a paywall. The project is open source and released under the
+            MIT licence.
+          </p>
+
+          <h3>Does it work offline?</h3>
+          <p>
+            After the first visit, yes. A service worker caches the application shell, so the editor
+            keeps loading without a connection and can be installed to your home screen or dock as a
+            progressive web app.
+          </p>
+
+          <h3>Does it work on a phone or tablet?</h3>
+          <p>
+            The interface adapts to small screens and the canvas responds to touch and stylus input.
+            A tablet with a pen is a genuinely comfortable way to draw; a phone is better suited to
+            quick crops, adjustments and filters than to detailed retouching.
+          </p>
+
+          <h3>How large an image can it handle?</h3>
+          <p>
+            Documents up to 8000 × 8000 pixels can be created directly. The practical ceiling
+            depends on how much memory your browser will give the tab, since every layer is a full
+            canvas buffer — a handful of layers at print resolution is fine on a normal laptop.
+          </p>
+
+          <h3>Can I use it instead of Photoshop or GIMP?</h3>
+          <p>
+            For layered compositing, retouching, colour correction, cropping and export, it covers
+            the same ground. What it deliberately does not do is CMYK output, colour management,
+            RAW development or scripting, so it complements a desktop suite for quick work rather
+            than replacing one in a print production pipeline.
+          </p>
+        </section>
+
+        <footer class="about-foot">
+          <p>
+            Paint Studio is an open source project. The source code is available on
+            <a href="https://github.com/RobertLib/paint" rel="noopener">GitHub</a>.
+          </p>
+        </footer>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── app shell ───────────────────────── -->
+    <div id="app" class="app" hidden>
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="icon"><use href="#i-brush" /></svg>
+          </span>
+          <span class="brand-name">Paint<em>Studio</em></span>
+        </div>
+
+        <nav class="menubar" id="menubar" aria-label="Main menu"></nav>
+
+        <div class="topbar-doc">
+          <input
+            id="docTitle"
+            class="doc-title"
+            type="text"
+            value="Untitled"
+            spellcheck="false"
+            aria-label="Document name"
+          />
+          <span class="doc-meta" id="docMeta"></span>
+        </div>
+
+        <div class="topbar-actions">
+          <button class="icon-btn" id="undoBtn" data-tip="Undo · ⌘Z" aria-label="Undo">
+            <svg class="icon"><use href="#i-undo" /></svg>
+          </button>
+          <button class="icon-btn" id="redoBtn" data-tip="Redo · ⇧⌘Z" aria-label="Redo">
+            <svg class="icon"><use href="#i-redo" /></svg>
+          </button>
+          <span class="sep" aria-hidden="true"></span>
+          <button class="icon-btn" id="themeBtn" data-tip="Toggle theme" aria-label="Toggle theme">
+            <svg class="icon"><use href="#i-moon" /></svg>
+          </button>
+          <button class="icon-btn" id="helpBtn" data-tip="Keyboard shortcuts · ?" aria-label="Keyboard shortcuts">
+            <svg class="icon"><use href="#i-help" /></svg>
+          </button>
+          <button class="btn btn-primary" id="exportBtn">
+            <svg class="icon"><use href="#i-download" /></svg>
+            <span>Export</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="optionsbar" id="optionsBar"></div>
+
+      <main class="workspace">
+        <aside class="rail" id="toolRail" aria-label="Tools"></aside>
+
+        <section class="stage" id="stage">
+          <canvas id="view" class="view-canvas"></canvas>
+          <div class="stage-layer" id="stageLayer"></div>
+
+          <div class="stage-hud">
+            <div class="zoombar">
+              <button class="icon-btn sm" id="zoomOutBtn" data-tip="Zoom out · ⌘−" aria-label="Zoom out">
+                <svg class="icon"><use href="#i-minus" /></svg>
+              </button>
+              <button class="zoom-value" id="zoomValue" data-tip="Reset to 100% · ⌘1">100%</button>
+              <button class="icon-btn sm" id="zoomInBtn" data-tip="Zoom in · ⌘+" aria-label="Zoom in">
+                <svg class="icon"><use href="#i-plus" /></svg>
+              </button>
+              <span class="sep" aria-hidden="true"></span>
+              <button class="icon-btn sm" id="fitBtn" data-tip="Fit to screen · ⌘0" aria-label="Fit to screen">
+                <svg class="icon"><use href="#i-fit" /></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="dropzone" id="dropzone">
+            <div class="dropzone-card">
+              <svg class="icon"><use href="#i-image" /></svg>
+              <strong>Drop image to open</strong>
+              <span>PNG · JPEG · WebP · GIF · SVG</span>
+            </div>
+          </div>
+        </section>
+
+        <aside class="sidebar" id="sidebar" aria-label="Panels">
+          <section class="panel color-panel">
+            <header class="panel-head">
+              <h2>Color</h2>
+              <button class="icon-btn sm" id="pickFromCanvas" data-tip="Pick color from canvas · I" aria-label="Pick color from canvas">
+                <svg class="icon"><use href="#i-eyedropper" /></svg>
+              </button>
+            </header>
+
+            <div class="color-body">
+              <div class="color-chips">
+                <button class="chip chip-primary is-active" id="primaryChip" data-tip="Primary color">
+                  <span class="chip-fill"></span>
+                </button>
+                <button class="chip chip-secondary" id="secondaryChip" data-tip="Secondary color">
+                  <span class="chip-fill"></span>
+                </button>
+                <div class="chip-actions">
+                  <button class="icon-btn xs" id="swapColorsBtn" data-tip="Swap colors · X" aria-label="Swap colors">
+                    <svg class="icon"><use href="#i-swap" /></svg>
+                  </button>
+                  <button class="icon-btn xs" id="resetColorsBtn" data-tip="Reset to black / white" aria-label="Reset colors">
+                    <svg class="icon"><use href="#i-reset" /></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="sv-field" id="svField">
+                <canvas id="svCanvas" width="240" height="140"></canvas>
+                <span class="sv-thumb" id="svThumb"></span>
+              </div>
+
+              <div class="slider-stack">
+                <div class="hue-track"><input type="range" id="hueSlider" min="0" max="360" value="0" aria-label="Hue" /></div>
+                <div class="alpha-track" id="alphaTrack"><input type="range" id="alphaSlider" min="0" max="100" value="100" aria-label="Opacity" /></div>
+              </div>
+
+              <div class="color-fields">
+                <label class="field hex-field">
+                  <span>HEX</span>
+                  <input type="text" id="hexInput" value="#111111" spellcheck="false" maxlength="9" />
+                </label>
+                <div class="rgb-readout" id="rgbReadout">17, 17, 17</div>
+              </div>
+
+              <div class="swatches" id="swatchGrid"></div>
+              <div class="recents">
+                <span class="recents-label">Recent</span>
+                <div class="recents-row" id="recentRow"></div>
+              </div>
+            </div>
+          </section>
+
+          <div class="tabs" role="tablist">
+            <button class="tab is-active" data-tab="layers" role="tab">
+              <svg class="icon"><use href="#i-layers" /></svg><span>Layers</span>
+            </button>
+            <button class="tab" data-tab="adjust" role="tab">
+              <svg class="icon"><use href="#i-sliders" /></svg><span>Adjust</span>
+            </button>
+            <button class="tab" data-tab="filters" role="tab">
+              <svg class="icon"><use href="#i-sparkles" /></svg><span>Filters</span>
+            </button>
+          </div>
+
+          <div class="tab-panels">
+            <section class="tab-panel is-active" data-panel="layers">
+              <div class="layer-props">
+                <div class="prop-row">
+                  <label for="layerBlend">Blend</label>
+                  <select id="layerBlend" class="select"></select>
+                </div>
+                <div class="prop-row">
+                  <label for="layerOpacity">Opacity</label>
+                  <div class="range-cell">
+                    <input type="range" id="layerOpacity" min="0" max="100" value="100" />
+                    <output id="layerOpacityOut">100%</output>
+                  </div>
+                </div>
+              </div>
+              <div class="layer-list" id="layerList" role="list"></div>
+              <div class="layer-toolbar">
+                <button class="icon-btn sm" id="addLayerBtn" data-tip="New layer · ⇧⌘N" aria-label="New layer"><svg class="icon"><use href="#i-plus" /></svg></button>
+                <button class="icon-btn sm" id="dupLayerBtn" data-tip="Duplicate layer · ⌘J" aria-label="Duplicate layer"><svg class="icon"><use href="#i-copy" /></svg></button>
+                <button class="icon-btn sm" id="mergeLayerBtn" data-tip="Merge down · ⌘E" aria-label="Merge down"><svg class="icon"><use href="#i-merge" /></svg></button>
+                <span class="spacer"></span>
+                <button class="icon-btn sm danger" id="delLayerBtn" data-tip="Delete layer" aria-label="Delete layer"><svg class="icon"><use href="#i-trash" /></svg></button>
+              </div>
+            </section>
+
+            <section class="tab-panel" data-panel="adjust">
+              <div class="adjust-list" id="adjustList"></div>
+              <div class="panel-actions">
+                <button class="btn btn-ghost" id="adjustResetBtn">Reset</button>
+                <button class="btn btn-primary" id="adjustApplyBtn">Apply</button>
+              </div>
+              <p class="panel-hint">Adjustments preview live on the active layer and apply inside the selection when one exists.</p>
+            </section>
+
+            <section class="tab-panel" data-panel="filters">
+              <div class="filter-grid" id="filterGrid"></div>
+              <p class="panel-hint">Filters apply to the active layer — or to the selected area only.</p>
+            </section>
+          </div>
+        </aside>
+      </main>
+
+      <footer class="statusbar">
+        <span class="status-item" id="statusTool">Brush</span>
+        <span class="status-item" id="statusPos">—</span>
+        <span class="status-item" id="statusSize">—</span>
+        <span class="status-item" id="statusSel"></span>
+        <span class="spacer"></span>
+        <span class="status-item" id="statusHint">Space + drag to pan · Scroll to zoom</span>
+      </footer>
+    </div>
+
+    <!-- ───────────────────────── dialogs ───────────────────────── -->
+    <dialog id="welcomeDialog" class="dialog welcome">
+      <div class="welcome-hero">
+        <span class="brand-mark lg" aria-hidden="true">
+          <svg class="icon"><use href="#i-brush" /></svg>
+        </span>
+        <h2>Paint<em>Studio</em></h2>
+        <p>A complete image editor in your browser. Layers, selections, retouching and filters — nothing ever leaves your device.</p>
+      </div>
+
+      <div class="welcome-grid">
+        <button class="start-card" data-start="new">
+          <svg class="icon"><use href="#i-file" /></svg>
+          <strong>New canvas</strong>
+          <span>Start from a blank document</span>
+        </button>
+        <button class="start-card" data-start="open">
+          <svg class="icon"><use href="#i-image" /></svg>
+          <strong>Open image</strong>
+          <span>Edit a photo from your device</span>
+        </button>
+        <button class="start-card" data-start="paste">
+          <svg class="icon"><use href="#i-paste" /></svg>
+          <strong>Paste</strong>
+          <span>From clipboard · ⌘V</span>
+        </button>
+        <button class="start-card" data-start="project">
+          <svg class="icon"><use href="#i-folder" /></svg>
+          <strong>Open project</strong>
+          <span>Resume a .paint file</span>
+        </button>
+      </div>
+
+      <div class="preset-row" id="welcomePresets"></div>
+
+      <p class="welcome-more">
+        <button type="button" class="link-btn" id="welcomeAbout">What can Paint Studio do?</button>
+      </p>
+    </dialog>
+
+    <dialog id="newDocDialog" class="dialog">
+      <header class="dialog-head">
+        <h2>New document</h2>
+        <button class="icon-btn sm" data-close aria-label="Close"><svg class="icon"><use href="#i-close" /></svg></button>
+      </header>
+      <div class="dialog-body">
+        <div class="preset-row" id="newDocPresets"></div>
+        <div class="form-grid">
+          <label class="field"><span>Width</span><input type="number" id="newDocW" min="1" max="8000" value="1600" /></label>
+          <label class="field"><span>Height</span><input type="number" id="newDocH" min="1" max="8000" value="1000" /></label>
+        </div>
+        <div class="radio-row" id="newDocBg">
+          <label><input type="radio" name="newbg" value="#ffffff" checked /><span>White</span></label>
+          <label><input type="radio" name="newbg" value="transparent" /><span>Transparent</span></label>
+          <label><input type="radio" name="newbg" value="custom" /><span>Primary color</span></label>
+        </div>
+      </div>
+      <footer class="dialog-foot">
+        <button class="btn btn-ghost" data-close>Cancel</button>
+        <button class="btn btn-primary" id="newDocCreate">Create</button>
+      </footer>
+    </dialog>
+
+    <dialog id="resizeDialog" class="dialog">
+      <header class="dialog-head">
+        <h2 id="resizeTitle">Image size</h2>
+        <button class="icon-btn sm" data-close aria-label="Close"><svg class="icon"><use href="#i-close" /></svg></button>
+      </header>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <label class="field"><span>Width</span><input type="number" id="resizeW" min="1" max="12000" /></label>
+          <label class="field"><span>Height</span><input type="number" id="resizeH" min="1" max="12000" /></label>
+        </div>
+        <label class="check"><input type="checkbox" id="resizeLock" checked /><span>Keep aspect ratio</span></label>
+        <div class="anchor-picker" id="anchorPicker" hidden>
+          <span class="anchor-label">Anchor</span>
+          <div class="anchor-grid"></div>
+        </div>
+      </div>
+      <footer class="dialog-foot">
+        <button class="btn btn-ghost" data-close>Cancel</button>
+        <button class="btn btn-primary" id="resizeApply">Apply</button>
+      </footer>
+    </dialog>
+
+    <dialog id="exportDialog" class="dialog">
+      <header class="dialog-head">
+        <h2>Export image</h2>
+        <button class="icon-btn sm" data-close aria-label="Close"><svg class="icon"><use href="#i-close" /></svg></button>
+      </header>
+      <div class="dialog-body">
+        <div class="export-preview"><canvas id="exportPreview"></canvas></div>
+        <div class="seg" id="exportFormat" role="radiogroup" aria-label="Format">
+          <button class="seg-btn is-active" data-format="image/png">PNG</button>
+          <button class="seg-btn" data-format="image/jpeg">JPEG</button>
+          <button class="seg-btn" data-format="image/webp">WebP</button>
+        </div>
+        <div class="prop-row" id="qualityRow" hidden>
+          <label for="exportQuality">Quality</label>
+          <div class="range-cell">
+            <input type="range" id="exportQuality" min="10" max="100" value="92" />
+            <output id="exportQualityOut">92</output>
+          </div>
+        </div>
+        <div class="prop-row">
+          <label for="exportScale">Scale</label>
+          <div class="range-cell">
+            <input type="range" id="exportScale" min="10" max="400" step="5" value="100" />
+            <output id="exportScaleOut">100%</output>
+          </div>
+        </div>
+        <label class="field"><span>File name</span><input type="text" id="exportName" value="paint-studio" spellcheck="false" /></label>
+        <p class="panel-hint" id="exportInfo"></p>
+      </div>
+      <footer class="dialog-foot">
+        <button class="btn btn-ghost" data-close>Cancel</button>
+        <button class="btn btn-primary" id="exportGo">
+          <svg class="icon"><use href="#i-download" /></svg><span>Download</span>
+        </button>
+      </footer>
+    </dialog>
+
+    <dialog id="shortcutsDialog" class="dialog wide">
+      <header class="dialog-head">
+        <h2>Keyboard shortcuts</h2>
+        <button class="icon-btn sm" data-close aria-label="Close"><svg class="icon"><use href="#i-close" /></svg></button>
+      </header>
+      <div class="dialog-body">
+        <div class="shortcut-columns" id="shortcutList"></div>
+      </div>
+    </dialog>
+
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+    <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+    <div class="menu-popover" id="menuPopover" hidden></div>
+    <div class="busy" id="busy" hidden><span class="spinner"></span><span id="busyLabel">Working…</span></div>
+
+    <input type="file" id="imageInput" accept="image/*" hidden />
+    <input type="file" id="projectInput" accept=".paint,application/json" hidden />
+
+    <noscript>
+      <div class="noscript">Paint Studio needs JavaScript to run. Please enable it and reload.</div>
+    </noscript>
+
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>

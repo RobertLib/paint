@@ -1,0 +1,588 @@
+/* ==========================================================================
+   Paint Studio — application shell layout
+   ========================================================================== */
+
+.app {
+  display: grid;
+  grid-template-rows: var(--h-top) var(--h-options) 1fr var(--h-status);
+  height: 100dvh;
+  min-height: 0;
+  background: var(--bg-0);
+  animation: app-in var(--t-slow) both;
+}
+
+@keyframes app-in {
+  from {
+    opacity: 0;
+    transform: scale(0.995);
+  }
+}
+
+/* ------------------------------- top bar --------------------------------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px 0 12px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--stroke);
+  box-shadow: var(--sh-1);
+  z-index: 30;
+  min-width: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-right: 4px;
+  flex: none;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  color: #fff;
+  background: linear-gradient(140deg, var(--accent), var(--accent-2));
+  box-shadow: 0 2px 10px var(--accent-glow), var(--sh-inset);
+}
+
+.brand-mark .icon {
+  width: 17px;
+  height: 17px;
+  stroke-width: 2;
+}
+
+.brand-mark.lg {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+}
+
+.brand-mark.lg .icon {
+  width: 28px;
+  height: 28px;
+}
+
+.brand-name {
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+}
+
+.brand-name em {
+  font-style: normal;
+  font-weight: 450;
+  color: var(--text-2);
+}
+
+.menubar {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.menubar::-webkit-scrollbar {
+  display: none;
+}
+
+.topbar-doc {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+.doc-title {
+  max-width: 240px;
+  min-width: 60px;
+  padding: 4px 8px;
+  font-size: 12.5px;
+  font-weight: 550;
+  text-align: right;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  transition: background var(--t-fast), border-color var(--t-fast);
+  field-sizing: content;
+}
+
+.doc-title:hover {
+  background: var(--bg-2);
+}
+
+.doc-title:focus {
+  background: var(--bg-2);
+  border-color: var(--accent);
+  text-align: left;
+}
+
+.doc-meta {
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+/* ----------------------------- options bar ------------------------------- */
+
+.optionsbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  background: linear-gradient(var(--bg-1), var(--bg-1)) padding-box;
+  border-bottom: 1px solid var(--stroke);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  z-index: 20;
+  min-width: 0;
+}
+
+.optionsbar::-webkit-scrollbar {
+  display: none;
+}
+
+.opt-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-right: 6px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex: none;
+}
+
+.opt-title .icon {
+  width: 17px;
+  height: 17px;
+  color: var(--accent);
+}
+
+/* ------------------------------ workspace -------------------------------- */
+
+.workspace {
+  display: grid;
+  grid-template-columns: var(--w-rail) minmax(0, 1fr) var(--w-side);
+  min-height: 0;
+  min-width: 0;
+}
+
+.workspace.side-collapsed {
+  grid-template-columns: var(--w-rail) minmax(0, 1fr) 0;
+}
+
+.workspace.side-collapsed .sidebar {
+  display: none;
+}
+
+/* -------------------------------- rail ----------------------------------- */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 6px;
+  background: var(--bg-1);
+  border-right: 1px solid var(--stroke);
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 15;
+}
+
+.rail-group {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+
+.rail-group + .rail-group {
+  padding-top: 6px;
+  border-top: 1px solid var(--stroke);
+}
+
+.rail-label {
+  grid-column: 1 / -1;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding: 1px 2px 2px;
+}
+
+/* -------------------------------- stage ---------------------------------- */
+
+.stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: var(--stage);
+  overflow: hidden;
+  touch-action: none;
+}
+
+.view-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* holds DOM-based overlays positioned in stage space (text editor, handles) */
+.stage-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.stage-hud {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.zoombar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--r-full);
+  background: var(--glass);
+  backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid var(--stroke-2);
+  box-shadow: var(--sh-2);
+  pointer-events: auto;
+}
+
+.zoom-value {
+  min-width: 54px;
+  padding: 3px 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  border-radius: var(--r-sm);
+  transition: background var(--t-fast);
+}
+
+.zoom-value:hover {
+  background: var(--bg-3);
+}
+
+.dropzone {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 8;
+  background: rgba(10, 11, 15, 0.6);
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-med);
+}
+
+.dropzone.is-active {
+  opacity: 1;
+}
+
+.dropzone-card {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 34px 52px;
+  border-radius: var(--r-xl);
+  border: 2px dashed var(--accent);
+  background: var(--bg-1);
+  box-shadow: var(--sh-3);
+  text-align: center;
+  transform: scale(0.96);
+  transition: transform var(--t-med);
+}
+
+.dropzone.is-active .dropzone-card {
+  transform: scale(1);
+}
+
+.dropzone-card .icon {
+  width: 34px;
+  height: 34px;
+  color: var(--accent);
+}
+
+.dropzone-card strong {
+  font-size: 15px;
+}
+
+.dropzone-card span {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+/* ------------------------------- sidebar --------------------------------- */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--bg-1);
+  border-left: 1px solid var(--stroke);
+  z-index: 15;
+}
+
+.panel {
+  border-bottom: 1px solid var(--stroke);
+  flex: none;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 8px 0 12px;
+}
+
+.panel-head h2 {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-3);
+  flex: 1 1 auto;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 6px 0;
+  flex: none;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 7px 4px;
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--text-2);
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  border-bottom: 2px solid transparent;
+  transition: color var(--t-fast), background var(--t-fast),
+    border-color var(--t-fast);
+}
+
+.tab .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.tab:hover {
+  color: var(--text);
+  background: var(--bg-2);
+}
+
+.tab.is-active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  background: var(--bg-2);
+}
+
+.tab-panels {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  border-top: 1px solid var(--stroke);
+}
+
+.tab-panel {
+  display: none;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+}
+
+.tab-panel.is-active {
+  display: flex;
+  animation: panel-in var(--t-med) both;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+.panel-hint {
+  padding: 8px 12px 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-3);
+  border-top: 1px solid var(--stroke);
+}
+
+.panel-actions {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--stroke);
+}
+
+.panel-actions .btn {
+  flex: 1 1 0;
+  justify-content: center;
+}
+
+/* ------------------------------ status bar ------------------------------- */
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 12px;
+  font-size: 11px;
+  color: var(--text-3);
+  background: var(--bg-1);
+  border-top: 1px solid var(--stroke);
+  z-index: 20;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.status-item {
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-item:empty {
+  display: none;
+}
+
+#statusTool {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ------------------------------ responsive ------------------------------- */
+
+@media (max-width: 1180px) {
+  :root {
+    --w-side: 262px;
+  }
+}
+
+@media (max-width: 980px) {
+  :root {
+    --w-rail: 46px;
+    --h-top: 46px;
+  }
+
+  .rail-group {
+    grid-template-columns: 1fr;
+  }
+
+  .rail-label {
+    display: none;
+  }
+
+  .brand-name,
+  .topbar-doc {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .workspace {
+    grid-template-columns: var(--w-rail) minmax(0, 1fr);
+  }
+
+  .sidebar {
+    position: fixed;
+    top: calc(var(--h-top) + var(--h-options));
+    right: 0;
+    bottom: var(--h-status);
+    width: min(320px, 88vw);
+    box-shadow: var(--sh-3);
+    transform: translateX(101%);
+    transition: transform var(--t-slow);
+    z-index: 40;
+  }
+
+  .sidebar.is-open {
+    transform: none;
+  }
+
+  .statusbar {
+    gap: 10px;
+  }
+
+  #statusHint {
+    display: none;
+  }
+
+  /* keep undo/redo and Export reachable: the rest lives in the menus */
+  .topbar {
+    padding: 0 6px 0 8px;
+    gap: 4px;
+  }
+
+  #themeBtn,
+  #helpBtn,
+  .topbar-actions .sep {
+    display: none;
+  }
+
+  .menu-btn {
+    padding: 0 7px;
+  }
+}
+
+@media (max-width: 520px) {
+  .brand {
+    display: none;
+  }
+
+  .btn-primary#exportBtn span {
+    display: none;
+  }
+
+  #exportBtn {
+    padding: 0 9px;
+  }
+}

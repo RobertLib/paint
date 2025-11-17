@@ -1,0 +1,26 @@
+{
+  "name": "Paint Studio — Image Editor & Drawing App",
+  "short_name": "Paint Studio",
+  "description": "Free online image editor and drawing app with layers, selections, retouching tools, photo adjustments and filters. Everything runs on your device.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a0b0f",
+  "theme_color": "#6f7dff",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["graphics", "photo", "productivity", "utilities"]
+}

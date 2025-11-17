@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Paint Studio">
+  <!-- Full-bleed variant: iOS and Android apply their own mask, so this one
+       must not round its own corners or it ends up double-rounded. -->
+  <defs>
+    <linearGradient id="mark" x1="0.06" y1="0" x2="0.94" y2="1">
+      <stop offset="0" stop-color="#7b88ff" />
+      <stop offset="1" stop-color="#a855f7" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#mark)" />
+  <g
+    transform="translate(256 256) scale(12) translate(-11.7 -12.7)"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M9.1 11.9l8-8.1a2.85 2.85 0 0 1 4.05 4.05l-8.1 8.05" />
+    <path d="M7.05 14.95a3 3 0 0 0-3 3c0 1.35-2.5 1.5-2 2 1.1 1.1 2.5 2 4 2a4 4 0 0 0 4-4 3 3 0 0 0-3-3z" />
+  </g>
+</svg>
