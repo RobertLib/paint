@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Primary Meta Tags -->
+    <title>Paint - Online Drawing Application | Free Drawing Tool</title>
+    <meta
+      name="title"
+      content="Paint - Online Drawing Application | Free Drawing Tool"
+    />
+    <meta
+      name="description"
+      content="Free online drawing application with professional tools. Draw with pencil, eraser, lines, shapes and color fill. Simple and intuitive interface."
+    />
+    <meta
+      name="keywords"
+      content="paint, drawing, online drawing, drawing app, canvas, drawing tool, free paint"
+    />
+    <meta name="author" content="Paint App" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://robertlib.github.io/paint/" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://robertlib.github.io/paint/" />
+    <meta property="og:title" content="Paint - Online Drawing Application" />
+    <meta
+      property="og:description"
+      content="Free online drawing application with professional tools. Draw with pencil, eraser, lines, shapes and color fill."
+    />
+    <meta
+      property="og:image"
+      content="https://robertlib.github.io/paint/og-image.png"
+    />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://robertlib.github.io/paint/" />
+    <meta
+      property="twitter:title"
+      content="Paint - Online Drawing Application"
+    />
+    <meta
+      property="twitter:description"
+      content="Free online drawing application with professional tools."
+    />
+    <meta
+      property="twitter:image"
+      content="https://robertlib.github.io/paint/og-image.png"
+    />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="./favicon.ico" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="./favicon-32x32.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="./favicon-16x16.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="./apple-touch-icon.png"
+    />
+    <link rel="manifest" href="./manifest.json" />
+
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#4a90e2" />
+    <meta name="msapplication-TileColor" content="#4a90e2" />
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Paint - Online Drawing Application",
+        "description": "Free online drawing application with professional tools",
+        "url": "https://robertlib.github.io/paint",
+        "applicationCategory": "DesignApplication",
+        "operatingSystem": "Any",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "browserRequirements": "Requires JavaScript. Requires HTML5.",
+        "softwareVersion": "1.0.0",
+        "author": {
+          "@type": "Organization",
+          "name": "Paint App"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="toolbar">
+        <div class="tool-section">
+          <h3>Tools</h3>
+          <div class="tools">
+            <button class="tool-btn active" data-tool="pencil" title="Pencil">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path
+                  d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                />
+              </svg>
+            </button>
+            <button class="tool-btn" data-tool="eraser" title="Eraser">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path d="M20 20H7L3 16l10-10 8 8-1 6zM10 10l4 4" />
+              </svg>
+            </button>
+            <button class="tool-btn" data-tool="line" title="Line">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <line x1="5" y1="19" x2="19" y2="5" stroke-width="2" />
+              </svg>
+            </button>
+            <button class="tool-btn" data-tool="rectangle" title="Rectangle">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <rect x="5" y="7" width="14" height="10" stroke-width="2" />
+              </svg>
+            </button>
+            <button class="tool-btn" data-tool="circle" title="Circle">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <circle cx="12" cy="12" r="7" stroke-width="2" />
+              </svg>
+            </button>
+            <button class="tool-btn" data-tool="fill" title="Fill">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path d="M16 8l-8 8M3 21h18M12 3v6" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="tool-section">
+          <h3>Color</h3>
+          <div class="color-picker-wrapper">
+            <input type="color" id="colorPicker" value="#000000" />
+            <div class="color-presets">
+              <button
+                class="color-preset"
+                data-color="#000000"
+                style="background: #000000"
+              ></button>
+              <button
+                class="color-preset"
+                data-color="#ffffff"
+                style="background: #ffffff"
+              ></button>
+              <button
+                class="color-preset"
+                data-color="#ff0000"
+                style="background: #ff0000"
+              ></button>
+              <button
+                class="color-preset"
+                data-color="#00ff00"
+                style="background: #00ff00"
+              ></button>
+              <button
+                class="color-preset"
+                data-color="#0000ff"
+                style="background: #0000ff"
+              ></button>
+              <button
+                class="color-preset"
+                data-color="#ffff00"
+                style="background: #ffff00"
+              ></button>
+              <button
+                class="color-preset"
+                data-color="#ff00ff"
+                style="background: #ff00ff"
+              ></button>
+              <button
+                class="color-preset"
+                data-color="#00ffff"
+                style="background: #00ffff"
+              ></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="tool-section">
+          <h3>Brush Size</h3>
+          <input type="range" id="brushSize" min="1" max="50" value="3" />
+          <span id="brushSizeValue">3</span>px
+        </div>
+
+        <div class="tool-section">
+          <h3>Actions</h3>
+          <button class="action-btn" id="clearBtn">Clear All</button>
+          <button class="action-btn" id="saveBtn">Save</button>
+        </div>
+      </div>
+
+      <div class="canvas-container">
+        <canvas id="canvas"></canvas>
+      </div>
+    </div>
+    <script src="main.js"></script>
+  </body>
+</html>

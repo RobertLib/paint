@@ -1,0 +1,6 @@
+# robots.txt for Paint App
+User-agent: *
+Allow: /
+
+# Sitemaps
+Sitemap: https://robertlib.github.io/paint/sitemap.xml
