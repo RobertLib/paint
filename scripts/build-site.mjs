@@ -7,7 +7,13 @@
      /<slug>/index.html, /cs/<slug>/…     one page per task (pages.mjs)
      /404.html, /sitemap.xml
      scripts/site/lastmod.json            per-page <lastmod> (see lastmod.mjs)
-   and refreshes the analytics + modulepreload blocks of /editor/index.html.
+   refreshes the analytics + modulepreload blocks of /editor/index.html and
+   keeps the "id" of /manifest.json in step with SITE.base.
+
+   Every page it writes carries GENERATOR_MARK. A page folder whose
+   index.html has the mark but which this build no longer produces (a renamed
+   or dropped slug or language) is removed, so it can't stay deployed with a
+   self-canonical outside the sitemap. Nothing without the mark is touched.
 
    The output is committed, so the site still deploys without a build step —
    run `node scripts/build-site.mjs` after changing copy or settings.
@@ -15,8 +21,17 @@
    ========================================================================== */
 
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmdirSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SITE } from "./site/config.mjs";
 import { readLastmod, writeLastmod } from "./site/lastmod.mjs";
@@ -30,6 +45,9 @@ const CONTENT = Object.fromEntries(
 );
 const DEFAULT_LANG = SITE.languages[0];
 const TODAY = new Date().toISOString().slice(0, 10);
+
+/** Marks a page as this generator's output; only marked pages are ever deleted. */
+const GENERATOR_MARK = `<meta name="generator" content="paint-studio-site" />`;
 
 /* --------------------------------- helpers -------------------------------- */
 
@@ -113,6 +131,7 @@ function head({ lang, path, page, title, description, jsonld, ui }) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    ${GENERATOR_MARK}
     <title>${esc(plain(title))}</title>
     <meta name="description" content="${esc(plain(description))}" />
     <link rel="canonical" href="${absolute(path)}" />
@@ -546,6 +565,73 @@ function write(path, html) {
   return file;
 }
 
+/* ------------------------------- stale pages ------------------------------ */
+
+/** Never page folders, whatever they contain (dot-folders are skipped too). */
+const NOT_PAGES = new Set(["editor", "js", "css", "docs", "scripts", "node_modules"]);
+
+/**
+ * Remove page folders an earlier build wrote that this build no longer
+ * produces (`produced` holds paths like "cs/oriznout-obrazek/"). Only
+ * /<a>/ and /<a>/<b>/ are looked at, only an index.html carrying
+ * GENERATOR_MARK is deleted, and its folder only goes once nothing else is
+ * left in it. Returns the removed paths.
+ */
+function removeStalePages(produced) {
+  const removed = [];
+  const isDir = (p) => {
+    try {
+      return lstatSync(p).isDirectory(); // a symlink is never followed
+    } catch {
+      return false;
+    }
+  };
+  const subdirs = (dir) =>
+    readdirSync(dir)
+      .filter((name) => !name.startsWith(".") && isDir(join(dir, name)))
+      .sort();
+  const prune = (dir) => {
+    const path = `${relative(ROOT, dir).split("\\").join("/")}/`;
+    if (produced.has(path)) return;
+    const file = join(dir, "index.html");
+    if (!existsSync(file) || !lstatSync(file).isFile()) return;
+    if (!readFileSync(file, "utf8").includes(GENERATOR_MARK)) return;
+    unlinkSync(file);
+    removed.push(path);
+    const rest = readdirSync(dir);
+    if (rest.every((name) => name === ".DS_Store")) {
+      for (const name of rest) unlinkSync(join(dir, name));
+      rmdirSync(dir);
+    }
+  };
+  for (const top of subdirs(ROOT)) {
+    if (NOT_PAGES.has(top)) continue;
+    const dir = join(ROOT, top);
+    for (const sub of subdirs(dir)) prune(join(dir, sub));
+    prune(dir);
+  }
+  return removed;
+}
+
+/* --------------------------------- manifest -------------------------------- */
+
+/**
+ * The manifest "id" resolves against the origin of start_url, not against
+ * the manifest's own URL, so "./" would claim the whole github.io account.
+ * It has to be the site's path ("/paint/"); keep it in step with SITE.base.
+ * Only that one value is rewritten, so the file keeps its formatting.
+ */
+function syncManifestId() {
+  const file = join(ROOT, "manifest.json");
+  const text = readFileSync(file, "utf8");
+  const id = new URL(SITE.base).pathname;
+  if (JSON.parse(text).id === id) return false;
+  const next = text.replace(/("id"\s*:\s*)"(?:[^"\\]|\\.)*"/, (_, key) => `${key}${JSON.stringify(id)}`);
+  if (JSON.parse(next).id !== id) throw new Error(`Set "id": "${id}" in manifest.json by hand`);
+  writeFileSync(file, next);
+  return true;
+}
+
 for (const lang of SITE.languages) {
   for (const key of ["ogImageAlt", "navMain", "breadcrumbLabel", "dropUnsupported"]) {
     if (!CONTENT[lang].ui[key]) throw new Error(`Missing ${lang} ui.${key}`);
@@ -555,7 +641,10 @@ for (const lang of SITE.languages) {
 
 let count = 0;
 const hashes = new Map(); // absolute URL → content hash, in sitemap order
+const produced = new Set(); // page paths written by this build
 const emit = (path, html) => {
+  if (produced.has(path)) throw new Error(`Two pages share the path /${path}`);
+  produced.add(path);
   write(path, html);
   hashes.set(absolute(path), contentHash(html));
   count++;
@@ -582,7 +671,11 @@ const ordered = Object.fromEntries(
 writeLastmod(ordered);
 writeFileSync(join(ROOT, `${SITE.indexNowKey}.txt`), SITE.indexNowKey);
 patchEditor();
+const manifestUpdated = syncManifestId();
+const stale = removeStalePages(produced);
 const changed = Object.values(ordered).filter((e) => e.date === TODAY).length;
 console.log(
   `Wrote ${count} pages (${changed} dated ${TODAY}), 404.html, sitemap.xml, lastmod.json and refreshed editor/index.html`
 );
+if (manifestUpdated) console.log(`Set the manifest.json id to ${new URL(SITE.base).pathname}`);
+for (const path of stale) console.log(`Removed the stale page /${path}`);

@@ -261,6 +261,9 @@ function pixelPass(img, v, docW, docH, region) {
           const cur = mx === 0 ? 0 : (mx - mn) / mx;
           s += vib * (1 - cur) * 1.2;
         }
+        // full desaturation plus negative vibrance stops at gray: a negative
+        // factor would invert the hue
+        if (s < 0) s = 0;
         if (s !== 1) {
           r = l + (r - l) * s;
           g = l + (g - l) * s;
@@ -583,6 +586,30 @@ export function gaussianBlur(canvas, px) {
 }
 
 /**
+ * How far blurCanvas(σ) reaches, for running it on part of an image (see
+ * effectArea). The browser's blur filter downsamples large radii on a grid of
+ * its own, so its result is exact only on the whole image (null); the
+ * JavaScript fallback is exact on any part with this much margin.
+ */
+function blurReach(sigma) {
+  if (supportsFilter()) return null;
+  if (!(sigma > 0.3)) return 0;
+  return boxRadii(sigma)
+    .filter((r) => r >= 1)
+    .reduce((a, r) => a + r, 0);
+}
+
+/** A per-pixel effect: no pixel depends on any other. */
+const PER_PIXEL = () => 0;
+
+/** Pixelate's block edge, relative to the (document) image size by default. */
+function blockSize(o) {
+  const s = o.scale;
+  const full = o.block ?? Math.max(2, Math.round(Math.min(o.image.width, o.image.height) / s / 90));
+  return Math.max(1, Math.round(scaled(full, s, 2)));
+}
+
+/**
  * A spatial size for an effect run at `scale` (thumbnail pixels per document
  * pixel): sizes shrink with the image so a thumbnail looks like the full
  * result, but never below `min`, where the effect would vanish entirely.
@@ -591,10 +618,18 @@ const scaled = (size, scale, min) => (scale < 1 ? Math.max(min, size * scale) : 
 
 const grayOf = (d, i) => 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
 
+/**
+ * `fn(canvas, opts)` returns the processed canvas (it may work in place).
+ * `reach(opts)` tells how far a pixel's result depends on its neighbours, so
+ * the effect can run on just a selected part (see effectArea); without it, or
+ * when it returns null, the effect needs the whole image. `grid(opts)` is the
+ * block size such a part must be aligned to.
+ */
 export const EFFECTS = [
   {
     id: "grayscale",
     name: t("Grayscale"),
+    reach: PER_PIXEL,
     fn: (c) =>
       eachPixel(c, (d, i) => {
         const g = grayOf(d, i);
@@ -604,6 +639,7 @@ export const EFFECTS = [
   {
     id: "noir",
     name: t("Noir"),
+    reach: PER_PIXEL,
     fn: (c) =>
       eachPixel(c, (d, i) => {
         const g = clamp255((grayOf(d, i) - 128) * 1.55 + 118);
@@ -613,6 +649,7 @@ export const EFFECTS = [
   {
     id: "sepia",
     name: t("Sepia"),
+    reach: PER_PIXEL,
     fn: (c) =>
       eachPixel(c, (d, i) => {
         const r = d[i],
@@ -626,6 +663,7 @@ export const EFFECTS = [
   {
     id: "invert",
     name: t("Invert"),
+    reach: PER_PIXEL,
     fn: (c) =>
       eachPixel(c, (d, i) => {
         d[i] = 255 - d[i];
@@ -636,6 +674,7 @@ export const EFFECTS = [
   {
     id: "vivid",
     name: t("Vivid"),
+    reach: PER_PIXEL,
     fn: (c) =>
       eachPixel(c, (d, i) => {
         const l = grayOf(d, i);
@@ -647,6 +686,7 @@ export const EFFECTS = [
   {
     id: "fade",
     name: t("Fade"),
+    reach: PER_PIXEL,
     fn: (c) =>
       eachPixel(c, (d, i) => {
         const l = grayOf(d, i);
@@ -658,6 +698,7 @@ export const EFFECTS = [
   {
     id: "warm",
     name: t("Warm"),
+    reach: PER_PIXEL,
     fn: (c) =>
       eachPixel(c, (d, i) => {
         d[i] = clamp255(d[i] * 1.11 + 8);
@@ -668,6 +709,7 @@ export const EFFECTS = [
   {
     id: "cool",
     name: t("Cool"),
+    reach: PER_PIXEL,
     fn: (c) =>
       eachPixel(c, (d, i) => {
         d[i] = clamp255(d[i] * 0.92);
@@ -678,6 +720,7 @@ export const EFFECTS = [
   {
     id: "vintage",
     name: t("Vintage"),
+    reach: PER_PIXEL,
     fn: (c) =>
       eachPixel(c, (d, i) => {
         const r = d[i],
@@ -691,6 +734,7 @@ export const EFFECTS = [
   {
     id: "duotone",
     name: t("Duotone"),
+    reach: PER_PIXEL,
     fn: (c, { primary, secondary }) => {
       const a = parseColor(primary) || { r: 20, g: 20, b: 60 };
       const b = parseColor(secondary) || { r: 255, g: 220, b: 120 };
@@ -705,6 +749,7 @@ export const EFFECTS = [
   {
     id: "posterize",
     name: t("Posterize"),
+    reach: PER_PIXEL,
     fn: (c) => {
       const steps = 5;
       const q = 255 / (steps - 1);
@@ -718,6 +763,7 @@ export const EFFECTS = [
   {
     id: "threshold",
     name: t("Threshold"),
+    reach: PER_PIXEL,
     fn: (c) =>
       eachPixel(c, (d, i) => {
         const g = grayOf(d, i) > 128 ? 255 : 0;
@@ -727,6 +773,7 @@ export const EFFECTS = [
   {
     id: "solarize",
     name: t("Solarize"),
+    reach: PER_PIXEL,
     fn: (c) =>
       eachPixel(c, (d, i) => {
         for (let k = 0; k < 3; k++) {
@@ -737,17 +784,20 @@ export const EFFECTS = [
   {
     id: "blur",
     name: t("Soft blur"),
+    reach: (o) => blurReach(scaled(o.radius ?? 5, o.scale, 0.5)),
     fn: (c, o) => blurCanvas(c, scaled(o.radius ?? 5, o.scale, 0.5)),
   },
   {
     id: "sharpen",
     name: t("Sharpen"),
+    reach: () => 1,
     // a 1 px radius cannot shrink, so a thumbnail gets a gentler amount
     fn: (c, o) => unsharp(c, 0.9 * scaled(1, o.scale, 0.3), 1),
   },
   {
     id: "emboss",
     name: t("Emboss"),
+    reach: () => 1,
     fn: (c, o) => {
       // identity plus a directional derivative; the derivative of a
       // downscaled image is weaker by the scale factor
@@ -758,6 +808,7 @@ export const EFFECTS = [
   {
     id: "edges",
     name: t("Edge detect"),
+    reach: () => 1,
     fn: (c, o) => {
       const k = scaled(1, o.scale, 0.3);
       const out = convolve(c, [0, -k, 0, -k, 4 * k, -k, 0, -k, 0], { divisor: 1 });
@@ -770,6 +821,7 @@ export const EFFECTS = [
   {
     id: "sketch",
     name: t("Pencil sketch"),
+    reach: (o) => blurReach(scaled(6, o.scale, 0.75)),
     fn: (c, o) => {
       const base = makeCanvas(c.width, c.height);
       ctx2d(base).drawImage(c, 0, 0);
@@ -799,6 +851,7 @@ export const EFFECTS = [
   {
     id: "bloom",
     name: t("Bloom"),
+    reach: (o) => blurReach(scaled(14, o.scale, 1)),
     fn: (c, o) => {
       const bright = makeCanvas(c.width, c.height);
       const bc = ctx2d(bright);
@@ -826,23 +879,51 @@ export const EFFECTS = [
   {
     id: "pixelate",
     name: t("Pixelate"),
+    // every block is the average of its own pixels, on a grid that starts at
+    // the image origin — so a part aligned to the grid pixelates exactly
+    reach: PER_PIXEL,
+    grid: blockSize,
     fn: (c, o) => {
-      // the default block is relative to the (document) image size
-      const s = o.scale;
-      const full = o.block ?? Math.max(2, Math.round(Math.min(c.width, c.height) / s / 90));
-      const size = Math.max(1, Math.round(scaled(full, s, 2)));
-      const small = makeCanvas(
-        Math.max(1, Math.ceil(c.width / size)),
-        Math.max(1, Math.ceil(c.height / size))
-      );
-      const sc = ctx2d(small);
-      sc.imageSmoothingEnabled = true;
-      sc.drawImage(c, 0, 0, small.width, small.height);
-      const out = makeCanvas(c.width, c.height);
-      const oc = ctx2d(out);
-      oc.imageSmoothingEnabled = false;
-      oc.drawImage(small, 0, 0, c.width, c.height);
-      return out;
+      const size = blockSize(o);
+      const w = c.width;
+      const h = c.height;
+      const ctx = c.getContext("2d");
+      const img = ctx.getImageData(0, 0, w, h);
+      const d = img.data;
+      for (let by = 0; by < h; by += size) {
+        const y1 = Math.min(h, by + size);
+        for (let bx = 0; bx < w; bx += size) {
+          const x1 = Math.min(w, bx + size);
+          // colours weighted by alpha, so transparent pixels add no darkness
+          let a = 0;
+          let r = 0;
+          let g = 0;
+          let b = 0;
+          for (let y = by; y < y1; y++) {
+            for (let i = (y * w + bx) * 4, e = (y * w + x1) * 4; i < e; i += 4) {
+              const k = d[i + 3];
+              a += k;
+              r += d[i] * k;
+              g += d[i + 1] * k;
+              b += d[i + 2] * k;
+            }
+          }
+          const A = a / ((x1 - bx) * (y1 - by));
+          const R = a ? r / a : 0;
+          const G = a ? g / a : 0;
+          const B = a ? b / a : 0;
+          for (let y = by; y < y1; y++) {
+            for (let i = (y * w + bx) * 4, e = (y * w + x1) * 4; i < e; i += 4) {
+              d[i] = R;
+              d[i + 1] = G;
+              d[i + 2] = B;
+              d[i + 3] = A;
+            }
+          }
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      return c;
     },
   },
   {
@@ -877,13 +958,42 @@ export const EFFECTS = [
  * `opts` carries the colours (`primary`, `secondary`), effect parameters
  * (`radius`, `block`) and `scale` — image pixels per document pixel (0 < scale
  * ≤ 1, default 1) — so a thumbnail renders spatial effects at its own size.
+ * When `canvas` is only a part of the image (see effectArea), `image` gives
+ * the whole image's { width, height }.
  */
 export function applyEffect(id, canvas, opts = {}) {
   const effect = EFFECTS.find((e) => e.id === id);
   if (!effect) return canvas;
+  return effect.fn(canvas, effectOptions(opts, canvas.width, canvas.height)) || canvas;
+}
+
+function effectOptions(opts, width, height) {
   const s = Number(opts.scale);
   const scale = s > 0 && s < 1 ? s : 1;
-  return effect.fn(canvas, { ...opts, scale }) || canvas;
+  return { ...opts, scale, image: opts.image || { width, height } };
+}
+
+/**
+ * The part of a w × h image an effect has to process for its result to be
+ * exact inside `rect`: `rect` grown by how far the effect looks at
+ * neighbours, and out to its block grid. Null when that is the whole image,
+ * or when the effect depends on all of it (its size, as the vignette does).
+ * Run the effect on that part with `image: { width: w, height: h }`.
+ */
+export function effectArea(id, rect, w, h, opts = {}) {
+  const effect = EFFECTS.find((e) => e.id === id);
+  const r = clipRect(rect, w, h);
+  if (!effect?.reach || !r) return null;
+  const o = effectOptions(opts, w, h);
+  const m = effect.reach(o);
+  if (m == null) return null;
+  const g = effect.grid ? effect.grid(o) : 1;
+  const x0 = Math.max(0, Math.floor((r.x - m) / g) * g);
+  const y0 = Math.max(0, Math.floor((r.y - m) / g) * g);
+  const x1 = Math.min(w, Math.ceil((r.x + r.w + m) / g) * g);
+  const y1 = Math.min(h, Math.ceil((r.y + r.h + m) / g) * g);
+  if (x0 === 0 && y0 === 0 && x1 === w && y1 === h) return null;
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 
 /* ---------------------------- levels & curves ---------------------------- */

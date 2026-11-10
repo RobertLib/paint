@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Paint Studio — Editor</title>
     <script>
-      // pick the saved (or system) theme before the first paint — no dark flash
+      // pick the theme before the first paint — no dark flash: the one the user
+      // chose with the theme toggle, otherwise the system's
       (function () {
         var theme = null;
         try {
-          theme = (JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null") || {}).theme;
+          theme = (JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null") || {}).themeChoice;
         } catch (e) {}
         if (theme !== "light" && theme !== "dark") {
           theme = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
@@ -211,7 +212,7 @@
             </div>
           </div>
 
-          <div class="taskbar" id="taskbar" role="region" aria-live="polite" hidden></div>
+          <div class="taskbar" id="taskbar" role="region" aria-label="Next steps" aria-live="polite" hidden></div>
 
           <div class="dropzone" id="dropzone">
             <div class="dropzone-card">
@@ -228,6 +229,9 @@
               <h2>Color</h2>
               <button class="icon-btn sm" id="pickFromCanvas" data-tip="Pick color from canvas · I" aria-label="Pick color from canvas">
                 <svg class="icon"><use href="#i-eyedropper" /></svg>
+              </button>
+              <button class="icon-btn sm sidebar-close" id="sidebarClose" data-tip="Close panels" aria-label="Close panels" aria-controls="sidebar">
+                <svg class="icon"><use href="#i-close" /></svg>
               </button>
             </header>
 
@@ -447,10 +451,10 @@
       <div class="dialog-body">
         <div class="export-preview"><canvas id="exportPreview"></canvas></div>
         <div class="seg" id="exportFormat" role="radiogroup" aria-label="Format">
-          <button class="seg-btn is-active" data-format="image/png">PNG</button>
-          <button class="seg-btn" data-format="image/jpeg">JPEG</button>
-          <button class="seg-btn" data-format="image/webp">WebP</button>
-          <button class="seg-btn" data-format="psd">PSD</button>
+          <button class="seg-btn is-active" data-format="image/png" role="radio" aria-checked="true">PNG</button>
+          <button class="seg-btn" data-format="image/jpeg" role="radio" aria-checked="false">JPEG</button>
+          <button class="seg-btn" data-format="image/webp" role="radio" aria-checked="false">WebP</button>
+          <button class="seg-btn" data-format="psd" role="radio" aria-checked="false">PSD</button>
         </div>
         <p class="panel-hint" id="exportFormatHint"></p>
         <div class="prop-row" id="qualityRow" hidden>
@@ -485,10 +489,10 @@
       </header>
       <div class="dialog-body">
         <div class="seg" id="levelsChannel" role="radiogroup" aria-label="Channel">
-          <button class="seg-btn is-active" data-channel="rgb">RGB</button>
-          <button class="seg-btn" data-channel="r">Red</button>
-          <button class="seg-btn" data-channel="g">Green</button>
-          <button class="seg-btn" data-channel="b">Blue</button>
+          <button class="seg-btn is-active" data-channel="rgb" role="radio" aria-checked="true">RGB</button>
+          <button class="seg-btn" data-channel="r" role="radio" aria-checked="false">Red</button>
+          <button class="seg-btn" data-channel="g" role="radio" aria-checked="false">Green</button>
+          <button class="seg-btn" data-channel="b" role="radio" aria-checked="false">Blue</button>
         </div>
         <canvas class="histogram" id="levelsHist" width="512" height="150"></canvas>
         <span class="anchor-label">Input levels</span>
@@ -535,10 +539,10 @@
       </header>
       <div class="dialog-body">
         <div class="seg" id="curvesChannel" role="radiogroup" aria-label="Channel">
-          <button class="seg-btn is-active" data-channel="rgb">RGB</button>
-          <button class="seg-btn" data-channel="r">Red</button>
-          <button class="seg-btn" data-channel="g">Green</button>
-          <button class="seg-btn" data-channel="b">Blue</button>
+          <button class="seg-btn is-active" data-channel="rgb" role="radio" aria-checked="true">RGB</button>
+          <button class="seg-btn" data-channel="r" role="radio" aria-checked="false">Red</button>
+          <button class="seg-btn" data-channel="g" role="radio" aria-checked="false">Green</button>
+          <button class="seg-btn" data-channel="b" role="radio" aria-checked="false">Blue</button>
         </div>
         <canvas class="curves-canvas" id="curvesCanvas" width="512" height="512"></canvas>
         <p class="panel-hint" id="curvesReadout">Click the curve to add a point · drag a point off the graph to remove it</p>

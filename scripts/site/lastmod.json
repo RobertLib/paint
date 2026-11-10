@@ -1,14 +1,14 @@
 {
   "https://robertlib.github.io/paint/": {
-    "hash": "b6bbb77e6614ad5c",
+    "hash": "cb324cc5ce4903f5",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/cs/": {
-    "hash": "90da32a3e3aa7049",
+    "hash": "81a2d4c85c48ded7",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/crop-image/": {
-    "hash": "20c3022255efce2d",
+    "hash": "6151934f79ee655b",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/cs/oriznout-obrazek/": {
@@ -16,11 +16,11 @@
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/resize-image/": {
-    "hash": "c25a978dd2028fc3",
+    "hash": "d82e4248a6c60f05",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/cs/zmenit-velikost-obrazku/": {
-    "hash": "bc47ef2d899954b4",
+    "hash": "8669e24998a0a746",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/rotate-image/": {
@@ -28,7 +28,7 @@
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/cs/otocit-obrazek/": {
-    "hash": "737e24ca584a421f",
+    "hash": "ac0991245ca8ff29",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/compress-image/": {
@@ -60,7 +60,7 @@
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/cs/webp-na-jpg/": {
-    "hash": "ca27dc2b8a4c2e56",
+    "hash": "c24a8396ab8a33ad",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/heic-to-jpg/": {
@@ -68,23 +68,23 @@
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/cs/heic-na-jpg/": {
-    "hash": "d35e44366965ce41",
+    "hash": "aa536f1297a24df5",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/blur-image/": {
-    "hash": "593166d7b03db37d",
+    "hash": "7bdc784fa25f6e7e",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/cs/rozmazat-fotku/": {
-    "hash": "a61ee08c8f3d9e10",
+    "hash": "fc41ef9e3f338df1",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/add-text-to-photo/": {
-    "hash": "87628419c9ce869f",
+    "hash": "c121a85bbbfe4249",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/cs/pridat-text-do-fotky/": {
-    "hash": "c156f2d8ade1c5d1",
+    "hash": "fd68e9a2d885629f",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/black-and-white-photo/": {
@@ -104,11 +104,11 @@
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/photo-filters/": {
-    "hash": "1a89545d8c5f96d7",
+    "hash": "aa0ca6bae19fdc57",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/cs/filtry-na-fotky/": {
-    "hash": "4e501ab583b595f4",
+    "hash": "6ab85790c19314ca",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/brighten-photo/": {
@@ -128,7 +128,7 @@
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/color-picker-from-image/": {
-    "hash": "24440ed8a520c9a4",
+    "hash": "60d9d9d2ed8d4afe",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/cs/zjistit-barvu-z-obrazku/": {
@@ -136,19 +136,19 @@
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/draw-on-image/": {
-    "hash": "5c8f50fa236ac1c6",
+    "hash": "97f03ef97ef9461f",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/cs/kresleni-do-fotky/": {
-    "hash": "db824a18f4a5fa40",
+    "hash": "c54be55082dede90",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/paint-online/": {
-    "hash": "2f40b026539ced67",
+    "hash": "d4b710f7e9117a43",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/cs/malovani-online/": {
-    "hash": "a09295b803f71478",
+    "hash": "7b7cd8e2ff8e229e",
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/open-psd-online/": {
@@ -164,7 +164,7 @@
     "date": "2026-11-10"
   },
   "https://robertlib.github.io/paint/cs/retus-fotky/": {
-    "hash": "1f121abdf56c75fd",
+    "hash": "dd83389babdb3e7e",
     "date": "2026-11-10"
   }
 }

@@ -13,7 +13,7 @@ import { Doc } from "./doc.js";
 import { history, sessionsBusy, settleSessions } from "./history.js";
 import { t } from "./i18n.js";
 import { emit, on, state } from "./state.js";
-import { idbGet, idbSet } from "./store.js";
+import { idbGet, idbRead, idbUpdate } from "./store.js";
 
 export const SLOT_CURRENT = "autosave";
 export const SLOT_PREVIOUS = "autosave-prev";
@@ -23,8 +23,15 @@ const MAX_PIXELS = 8000 * 8000 * 3;
 
 let timer = 0;
 let saving = null;
-/** session id held by the current slot (undefined = not read yet) */
-let storedSid;
+
+/* the user hears once per document why it is not being autosaved — and
+   again only after a later write has succeeded */
+const warned = new WeakMap();
+function warn(doc, reason, msg, kind) {
+  if (warned.get(doc) === reason) return;
+  warned.set(doc, reason);
+  emit("toast", { msg, kind });
+}
 
 /* every document gets a session id; a restored one keeps its own */
 const sids = new WeakMap();
@@ -47,7 +54,11 @@ async function save() {
     schedule();
     return false;
   }
-  if (tooBig(doc)) return false;
+  if (tooBig(doc)) {
+    const msg = t("This document is too large to be autosaved — save the project to keep your work");
+    warn(doc, "big", msg, "info");
+    return false;
+  }
   if (saving) {
     // one write at a time; then write again with the newest state
     await saving;
@@ -58,17 +69,23 @@ async function save() {
       const sid = sidOf(doc);
       const data = await doc.toStorable();
       const thumb = await thumbnail(doc);
-      if (storedSid === undefined) storedSid = (await idbGet(SLOT_CURRENT))?.sid ?? null;
-      const existing = storedSid !== sid ? await idbGet(SLOT_CURRENT) : null;
-      // another document's session moves aside instead of being overwritten
-      if (existing?.doc) await idbSet(SLOT_PREVIOUS, existing);
-      const ok = await idbSet(SLOT_CURRENT, { sid, savedAt: Date.now(), thumb, doc: data });
-      if (ok === null) throw new Error("IndexedDB write failed");
-      storedSid = sid;
+      const entry = { sid, savedAt: Date.now(), thumb, doc: data };
+      // the slot is read again on every write — another tab or window may
+      // have saved its own document there since. That session moves to the
+      // second slot in the same transaction: either both writes land or
+      // neither does, so it is never overwritten without being kept
+      await idbUpdate(SLOT_CURRENT, (existing) =>
+        existing?.doc && existing.sid !== sid
+          ? { [SLOT_PREVIOUS]: existing, [SLOT_CURRENT]: entry }
+          : { [SLOT_CURRENT]: entry }
+      );
+      warned.delete(doc);
       emit("autosave", { ok: true });
       return true;
     } catch (err) {
       console.warn("[paint] autosave failed", err);
+      const msg = t("Autosave failed — this browser's storage may be full or blocked. Save the project to keep your work");
+      warn(doc, "failed", msg, "err");
       emit("autosave", { ok: false });
       return false;
     }
@@ -132,8 +149,18 @@ export async function listSessions() {
   return all.filter((s) => s && (!open || s.sid !== open));
 }
 
-export async function loadAutosave(slot = SLOT_CURRENT) {
-  const entry = await idbGet(slot);
+/**
+ * Load a stored session: the one in `slot` — or, given its `sid`, the one
+ * with that id in whichever slot holds it now (another tab may have moved
+ * it). Resolves null when there is no such session; rejects when storage
+ * fails, which is not the same as the session being gone.
+ */
+export async function loadAutosave(slot = SLOT_CURRENT, sid = null) {
+  let entry = await idbRead(slot);
+  if (sid && entry?.sid !== sid) {
+    entry = await idbRead(slot === SLOT_PREVIOUS ? SLOT_CURRENT : SLOT_PREVIOUS);
+    if (entry?.sid !== sid) return null;
+  }
   if (!entry?.doc) return null;
   const doc = await Doc.fromJSON(entry.doc);
   sids.set(doc, entry.sid || newSid());
@@ -159,6 +186,10 @@ export function initAutosave() {
     // a freshly opened document is saved right away (the session before it
     // moves to the second slot)
     if (reason === "open") schedule();
+  });
+  // a new title is part of the document too
+  on("doc-renamed", () => {
+    if (state.doc) schedule();
   });
   on("flush-autosave", () => flushAutosave());
   // last chance when the tab goes away

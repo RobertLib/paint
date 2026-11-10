@@ -2,8 +2,11 @@
 #
 # Regenerates every raster icon from the SVG sources.
 #
-#   icon.svg           rounded tile  → favicons (browser tabs)
-#   icon-maskable.svg  full bleed    → PWA + Apple touch icon (the OS masks it)
+#   icon.svg           rounded tile  → favicons and the PWA "any" icons, used
+#                                      as they are where nothing masks them
+#                                      (Windows taskbar and Start, shortcuts)
+#   icon-maskable.svg  full bleed    → PWA "maskable" icons + Apple touch icon
+#                                      (Android and iOS cut their own shape)
 #   og-image.svg       social card   → og-image.png
 #
 # Rendering goes through rsvg-convert: ImageMagick's built-in SVG renderer
@@ -55,10 +58,14 @@ render icon.svg 48 .favicon-48.png
 rm -f .favicon-48.png
 cp icon.svg favicon.svg
 
-# Apple touch icon + PWA icons — full bleed so the platform mask fits
+# PWA "any" icons — the rounded tile, shown unmasked (manifest purpose "any")
+render icon.svg 192 icon-192x192.png
+render icon.svg 512 icon-512x512.png
+
+# Apple touch icon + PWA maskable icons — full bleed so the platform mask fits
 render icon-maskable.svg 180 apple-touch-icon.png
-render icon-maskable.svg 192 icon-192x192.png
-render icon-maskable.svg 512 icon-512x512.png
+render icon-maskable.svg 192 icon-maskable-192x192.png
+render icon-maskable.svg 512 icon-maskable-512x512.png
 
 # Social card
 rsvg-convert -w 1200 -h 630 og-image.svg -o og-image.png
@@ -66,7 +73,8 @@ rsvg-convert -w 1200 -h 630 og-image.svg -o og-image.png
 echo "✓ Done:"
 status=0
 for f in favicon.svg favicon.ico favicon-16x16.png favicon-32x32.png \
-  apple-touch-icon.png icon-192x192.png icon-512x512.png og-image.png; do
+  icon-192x192.png icon-512x512.png apple-touch-icon.png \
+  icon-maskable-192x192.png icon-maskable-512x512.png og-image.png; do
   if [[ $f == *.svg ]]; then
     size="vector"
   elif ! size=$("${im_identify[@]}" -format '%wx%h ' "$f" 2>&1); then

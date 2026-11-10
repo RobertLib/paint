@@ -16,7 +16,7 @@ import { openExportDialog, openResizeDialog } from "./menus.js";
 import { emit, on, setTool, state } from "./state.js";
 import { openCurves, openLevels } from "./tone.js";
 import { TOOLS } from "./tools.js";
-import { icon, openTab } from "./ui.js";
+import { icon, openTab, sideScroll } from "./ui.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -65,10 +65,18 @@ async function copyHex() {
   }
 }
 
-const colorText = () => {
+/** The live readout: a swatch, the HEX and the RGB values (phones drop RGB). */
+function showColor(el) {
   const c = pickedColor();
-  return `${rgbToHex(c).toUpperCase()} · RGB ${c.r}, ${c.g}, ${c.b}`;
-};
+  const hex = rgbToHex(c).toUpperCase();
+  el.innerHTML = `<i class="taskbar-swatch"></i><span>${hex}</span><span class="taskbar-rgb"> · RGB ${c.r}, ${c.g}, ${c.b}</span>`;
+  el.firstElementChild.style.background = hex;
+  // the readout is the answer: on a phone it keeps its width, the actions scroll
+  el.classList.add("is-readout");
+}
+
+/** The colour listener of the task bar shown last (a task can be started again). */
+let offColor = null;
 
 const TASKS = {
   crop: {
@@ -211,17 +219,24 @@ function showBar(task) {
       )
       .join("")}</span>
     <button class="icon-btn sm" data-task-close aria-label="${t("Close")}">${icon("i-close")}</button>`;
-  $("#taskbarText").textContent = task.live ? `${task.hint}` : task.hint || "";
+  $("#taskbarText").textContent = task.hint || "";
+  // a live readout keeps a compact place on phones, where hints are hidden
+  bar.classList.toggle("is-live", !!task.live);
   bar.hidden = false;
+  // on a phone the actions scroll sideways: fade the edge with more
+  sideScroll($(".taskbar-actions", bar));
   bar.onclick = (e) => {
     const btn = e.target.closest("[data-task-action]");
     if (btn) actions[Number(btn.dataset.taskAction)]?.run();
     if (e.target.closest("[data-task-close]")) bar.hidden = true;
   };
+  offColor?.();
+  offColor = null;
   if (task.live) {
-    on("color", () => {
-      if (bar.hidden) return;
-      $("#taskbarText").textContent = colorText();
+    offColor = on("color", ({ which } = {}) => {
+      // recording a recent colour changes nothing that is shown
+      if (bar.hidden || which === "recent") return;
+      showColor($("#taskbarText"));
     });
   }
 }

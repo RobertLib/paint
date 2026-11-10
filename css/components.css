@@ -1305,6 +1305,12 @@ kbd {
   position: fixed;
   z-index: 200;
   min-width: 220px;
+  /* a phone held sideways is shorter than the Layer menu: scroll inside
+     (menus.js sets the exact room below the menu button) */
+  max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 5px;
   background: var(--glass);
   -webkit-backdrop-filter: blur(18px) saturate(170%);
@@ -1335,9 +1341,14 @@ kbd {
   transition: background var(--t-fast);
 }
 
-.menu-item:hover:not(:disabled) {
+.menu-item:hover:not(:disabled),
+.menu-item:focus-visible {
   background: var(--accent-fill);
   color: var(--accent-text);
+}
+
+.menu-item:focus-visible {
+  outline: none;
 }
 
 .menu-item:disabled {
@@ -1396,6 +1407,10 @@ kbd {
   left: 50%;
   bottom: calc(46px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
+  /* sized by the messages, not by the half of the screen right of left: 50%
+     (which made every toast wrap on a phone) */
+  width: max-content;
+  max-width: min(640px, calc(100vw - 24px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1412,7 +1427,6 @@ kbd {
   margin: 0;
   padding: 0;
   border: 0;
-  width: auto;
   height: auto;
   overflow: visible;
   color: inherit;
@@ -1560,11 +1574,17 @@ kbd {
   pointer-events: auto;
 }
 
-.panel-toggle {
+.panel-toggle,
+.icon-btn.sidebar-close {
   display: none;
 }
 
 @media (max-width: 760px) {
+  /* the open panels cover the stage button: they close from inside too */
+  .icon-btn.sidebar-close {
+    display: grid;
+  }
+
   .panel-toggle {
     display: grid;
     place-items: center;
@@ -1656,6 +1676,17 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
+/* the colour picker's live readout: a swatch, HEX and RGB */
+.taskbar-swatch {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-right: 6px;
+  vertical-align: -2px;
+  border-radius: 4px;
+  border: 1px solid var(--stroke-3);
+}
+
 .taskbar-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1677,7 +1708,27 @@ kbd {
     animation: none;
   }
 
+  /* hints stay on the landing page; a live readout (the colour picker's HEX)
+     is the answer itself and keeps a compact place */
   .taskbar-text {
+    display: none;
+  }
+
+  .taskbar.is-live .taskbar-text {
+    display: block;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
+  .taskbar.is-live .taskbar-text.is-readout {
+    flex: none;
+  }
+
+  .taskbar-rgb {
     display: none;
   }
 
@@ -1761,6 +1812,14 @@ kbd {
 .layer-thumb.is-target {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* the thumbnails are buttons (layer pixels / mask): the keyboard focus must
+   not look like the accent outline of the edit target */
+.layer-thumb:focus-visible {
+  outline: 2px dashed var(--text);
+  outline-offset: 1px;
+  border-radius: var(--r-xs);
 }
 
 .mask-thumb {

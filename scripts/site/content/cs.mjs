@@ -43,7 +43,7 @@ export default {
     features: [
       {
         h2: "Vrstvy, masky a režimy prolnutí",
-        p: "Skládejte obrázek z libovolného počtu vrstev jako v desktopovém editoru. V panelu Vrstvy je přejmenujete, zamknete, skryjete, nastavíte jim krytí a přetažením změníte jejich pořadí. Šestnáct režimů prolnutí pomáhá se stíny, světly i barevným tónováním. Maska vrstvy skryje část obrazu bez mazání: černou barvou skrýváte, bílou zase odkrýváte. Hotovou vrstvu spojíte s vrstvou pod ní příkazem Sloučit dolů, celý dokument příkazem Sloučit do jedné vrstvy.",
+        p: "Skládejte obrázek z libovolného počtu vrstev jako v desktopovém editoru. V panelu Vrstvy je přejmenujete, zamknete, skryjete, nastavíte jim krytí a přetažením změníte jejich pořadí. Sedmnáct režimů prolnutí pomáhá se stíny, světly i barevným tónováním. Maska vrstvy skryje část obrazu bez mazání: černou barvou skrýváte, bílou zase odkrýváte. Hotovou vrstvu spojíte s vrstvou pod ní příkazem Sloučit dolů, celý dokument příkazem Sloučit do jedné vrstvy.",
       },
       {
         h2: "Výběry, které hlídají každý zásah",
@@ -51,7 +51,7 @@ export default {
       },
       {
         h2: "Štětce, tvary a text",
-        p: "Štětec má nastavitelnou velikost, krytí, tvrdost i vyhlazení tahu a reaguje na přítlak pera. Vedle něj jsou tu nástroje Tužka pro ostré pixelové čáry, Sprej, Guma, Výplň s nastavitelnou tolerancí a Přechod, lineární i kruhový. Pro přesnou práci slouží tvary Čára, Šipka, Obdélník se zaoblenými rohy, Elipsa, Mnohoúhelník a Hvězda, kreslené obrysem, výplní nebo obojím. Nástroj Text píše rovnou na plátno ve výsledném písmu a textové vrstvy zůstávají upravitelné.",
+        p: "Štětec má nastavitelnou velikost, krytí, tvrdost i vyhlazení tahu a reaguje na přítlak pera. Vedle něj jsou tu nástroje Tužka pro ostré pixelové čáry, Sprej, Guma, Výplň s nastavitelnou tolerancí a Přechod, lineární i kruhový. Pro přesnou práci slouží Čára a Šipka s nastavitelnou tloušťkou a tvary Obdélník se zaoblenými rohy, Elipsa, Mnohoúhelník a Hvězda, které kreslíte obrysem, výplní nebo obojím. Nástroj Text píše rovnou na plátno ve výsledném písmu a textové vrstvy zůstávají upravitelné.",
       },
       {
         h2: "Retuš drobných vad",
@@ -85,7 +85,7 @@ export default {
       },
       {
         q: "Funguje editor bez internetu?",
-        a: "Po první návštěvě ano. Aplikace se uloží do mezipaměti prohlížeče, takže se načte i bez připojení, a můžete si ji nainstalovat na plochu nebo do docku jako aplikaci (PWA). Rozpracovaný obrázek se průběžně ukládá do úložiště prohlížeče a při dalším otevření vám ho editor nabídne k obnovení.",
+        a: "Po první návštěvě ano. Aplikace se uloží do mezipaměti prohlížeče, takže se načte i bez připojení, a můžete si ji nainstalovat na plochu nebo do docku jako aplikaci (PWA). Rozpracovaný obrázek se průběžně ukládá do úložiště prohlížeče a při dalším otevření vám ho editor nabídne k obnovení. Výjimkou jsou velmi velké dokumenty: když všechny vrstvy dohromady přesáhnou zhruba 192 megapixelů (třeba deset vrstev 24megapixelové fotky), automatické ukládání se vynechá – takovou práci si proto ukládejte jako projekt <code>.paint</code>.",
       },
       {
         q: "Dá se používat na mobilu nebo tabletu?",
@@ -93,7 +93,7 @@ export default {
       },
       {
         q: "Jak velký obrázek editor zvládne?",
-        a: "Dokument může mít nejvýš 8000 × 8000 pixelů. Větší obrázky editor při otevření zmenší tak, aby se do tohoto rozměru vešly. Jak svižně se s velkou fotkou a mnoha vrstvami pracuje, pak závisí hlavně na výkonu a paměti vašeho zařízení.",
+        a: "Na počítači může mít dokument až 8000 × 8000 pixelů. Velikost plátna navíc omezuje prohlížeč – Safari na iPhonu a iPadu zvládne nejvýš zhruba 16,7 megapixelu. Větší obrázky editor při otevření zmenší tak, aby se do limitu vešly. Jak svižně se s velkou fotkou a mnoha vrstvami pracuje, pak závisí hlavně na výkonu a paměti vašeho zařízení.",
       },
       {
         q: "Co Paint Studio neumí?",
@@ -101,7 +101,7 @@ export default {
       },
       {
         q: "Jaké má klávesové zkratky?",
-        a: "Zkratky odpovídají zvyklostem z jiných editorů: jednotlivé klávesy přepínají nástroje, <kbd>Ctrl</kbd>+<kbd>Z</kbd> vrací krok zpět (až 60 kroků), mezerník s tažením posouvá plátno a kolečko myši přibližuje až na 3200 %. Kompletní přehled zobrazíte v editoru klávesou <kbd>?</kbd>. K dispozici je také tmavý a světlý motiv.",
+        a: "Zkratky odpovídají zvyklostem z jiných editorů: jednotlivé klávesy přepínají nástroje, <kbd>Ctrl</kbd>+<kbd>Z</kbd> vrací krok zpět (až 80 kroků, u velkých fotek méně), mezerník s tažením posouvá plátno a kolečko myši přibližuje až na 3200 %. Kompletní přehled zobrazíte v editoru klávesou <kbd>?</kbd>. K dispozici je také tmavý a světlý motiv, který se řídí nastavením systému, dokud si ho sami nezvolíte.",
       },
       {
         q: "Je editor v češtině?",
@@ -186,7 +186,7 @@ export default {
         },
         {
           h2: "Zvětšování má své meze",
-          p: "Zmenšení fotky je bezpečné: obraz zůstane ostrý a soubor bude výrazně menší. Zvětšení nad původní rozlišení ale nové detaily nepřidá, pixely se jen dopočítají a obraz změkne. Editor ke zvětšování nepoužívá umělou inteligenci, takže z malého obrázku z internetu plakát neuděláte. Pokud potřebujete jen menší soubor, můžete místo změny rozměrů použít posuvník měřítka 10–400 % přímo v dialogu „Exportovat obrázek“. Největší možný dokument má 8000 × 8000 px.",
+          p: "Zmenšení fotky je bezpečné: obraz zůstane ostrý a soubor bude výrazně menší. Zvětšení nad původní rozlišení ale nové detaily nepřidá, pixely se jen dopočítají a obraz změkne. Editor ke zvětšování nepoužívá umělou inteligenci, takže z malého obrázku z internetu plakát neuděláte. Pokud potřebujete jen menší soubor, můžete místo změny rozměrů použít posuvník měřítka 10–400 % přímo v dialogu „Exportovat obrázek“. Největší možný dokument má 8000 × 8000 px, v Safari na iPhonu a iPadu zhruba 16,7 megapixelu.",
         },
       ],
       faq: [
@@ -232,6 +232,10 @@ export default {
         {
           h2: "Jak srovnat křivý horizont",
           p: "Zvolte volné otočení – editor přepne na nástroj Transformace a kolem obrázku zobrazí rámeček. Uchopte myší místo kousek vně rámečku a táhněte, obraz se natáčí o libovolný úhel. Se stisknutou klávesou <kbd>Shift</kbd> skáče po 15°. Horizont nebo svislou hranu budovy porovnávejte s okrajem okna editoru a otočení potvrďte klávesou <kbd>Enter</kbd>. V rozích pak zůstanou prázdná místa, proto fotku nakonec ořízněte nástrojem Oříznutí tak, aby zmizela.",
+        },
+        {
+          h2: "Jak otočenou fotku uložit",
+          p: "Otočený obrázek uložíte tlačítkem Exportovat. Fotky ukládejte jako JPEG, snímky obrazovky, skeny a grafiku jako PNG. Pixely v uloženém souboru jsou už natočené správně, takže se obrázek zobrazí stejně v každém programu – i v takovém, který fotky z telefonu jinak ukazuje na boku. Po volném otočení nejdřív ořízněte prázdné rohy; kdybyste je ponechali, JPEG je vyplní bílou a PNG je zachová průhledné. Dialog „Exportovat obrázek“ ukáže odhad velikosti souboru ještě před stažením a u JPEG a WebP vyvážíte velikost a ostrost posuvníkem kvality.",
         },
       ],
       faq: [
@@ -421,6 +425,10 @@ export default {
           h2: "JPG, nebo PNG?",
           p: "WebP může obsahovat fotku i grafiku s průhledností. Pro fotografie je JPG správná volba: soubor zůstane malý a kvalita 85–90 zachová detaily. Jde-li o logo, ikonu nebo produkt na průhledném pozadí, zvolte v dialogu PNG – JPEG by průhledná místa vyplnil bílou. PNG bývá větší, zato je bezztrátový. Odhad velikosti souboru vidíte ještě před stažením, takže snadno porovnáte, který formát vyjde pro konkrétní obrázek výhodněji.",
         },
+        {
+          h2: "Úpravy před uložením",
+          p: "WebP se otevře v plnohodnotném editoru, takže ho můžete před převodem rovnou vylepšit. Nástrojem Oříznutí odstraňte okraj nebo pruh převzatý z webové stránky, v dialogu Velikost obrázku… obrázek zmenšete pro dokument či prezentaci a v panelu Korekce dolaďte jas a kontrast. Dialog „Exportovat obrázek“ pak znovu otevřete tlačítkem Exportovat a obrázek stáhněte. Úpravy se zapíšou jen do nového souboru, původní soubor .webp na disku zůstane beze změny.",
+        },
       ],
       faq: [
         {
@@ -482,7 +490,7 @@ export default {
         },
         {
           q: "Zůstane fotka v plném rozlišení?",
-          a: "Běžné fotky z iPhonu se 12 nebo 24 megapixely zůstanou v plném rozlišení. Snímky ve 48 megapixelech (8064 × 6048 px) editor při otevření nepatrně zmenší, protože dokument může mít nejvýš 8000 × 8000 px. Kvalitu JPEG pak určíte posuvníkem.",
+          a: "Na počítači zůstanou běžné fotky z iPhonu se 12 nebo 24 megapixely v plném rozlišení. Snímky ve 48 megapixelech (8064 × 6048 px) editor při otevření nepatrně zmenší, protože dokument může mít nejvýš 8000 px na stranu. Safari na iPhonu a iPadu ale zvládne plátno jen asi do 16,7 megapixelu, takže tam v plném rozlišení zůstanou 12megapixelové snímky a větší se zmenší. Kvalitu JPEG pak určíte posuvníkem.",
         },
       ],
     },
@@ -509,7 +517,7 @@ export default {
         },
         {
           h2: "Rozmazání, nebo pixelizace?",
-          p: "Rozmazání působí jemněji a na fotce méně ruší – hodí se pro kolemjdoucí v pozadí nebo detaily, které nemají odvádět pozornost. Pixelizace vytvoří typické čtverečky a na první pohled dává najevo, že bylo něco záměrně skryto, což se hodí u snímků obrazovky s osobními údaji nebo u fotek do inzerátu. Když výběru nastavíte prolnutí okraje, rozmazaná oblast plynule přejde do okolí a nebude mít ostrou hranu. Bez výběru se rozmaže celý obrázek.",
+          p: "Rozmazání působí jemněji a na fotce méně ruší – hodí se pro kolemjdoucí v pozadí nebo detaily, které nemají odvádět pozornost. Pixelizace vytvoří typické čtverečky a na první pohled dává najevo, že bylo něco záměrně skryto, což se hodí u snímků obrazovky s osobními údaji nebo u fotek do inzerátu. Když výběru nastavíte prolnutí okraje, rozmazaná oblast plynule přejde do okolí a nebude mít ostrou hranu. Rozmazání i pixelizace z lišty potřebují výběr – když žádný není, editor vás nejdřív vyzve, abyste označili, co chcete skrýt.",
         },
         {
           h2: "Rozostřené pozadí a jemné rozmazání štětcem",
@@ -558,7 +566,7 @@ export default {
         },
         {
           h2: "Text zůstává upravitelný",
-          p: "Každý nápis vznikne jako samostatná textová vrstva v panelu Vrstvy. Překlep opravíte tak, že na text znovu kliknete nástrojem Text, a nástrojem Přesun ho posunete jinam. Upravitelný zůstává, dokud do jeho vrstvy nezačnete malovat nebo ji neotočíte či nepřeklopíte – pak se z něj stanou obyčejné pixely. Pokud chcete text natočit, udělejte to až úplně nakonec. Práci uloženou jako projekt <code>.paint</code> otevřete později i se všemi vrstvami.",
+          p: "Každý nápis vznikne jako samostatná textová vrstva v panelu Vrstvy. Překlep opravíte tak, že na text znovu kliknete nástrojem Text, a nástrojem Přesun ho posunete jinam. Upravitelný zůstává, dokud se nezmění pixely jeho vrstvy. Malování, filtry, korekce (i Úrovně a Křivky), nástroj Transformace, otočení či překlopení obrázku, příkazy Sloučit dolů a Použít masku nebo přesun nástrojem Přesun při aktivním výběru z něj udělají obyčejné pixely. Pokud chcete text natočit, udělejte to až úplně nakonec. Práci uloženou jako projekt <code>.paint</code> otevřete později i se všemi vrstvami.",
         },
         {
           h2: "Meme, popisky a vodoznak",
@@ -572,7 +580,7 @@ export default {
         },
         {
           q: "Můžu text později změnit?",
-          a: "Ano. Text je na vlastní textové vrstvě, stačí na něj znovu kliknout nástrojem Text a nápis upravit. Změnu potvrďte klávesami <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (na Macu <kbd>⌘</kbd>+<kbd>Enter</kbd>). Upravitelnost končí, jakmile do vrstvy malujete nebo ji otočíte či překlopíte.",
+          a: "Ano. Text je na vlastní textové vrstvě, stačí na něj znovu kliknout nástrojem Text a nápis upravit. Změnu potvrďte klávesami <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (na Macu <kbd>⌘</kbd>+<kbd>Enter</kbd>). Upravitelnost končí, jakmile se změní pixely vrstvy – třeba malováním, filtrem, korekcí, nástrojem Transformace, otočením či překlopením obrázku nebo příkazem Sloučit dolů.",
         },
         {
           q: "Jaká písma jsou k dispozici?",
@@ -697,7 +705,7 @@ export default {
         },
         {
           h2: "Kombinování filtrů",
-          p: "Filtry se sčítají: každý další se použije na výsledek předchozího. Zkuste například kombinaci filtrů Teplé a Vinětace pro útulný podvečerní portrét, filtr Vybledlé s posuvníkem zrna v panelu Korekce pro vzhled staré fotky z alba, nebo dvojici Posterizace a Detekce hran pro komiksový efekt. Na pořadí záleží – filtr Zaostření použitý před filtrem Pixelizace dá jiný výsledek než naopak. Když se kombinace nepovede, vraťte se o několik kroků zpět, historie si pamatuje až 60 kroků.",
+          p: "Filtry se sčítají: každý další se použije na výsledek předchozího. Zkuste například kombinaci filtrů Teplé a Vinětace pro útulný podvečerní portrét, filtr Vybledlé s posuvníkem zrna v panelu Korekce pro vzhled staré fotky z alba, nebo dvojici Posterizace a Detekce hran pro komiksový efekt. Na pořadí záleží – filtr Zaostření použitý před filtrem Pixelizace dá jiný výsledek než naopak. Když se kombinace nepovede, vraťte se o několik kroků zpět, historie si pamatuje až 80 kroků, u velkých fotek méně.",
         },
         {
           h2: "Filtr jen na část fotky",
@@ -877,7 +885,7 @@ export default {
       sections: [
         {
           h2: "Šipky a rámečky pro návody a reklamace",
-          p: "Snímek obrazovky s červenou šipkou vysvětlí víc než odstavec textu. Nástroj Šipka nakreslí rovnou šipku tažením, Obdélník se zaoblenými rohy nebo Elipsa zarámují tlačítko v aplikaci, chybu v dokumentu nebo poškození na fotce zboží pro reklamaci. Tvary kreslíte obrysem, výplní, nebo obojím. Na rovné spojnice a kóty použijte nástroj Čára, další tvary nabízejí Mnohoúhelník a Hvězda. Barvu všech nástrojů nastavíte v panelu Barva.",
+          p: "Snímek obrazovky s červenou šipkou vysvětlí víc než odstavec textu. Nástroj Šipka nakreslí rovnou šipku tažením, Obdélník se zaoblenými rohy nebo Elipsa zarámují tlačítko v aplikaci, chybu v dokumentu nebo poškození na fotce zboží pro reklamaci. Obdélník i Elipsu můžete kreslit obrysem, výplní, nebo obojím. Na rovné spojnice a kóty použijte nástroj Čára. Mnohoúhelník a Hvězda nakreslí do rámečku, který natáhnete, tvar se 3 až 16 stranami nebo cípy. Barvu všech nástrojů nastavíte v panelu Barva.",
         },
         {
           h2: "Zvýrazňovač a ruční poznámky",
@@ -926,7 +934,7 @@ export default {
         },
         {
           h2: "Vrstvy pro skicu, linku a barvy",
-          p: "Kresbu si rozdělte do vrstev: na jednu skicu, na další čistou linku a pod ni barvy. Skicu pak skryjete nebo jí snížíte krytí a barvy opravujete, aniž byste poškodili obrys. Vrstev může být libovolně mnoho a 16 režimů prolnutí pomůže se stíny a světly. Přiblížení až na 3200 % umožní dokreslit detaily, historie vrátí až 60 kroků. K dispozici jsou i tvary a nástroj Text, třeba pro komiksové bubliny nebo přání k narozeninám.",
+          p: "Kresbu si rozdělte do vrstev: na jednu skicu, na další čistou linku a pod ni barvy. Skicu pak skryjete nebo jí snížíte krytí a barvy opravujete, aniž byste poškodili obrys. Vrstev může být libovolně mnoho a 17 režimů prolnutí pomůže se stíny a světly. Přiblížení až na 3200 % umožní dokreslit detaily, historie vrátí až 80 kroků (u velmi velkých pláten méně). K dispozici jsou i tvary a nástroj Text, třeba pro komiksové bubliny nebo přání k narozeninám.",
         },
         {
           h2: "Pro děti i dospělé, na čemkoli s prohlížečem",
@@ -944,11 +952,11 @@ export default {
         },
         {
           q: "Jak změnit velikost plátna?",
-          a: "Výchozí plátno má 1600 × 1000 px. Rozměry změníte v nabídce Obrázek přes Velikost plátna…, kde ukotvením zvolíte i to, kde zůstane stávající kresba. Dokument může mít nejvýš 8000 × 8000 px.",
+          a: "Výchozí plátno má 1600 × 1000 px. Rozměry změníte v nabídce Obrázek přes Velikost plátna…, kde ukotvením zvolíte i to, kde zůstane stávající kresba. Dokument může mít nejvýš 8000 × 8000 px, v Safari na iPhonu a iPadu zhruba 16,7 megapixelu.",
         },
         {
           q: "Kde najdu obrázek, když zavřu okno?",
-          a: "Editor průběžně ukládá práci do úložiště prohlížeče a při další návštěvě ve stejném prohlížeči vám ji nabídne k obnovení. Na jiném zařízení ji ale mít nebudete – pro přenos nebo zálohu uložte projekt <code>.paint</code> přes nabídku Soubor.",
+          a: "Editor průběžně ukládá práci do úložiště prohlížeče a při další návštěvě ve stejném prohlížeči vám ji nabídne k obnovení. Velmi velké dokumenty, jejichž vrstvy mají dohromady přes 192 megapixelů, se ale automaticky neukládají. Na jiném zařízení práci mít nebudete – pro přenos nebo zálohu uložte projekt <code>.paint</code> přes nabídku Soubor.",
         },
       ],
     },
@@ -1042,7 +1050,7 @@ export default {
         },
         {
           q: "Je retuš nevratná?",
-          a: "V editoru ne, historie vrátí až 60 kroků. Pro větší jistotu si před retuší v panelu Vrstvy duplikujte vrstvu a pracujte na kopii. Originál pod ní pak můžete kdykoli zobrazit a porovnat s výsledkem.",
+          a: "V editoru ne, historie vrátí až 80 kroků (u velkých fotek méně, protože ji omezuje i paměť). Pro větší jistotu si před retuší v panelu Vrstvy duplikujte vrstvu a pracujte na kopii. Originál pod ní pak můžete kdykoli zobrazit a porovnat s výsledkem.",
         },
         {
           q: "Proč retuš na fotce vytváří šmouhy?",

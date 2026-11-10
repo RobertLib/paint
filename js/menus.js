@@ -10,7 +10,15 @@ import { overlay, requestRender } from "./render.js";
 import { emit, on, opt, setOpt, setTheme, setTool, state, swapColors } from "./state.js";
 import { openCurves, openLevels } from "./tone.js";
 import { TOOL_LIST, TOOLS, isTypingTarget } from "./tools.js";
-import { MOD, icon, openTab } from "./ui.js";
+import {
+  MOD,
+  canMergeDown,
+  icon,
+  isPhoneLayout,
+  openTab,
+  setSidebarOpen,
+  sideScroll,
+} from "./ui.js";
 import { view } from "./viewport.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -99,6 +107,9 @@ const MENUS = [
     items: () => {
       const layer = state.doc?.active;
       const hasMask = !!layer?.mask;
+      const editingMask = hasMask && !!layer.editMask;
+      // what painting changes: the layer's pixels or its mask (the check)
+      const target = (mask) => () => A.setActiveLayer(state.doc.activeIndex, { mask });
       return [
         { label: t("New layer"), keys: KEY_NEW_LAYER, icon: "i-plus", run: A.addLayer, enabled: !!state.doc },
         { label: t("Duplicate layer"), keys: `${MOD}J`, icon: "i-copy", run: A.duplicateLayer, enabled: !!state.doc },
@@ -106,12 +117,14 @@ const MENUS = [
         { divider: true },
         { label: t("Add mask (reveal all)"), icon: "i-mask", run: () => A.addMask("reveal"), enabled: !!layer && !hasMask },
         { label: t("Add mask from selection"), run: () => A.addMask("selection"), enabled: !!layer && !hasMask && !!state.doc?.selection },
+        { label: t("Edit layer pixels"), icon: hasMask && !editingMask ? "i-check" : null, run: target(false), enabled: hasMask },
+        { label: t("Edit mask"), icon: editingMask ? "i-check" : null, run: target(true), enabled: hasMask },
         { label: t("Invert mask"), run: A.invertMask, enabled: hasMask },
         { label: layer?.maskEnabled === false ? t("Enable mask") : t("Disable mask"), run: () => A.toggleMaskEnabled(), enabled: hasMask },
         { label: t("Apply mask"), run: A.applyLayerMask, enabled: hasMask },
         { label: t("Delete mask"), run: A.deleteMask, enabled: hasMask },
         { divider: true },
-        { label: t("Merge down"), keys: `${MOD}E`, icon: "i-merge", run: A.mergeDown, enabled: (state.doc?.activeIndex || 0) > 0 && !state.doc?.layers[state.doc.activeIndex - 1]?.locked },
+        { label: t("Merge down"), keys: `${MOD}E`, icon: "i-merge", run: A.mergeDown, enabled: canMergeDown() },
         { label: t("Flatten image"), icon: "i-layers", run: A.flattenImage, enabled: (state.doc?.layers.length || 0) > 1 },
         { divider: true },
         { label: t("Bring forward"), run: () => A.raiseLayer(1), enabled: !!state.doc },
@@ -150,6 +163,7 @@ const MENUS = [
       },
       {
         label: t("Toggle panels"),
+        keys: "⇧F",
         icon: "i-panel",
         run: togglePanels,
       },
@@ -211,64 +225,194 @@ function quickAdjust(values) {
 
 function buildMenubar() {
   const bar = $("#menubar");
+  const pop = $("#menuPopover");
+  // a menu bar as assistive technology knows it: one tab stop, arrows inside
+  bar.setAttribute("role", "menubar");
+  pop.setAttribute("role", "menu");
   bar.innerHTML = MENUS.map(
-    (m, i) => `<button class="menu-btn" data-menu="${i}">${m.name}</button>`
+    (m, i) =>
+      `<button class="menu-btn" id="menu-btn-${i}" data-menu="${i}" role="menuitem" aria-haspopup="menu"
+               aria-expanded="false" tabindex="${i === 0 ? 0 : -1}">${m.name}</button>`
   ).join("");
+  const buttons = $$(".menu-btn", bar);
+  // narrow windows scroll the menu bar sideways
+  sideScroll(bar);
 
   let openIndex = null;
 
-  const close = () => {
-    $("#menuPopover").hidden = true;
-    $$(".menu-btn", bar).forEach((b) => b.classList.remove("is-open"));
-    openIndex = null;
+  /** Move the menu bar's tab stop — and the focus — to a menu button. */
+  const focusButton = (index) => {
+    const btn = buttons[(index + buttons.length) % buttons.length];
+    for (const b of buttons) b.tabIndex = b === btn ? 0 : -1;
+    btn.focus();
+    return btn;
   };
 
-  const open = (index, btn) => {
+  /** focus: back to the menu's button (Escape, a command picked by keyboard). */
+  const close = ({ focus = false } = {}) => {
+    const index = openIndex;
+    pop.hidden = true;
+    for (const b of buttons) {
+      b.classList.remove("is-open");
+      b.setAttribute("aria-expanded", "false");
+    }
+    openIndex = null;
+    if (focus && index !== null) focusButton(index);
+  };
+
+  /** which: "first" | "last" | "next" | "prev" among the enabled commands. */
+  const focusItem = (which) => {
+    const list = $$(".menu-item:not(:disabled)", pop);
+    if (!list.length) return;
+    const i = list.indexOf(document.activeElement);
+    const to =
+      which === "last"
+        ? list.length - 1
+        : which === "next"
+        ? (i + 1) % list.length
+        : which === "prev"
+        ? (i <= 0 ? list.length : i) - 1
+        : 0;
+    list[to].focus();
+  };
+
+  /** focus: "first" | "last" to put the keyboard in the menu as it opens. */
+  const open = (index, { focus = null } = {}) => {
     const menu = MENUS[index];
-    if (!menu) return;
+    const btn = buttons[index];
+    if (!menu || !btn) return;
     const items = menu.items();
-    const pop = $("#menuPopover");
     pop.innerHTML = items
       .map((item, i) =>
         item.divider
-          ? `<div class="menu-divider"></div>`
-          : `<button class="menu-item" data-item="${i}"${
-              item.enabled === false ? " disabled" : ""
+          ? `<div class="menu-divider" role="separator"></div>`
+          : `<button class="menu-item" data-item="${i}" role="menuitem" tabindex="-1"${
+              item.enabled === false ? ' disabled aria-disabled="true"' : ""
             }>${item.icon ? icon(item.icon) : `<span class="icon"></span>`}
                <span>${item.label}</span>
                ${item.keys ? `<span class="keys">${platformKeys(item.keys)}</span>` : ""}
              </button>`
       )
       .join("");
+    pop.setAttribute("aria-labelledby", btn.id);
     pop.hidden = false;
+    // under its button, inside what is visible of the window: the layout
+    // viewport's width (innerWidth may include an overflowing page) and the
+    // visual viewport's bottom (a phone's keyboard, pinch zoom); taller
+    // menus scroll
+    const root = document.documentElement;
+    const vv = window.visualViewport;
+    const right = vv ? Math.min(root.clientWidth, vv.offsetLeft + vv.width) : root.clientWidth;
+    const bottom = vv ? Math.min(root.clientHeight, vv.offsetTop + vv.height) : root.clientHeight;
     const r = btn.getBoundingClientRect();
-    pop.style.left = `${Math.max(4, Math.min(r.left, innerWidth - pop.offsetWidth - 8))}px`;
-    pop.style.top = `${r.bottom + 4}px`;
-    $$(".menu-btn", bar).forEach((b) => b.classList.toggle("is-open", b === btn));
+    const top = r.bottom + 4;
+    pop.style.top = `${top}px`;
+    pop.style.maxHeight = `${Math.max(96, bottom - top - 8)}px`;
+    pop.scrollTop = 0;
+    pop.style.left = `${Math.max(4, Math.min(r.left, right - pop.offsetWidth - 8))}px`;
+    for (const b of buttons) {
+      b.classList.toggle("is-open", b === btn);
+      b.setAttribute("aria-expanded", String(b === btn));
+      b.tabIndex = b === btn ? 0 : -1;
+    }
     openIndex = index;
 
     pop.onclick = (e) => {
       const el = e.target.closest("[data-item]");
-      if (!el) return;
+      if (!el || el.disabled) return;
       const item = items[Number(el.dataset.item)];
-      close();
+      // a click without a pointer came from Enter/Space: the focus returns to
+      // the menu bar (and a dialog the command opens takes it from there)
+      close({ focus: e.detail === 0 });
       item?.run?.();
     };
+    if (focus) focusItem(focus);
   };
 
   bar.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-menu]");
     if (!btn) return;
     const index = Number(btn.dataset.menu);
-    if (openIndex === index) close();
-    else open(index, btn);
+    // Enter/Space on a menu button arrive as a click without a pointer: the
+    // menu opens with its first command focused
+    const keyboard = e.detail === 0;
+    if (openIndex === index) close({ focus: keyboard });
+    else open(index, { focus: keyboard ? "first" : null });
   });
 
   bar.addEventListener("pointerover", (e) => {
     const btn = e.target.closest("[data-menu]");
     if (btn && openIndex !== null && openIndex !== Number(btn.dataset.menu)) {
-      open(Number(btn.dataset.menu), btn);
+      open(Number(btn.dataset.menu));
     }
+  });
+
+  bar.addEventListener("keydown", (e) => {
+    const btn = e.target.closest?.("[data-menu]");
+    if (!btn) return;
+    const index = Number(btn.dataset.menu);
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      const next = focusButton(index + (e.key === "ArrowLeft" ? -1 : 1));
+      // an open menu follows the focus to its neighbour
+      if (openIndex !== null) open(Number(next.dataset.menu), { focus: "first" });
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      open(index, { focus: e.key === "ArrowDown" ? "first" : "last" });
+    } else if (e.key === "Home" || e.key === "End") {
+      focusButton(e.key === "Home" ? 0 : buttons.length - 1);
+    } else {
+      // the button's own click handles Enter/Space: they are no shortcuts
+      // here (Enter would also apply a crop)
+      if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  pop.addEventListener("keydown", (e) => {
+    if (openIndex === null) return;
+    switch (e.key) {
+      case "ArrowDown":
+        focusItem("next");
+        break;
+      case "ArrowUp":
+        focusItem("prev");
+        break;
+      case "Home":
+        focusItem("first");
+        break;
+      case "End":
+        focusItem("last");
+        break;
+      case "ArrowLeft":
+      case "ArrowRight": {
+        const next = focusButton(openIndex + (e.key === "ArrowLeft" ? -1 : 1));
+        open(Number(next.dataset.menu), { focus: "first" });
+        break;
+      }
+      case "Escape":
+        close({ focus: true });
+        break;
+      case "Tab":
+        // leaving the menu closes it; the Tab itself moves on from its button
+        close({ focus: true });
+        return;
+      case "Enter":
+      case " ":
+        // the command's own click runs it
+        e.stopPropagation();
+        return;
+      default:
+        return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  // the focus left for somewhere else (a click into a field, a dialog)
+  pop.addEventListener("focusout", (e) => {
+    const to = e.relatedTarget;
+    if (openIndex !== null && to && !pop.contains(to) && !bar.contains(to)) close();
   });
 
   document.addEventListener("pointerdown", (e) => {
@@ -277,16 +421,13 @@ function buildMenubar() {
   window.addEventListener("keydown", (e) => {
     // Escape closes the menu — and only the menu, not the selection under it
     if (e.key === "Escape" && openIndex !== null) {
-      close();
+      close({ focus: bar.contains(document.activeElement) });
       e.stopImmediatePropagation();
     }
   });
 
   // tasks can open a menu programmatically
-  on("open-menu", (index) => {
-    const btn = $(`[data-menu="${index}"]`, bar);
-    if (btn) open(index, btn);
-  });
+  on("open-menu", (index) => open(index));
 }
 
 /* ================================= dialogs ================================ */
@@ -354,11 +495,13 @@ function initNewDialog() {
   });
   $("#newDocCreate").addEventListener("click", () => {
     const bg = $('#newDocBg input:checked').value;
-    A.newDocument({
+    const created = A.newDocument({
       width: Number($("#newDocW").value),
       height: Number($("#newDocH").value),
       background: bg,
     });
+    // kept the unsaved document ("discard changes?" → Cancel): stay here
+    if (!created) return;
     dialog.close();
     $("#welcomeDialog").close();
   });
@@ -373,6 +516,17 @@ const ANCHORS = [
   "left", "center", "right",
   "bottom-left", "bottom", "bottom-right",
 ];
+const ANCHOR_LABELS = {
+  "top-left": t("Top left"),
+  top: t("Top"),
+  "top-right": t("Top right"),
+  left: t("Left"),
+  center: t("Middle"),
+  right: t("Right"),
+  "bottom-left": t("Bottom left"),
+  bottom: t("Bottom"),
+  "bottom-right": t("Bottom right"),
+};
 
 function openResizeDialog(mode) {
   const doc = state.doc;
@@ -393,15 +547,21 @@ function initResizeDialog() {
   wireDialog(dialog);
 
   const grid = $("#anchorPicker .anchor-grid");
+  grid.setAttribute("role", "group");
+  grid.setAttribute("aria-label", t("Anchor"));
   grid.innerHTML = ANCHORS.map(
     (a) =>
-      `<button class="anchor-cell${a === "center" ? " is-active" : ""}" data-anchor="${a}" aria-label="${a}"></button>`
+      `<button class="anchor-cell${a === resizeAnchor ? " is-active" : ""}" data-anchor="${a}"
+               aria-label="${ANCHOR_LABELS[a]}" aria-pressed="${a === resizeAnchor}"></button>`
   ).join("");
   grid.addEventListener("click", (e) => {
     const cell = e.target.closest("[data-anchor]");
     if (!cell) return;
     resizeAnchor = cell.dataset.anchor;
-    $$(".anchor-cell", grid).forEach((c) => c.classList.toggle("is-active", c === cell));
+    $$(".anchor-cell", grid).forEach((c) => {
+      c.classList.toggle("is-active", c === cell);
+      c.setAttribute("aria-pressed", String(c === cell));
+    });
   });
 
   const w = $("#resizeW");
@@ -567,44 +727,48 @@ function refreshExportPreview() {
 
 /* --- shortcuts --- */
 
+// written like the menus' keys (⇧⌘E): platformKeys() reads them Ctrl+Shift+E
+// outside a Mac
 const SHORTCUT_GROUPS = [
   {
     title: t("File"),
     rows: [
       [t("New document"), KEY_NEW],
-      [t("Open image"), `${MOD} O`],
-      [t("Save project"), `${MOD} S`],
-      [t("Export image"), `⇧ ${MOD} E`],
-      [t("Paste image"), `${MOD} V`],
+      [t("Open image"), `${MOD}O`],
+      [t("Save project"), `${MOD}S`],
+      [t("Export image"), `⇧${MOD}E`],
+      [t("Copy"), `${MOD}C`],
+      [t("Paste image"), `${MOD}V`],
     ],
   },
   {
     title: t("Edit"),
     rows: [
-      [t("Undo / Redo"), `${MOD} Z · ⇧${MOD} Z`],
-      [t("Free transform"), `⌥ ${MOD} T`],
-      [t("Select all / Deselect"), `${MOD} A · ${MOD} D`],
-      [t("Invert selection"), `⇧ ${MOD} I`],
+      [t("Undo / Redo"), `${MOD}Z · ⇧${MOD}Z · ${MOD}Y`],
+      [t("Free transform"), `⌥${MOD}T`],
+      [t("Select all / Deselect"), `${MOD}A · ${MOD}D`],
+      [t("Invert selection"), `⇧${MOD}I`],
       [t("Delete selected pixels"), "⌫"],
-      [t("Fill with primary color"), "⌥ ⌫"],
-      [t("Selection to new layer"), `⇧ ${MOD} J`],
+      [t("Fill with primary color"), "⌥⌫"],
+      [t("Selection to new layer"), `⇧${MOD}J`],
     ],
   },
   {
     title: t("Layers"),
     rows: [
       [t("New layer"), KEY_NEW_LAYER],
-      [t("Duplicate layer"), `${MOD} J`],
-      [t("Merge down"), `${MOD} E`],
-      [t("Levels / Curves"), `${MOD} L · ${MOD} M`],
+      [t("Duplicate layer"), `${MOD}J`],
+      [t("Merge down"), `${MOD}E`],
+      [t("Levels / Curves"), `${MOD}L · ${MOD}M`],
     ],
   },
   {
     title: t("View"),
     rows: [
-      [t("Zoom in / out"), `${MOD} + · ${MOD} −`],
-      [t("Fit on screen"), `${MOD} 0`],
-      [t("Actual pixels"), `${MOD} 1`],
+      [t("Zoom in / out"), `${MOD}+ · ${MOD}−`],
+      [t("Fit on screen"), `${MOD}0`],
+      [t("Actual pixels"), `${MOD}1`],
+      [t("Toggle panels"), "⇧F"],
       [t("Pan the canvas"), t("Space + drag")],
       [t("Zoom at pointer"), t("Scroll")],
     ],
@@ -665,8 +829,8 @@ function initWelcome() {
   });
 
   presetChips($("#welcomePresets"), (w, h) => {
-    A.newDocument({ width: w, height: h, background: "#ffffff" });
-    dialog.close();
+    // the welcome screen stays when the current document was kept
+    if (A.newDocument({ width: w, height: h, background: "#ffffff" })) dialog.close();
   });
 
   dialog.addEventListener("click", (e) => {
@@ -677,7 +841,9 @@ function initWelcome() {
     else if (kind === "open") $("#imageInput").click();
     else if (kind === "project") $("#projectInput").click();
     else if (kind === "paste") A.pasteFromClipboard();
-    else if (kind === "restore") emit("restore-autosave", card.dataset.slot);
+    else if (kind === "restore") {
+      emit("restore-autosave", { slot: card.dataset.slot, sid: card.dataset.sid });
+    }
   });
 
   $("#welcomeAbout").setAttribute("href", SITE_HOME);
@@ -803,8 +969,13 @@ function initShortcuts() {
   );
 
   window.addEventListener("keydown", (e) => {
-    if (isTypingTarget(e.target)) return;
+    // A dropdown (Blend, Ratio, Font) keeps the focus after a mouse pick: it
+    // keeps the keys it works with, every other key stays a shortcut — and a
+    // letter must not also pick an option by typing ("E" → Exclusion).
+    const onSelect = e.target?.tagName === "SELECT";
+    if (onSelect ? SELECT_KEYS.has(e.key) : isTypingTarget(e.target)) return;
     if (modalOpen()) return;
+    if (onSelect && e.key.length === 1) e.preventDefault();
     // AltGr arrives as Ctrl+Alt on Windows: it types characters, not commands
     const altGraph = e.getModifierState?.("AltGraph");
     const mod = (e.metaKey || e.ctrlKey) && !altGraph;
@@ -812,80 +983,83 @@ function initShortcuts() {
     const phys = physicalKey(e);
     // letters follow the layout (Z/Y swap on QWERTZ), everything else the key
     const letter = key.length === 1 && /\p{L}/u.test(key) && /^[a-z]$/.test(key) ? key : phys;
-    // holding a command key must not fire it again and again
-    const once = () => !e.repeat;
 
     if (mod) {
+      // A command key is always ours (no browser zoom, no "save page"), but
+      // while a stroke is in progress it waits: it could change the layer
+      // being painted on. Holding one fires it once — except undo/redo and
+      // zoom, which repeat on purpose.
+      const command = (run, { repeat = false } = {}) => {
+        e.preventDefault();
+        if (state.dragging || (e.repeat && !repeat)) return;
+        run();
+      };
       // ⌥⌘T on a Mac reports "†" as the key; match the physical key instead
       if (e.altKey && e.code === "KeyT") {
-        e.preventDefault();
-        if (once()) startTransform();
+        command(startTransform);
         return;
       }
-      // zoom by position: Ctrl+0 / Ctrl+1 / Ctrl+ +/− on any layout
-      if (phys === "0" || phys === "1" || phys === "+" || phys === "-" || key === "+" || key === "=" || key === "-") {
-        e.preventDefault();
-        if (phys === "0") view.fit();
-        else if (phys === "1") view.actualSize();
-        else if (phys === "+" || key === "+" || key === "=") view.zoomStep(1);
-        else view.zoomStep(-1);
+      // Zoom by the character first: on a Czech keyboard "+" is the Digit1
+      // key (Ctrl+1 by position would be "actual pixels"). Ctrl+0 / Ctrl+1 go
+      // by position, so they work where the digit row types ěščř… too.
+      if (key === "+" || key === "=") {
+        command(() => view.zoomStep(1), { repeat: true });
+        return;
+      }
+      if (key === "-") {
+        command(() => view.zoomStep(-1), { repeat: true });
+        return;
+      }
+      if (phys === "0" || phys === "1" || phys === "+" || phys === "-") {
+        const zoom = {
+          0: () => view.fit(),
+          1: () => view.actualSize(),
+          "+": () => view.zoomStep(1),
+          "-": () => view.zoomStep(-1),
+        }[phys];
+        command(zoom, { repeat: phys === "+" || phys === "-" });
         return;
       }
       switch (letter) {
         case "z":
-          e.preventDefault();
-          e.shiftKey ? A.redo() : A.undo();
+          command(() => (e.shiftKey ? A.redo() : A.undo()), { repeat: true });
           return;
         case "y":
-          e.preventDefault();
-          A.redo();
+          command(() => A.redo(), { repeat: true });
           return;
         case "n":
           // only reaches the page in an installed app window
-          e.preventDefault();
-          if (once()) e.shiftKey ? A.addLayer() : openNewDialog();
+          command(() => (e.shiftKey ? A.addLayer() : openNewDialog()));
           return;
         case "o":
-          e.preventDefault();
-          if (once()) $("#imageInput").click();
+          command(() => $("#imageInput").click());
           return;
         case "s":
-          e.preventDefault();
-          if (once()) A.saveProject();
+          command(() => A.saveProject());
           return;
         case "e":
-          e.preventDefault();
-          if (once()) e.shiftKey ? openExportDialog() : A.mergeDown();
+          command(() => (e.shiftKey ? openExportDialog() : A.mergeDown()));
           return;
         case "j":
-          e.preventDefault();
-          if (once()) e.shiftKey ? A.duplicateSelectionToLayer() : A.duplicateLayer();
+          command(() => (e.shiftKey ? A.duplicateSelectionToLayer() : A.duplicateLayer()));
           return;
         case "a":
-          e.preventDefault();
-          if (once()) A.selectAll();
+          command(() => A.selectAll());
           return;
         case "d":
-          e.preventDefault();
-          if (once()) A.deselect();
+          command(() => A.deselect());
           return;
         case "i":
-          if (e.shiftKey) {
-            e.preventDefault();
-            if (once()) A.invertSelection();
-          }
+          if (e.shiftKey) command(() => A.invertSelection());
           return;
         case "l":
-          e.preventDefault();
-          if (once()) openLevels();
+          command(() => openLevels());
           return;
         case "m":
-          e.preventDefault();
-          if (once()) openCurves();
+          command(() => openCurves());
           return;
         case "c":
-          e.preventDefault();
-          if (once()) A.copyToClipboard();
+          command(() => A.copyToClipboard());
           return;
         default:
           return;
@@ -901,6 +1075,9 @@ function initShortcuts() {
       }
       return;
     }
+
+    // holding a command key must not fire it again and again
+    const once = () => !e.repeat;
 
     // ⌥N / ⇧⌥N: New… and New layer in a browser tab (see KEY_NEW)
     if (e.altKey && !altGraph && e.code === "KeyN") {
@@ -957,12 +1134,17 @@ function initShortcuts() {
     }
 
     if (e.altKey || e.ctrlKey || e.metaKey) return;
+    // a held key fires its single-key command once (the brackets above
+    // repeat on purpose)
+    if (e.repeat) return;
 
     if (letter === "x") {
       swapColors();
       return;
     }
-    if (key === "?" || (e.shiftKey && (key === "/" || e.code === "Slash"))) {
+    // by the character only: Shift + the Slash key is "_" or "-" elsewhere
+    // (Czech), not a question mark
+    if (e.key === "?") {
       openShortcuts();
       return;
     }
@@ -979,8 +1161,32 @@ function initShortcuts() {
   });
 }
 
-/** Hide or show the side panels (desktop) — the menu item and Shift+F. */
+/** Keys a focused dropdown needs for itself (see initShortcuts). */
+const SELECT_KEYS = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "Home",
+  "End",
+  "PageUp",
+  "PageDown",
+  " ",
+  "Enter",
+  "Tab",
+  "Escape",
+]);
+
+/**
+ * Hide or show the side panels — the menu item and Shift+F. On a desktop
+ * they are a column that goes away; on a phone a sheet that slides in over
+ * the stage (hiding the column there would leave its button nothing to show).
+ */
 export function togglePanels() {
+  if (isPhoneLayout()) {
+    setSidebarOpen(!$("#sidebar").classList.contains("is-open"));
+    return;
+  }
   $(".workspace").classList.toggle("side-collapsed");
 }
 

@@ -11,7 +11,7 @@ The interface is available in English and Czech.
 
 ## Features
 
-**Layers** — unlimited layers with 16 blend modes, per-layer opacity,
+**Layers** — unlimited layers with 17 blend modes, per-layer opacity,
 visibility, locking, drag-to-reorder, rename, duplicate, merge down and flatten.
 **Layer masks** (reveal all, hide all or from the selection; paint black to
 hide and white to reveal; invert, disable, apply, delete).
@@ -24,10 +24,12 @@ linear/radial gradients.
 healing (fills the painted area from its surroundings with matched texture) and
 dodge/burn by tonal range.
 
-**Shapes & type** — line, arrow, rectangle (with corner radius), ellipse,
-polygon and star, each as outline, solid or both. The text tool types directly
-on the canvas in the final font; every text becomes a **text layer that stays
-editable** until it is painted on.
+**Shapes & type** — line and arrow (Shift snaps the angle), plus rectangle
+(with corner radius), ellipse, polygon and star, each as outline, solid or
+both. The text tool types directly on the canvas in the final font; every text
+becomes a **text layer that stays editable** until its pixels change (painting,
+filters, adjustments, the Transform tool, rotating or flipping the image, merge
+down, apply mask).
 
 **Selections** — rectangular, elliptical, freehand lasso and magic wand, with
 new/add/subtract/intersect modes, feathering and animated marching ants. Every
@@ -55,9 +57,13 @@ and layer effects are not applied; PSB, CMYK, Lab, indexed, bitmap and duotone a
 Exports PNG, JPEG, WebP with quality, scale and a live size estimate, and
 **layered PSD**. `.paint` project files keep layers, masks and editable text.
 
-**Everything else** — undo/redo history, **autosave** to the browser's own
-storage with restore on the next visit, zoom to 3200% with pan and pinch,
-dark and light themes, drag-and-drop and clipboard import, offline support and
+**Everything else** — undo/redo history (up to 80 steps within a memory
+budget), **autosave** to the browser's own storage with restore on the next
+visit (skipped for documents above 192 megapixels summed over all layers),
+documents up to 8000 × 8000 px within the browser's canvas limit (about
+16.7 MP in iPhone/iPad Safari; larger images are scaled down on open), zoom to
+3200% with pan and pinch, dark and light themes that follow the system until
+one is chosen, drag-and-drop and clipboard import, offline support and
 installable PWA (with "open with" file handling), and a full keyboard shortcut
 set (press `?`).
 
@@ -104,8 +110,14 @@ node scripts/build-site.mjs
 | `scripts/site/lastmod.json` | per-URL content hash and `<lastmod>` date (generated — commit it) |
 
 The generator also writes `sitemap.xml` (with `hreflang` alternates), the
-IndexNow key file and keeps the `modulepreload` list and analytics snippet of
-`editor/index.html` up to date.
+IndexNow key file, keeps the `modulepreload` list and analytics snippet of
+`editor/index.html` up to date and sets the `id` in `manifest.json` to the
+path of `base` (see below).
+
+Every generated page carries `<meta name="generator" content="paint-studio-site" />`.
+When a slug is renamed or a page or language is dropped, the next build deletes
+the old folder's `index.html` (and the folder, once it is empty) — but only if
+it carries that marker, so nothing else in the repository is ever removed.
 
 A page's `<lastmod>` only moves when its title, description or main content
 changes: `lastmod.json` remembers a hash per URL, so rebuilding without copy
@@ -146,6 +158,10 @@ Adding a language takes:
 
 1. Point the domain at GitHub Pages and add a `CNAME` file with the domain.
 2. Change `base` in `scripts/site/config.mjs` and run `node scripts/build-site.mjs`.
+   The build also moves the `id` in `manifest.json` to the new path (`"/"` at
+   the root of a domain): the manifest `id` resolves against the origin, not
+   against the manifest's URL, so on `robertlib.github.io` it has to be
+   `"/paint/"` — `"./"` would claim the whole account. Check that it changed.
 3. Update the `Sitemap:` line in `robots.txt` — on its own domain the file is
    finally served from the root, where crawlers read it.
 

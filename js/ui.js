@@ -12,6 +12,8 @@ import { history } from "./history.js";
 import { platformKeys, t } from "./i18n.js";
 import { requestRender } from "./render.js";
 import {
+  emit,
+  markDirty,
   on,
   opt,
   recordRecent,
@@ -102,9 +104,10 @@ const HINTS = {
 };
 
 function syncRail() {
-  $$("#toolRail .tool-btn").forEach((b) =>
-    b.classList.toggle("is-active", b.dataset.tool === state.tool)
-  );
+  $$("#toolRail .tool-btn").forEach((b) => {
+    b.classList.toggle("is-active", b.dataset.tool === state.tool);
+    b.setAttribute("aria-pressed", String(b.dataset.tool === state.tool));
+  });
   const tool = activeTool();
   $("#statusTool").textContent = tool.label;
   $("#statusHint").textContent =
@@ -113,7 +116,38 @@ function syncRail() {
 
 /* =============================== options bar ============================== */
 
+/**
+ * A bar that scrolls sideways with its scrollbar hidden (the options bar, the
+ * menu bar on narrow screens): a mouse wheel scrolls it too, and an edge
+ * with more beyond it fades out (.more-start / .more-end in layout.css).
+ * Returns the function that re-measures it after its content changed.
+ */
+export function sideScroll(el) {
+  const update = () => {
+    const max = el.scrollWidth - el.clientWidth;
+    el.classList.toggle("more-start", max > 1 && el.scrollLeft > 1);
+    el.classList.toggle("more-end", max > 1 && el.scrollLeft < max - 1);
+  };
+  el.addEventListener("scroll", update, { passive: true });
+  el.addEventListener(
+    "wheel",
+    (e) => {
+      if (el.scrollWidth - el.clientWidth <= 1) return;
+      // trackpads scroll sideways by themselves; a wheel only knows up/down
+      if (e.ctrlKey || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientWidth : 1;
+      el.scrollLeft += e.deltaY * unit;
+    },
+    { passive: false }
+  );
+  if (window.ResizeObserver) new ResizeObserver(update).observe(el);
+  update();
+  return update;
+}
+
 let optionsWired = false;
+let measureOptions = () => {};
 
 function buildOptions() {
   const bar = $("#optionsBar");
@@ -193,12 +227,16 @@ function buildOptions() {
   }
 
   bar.innerHTML = parts.join("");
+  // a new tool's options start at the beginning
+  bar.scrollLeft = 0;
 
   if (optionsWired) {
     syncOptionSwatches();
+    measureOptions();
     return;
   }
   optionsWired = true;
+  measureOptions = sideScroll(bar);
 
   bar.addEventListener("input", onOptionInput);
   bar.addEventListener("change", onOptionInput);
@@ -346,9 +384,12 @@ function buildColorPanel() {
   });
 
   // the field works from the keyboard too: arrows move the picker
+  // (aria-valuenow follows saturation, the value text names both axes)
   field.tabIndex = 0;
   field.setAttribute("role", "slider");
   field.setAttribute("aria-label", t("Saturation and brightness"));
+  field.setAttribute("aria-valuemin", "0");
+  field.setAttribute("aria-valuemax", "100");
   field.addEventListener("keydown", (e) => {
     const step = e.shiftKey ? 0.1 : 0.01;
     const moves = {
@@ -446,11 +487,17 @@ function drawSV(canvas) {
 function syncColorPanel() {
   const color = state[state.activeChip];
   if (!picker.silent) {
-    const hsv = rgbToHsv(color);
-    // keep the hue slider steady on greys, where hue is undefined
-    picker.h = hsv.s > 0.004 ? hsv.h : picker.h;
-    picker.s = hsv.s;
-    picker.v = hsv.v;
+    // Only a different colour moves the picker. RGB loses what the picker
+    // still knows: black (value 0) has no hue or saturation, greys no hue —
+    // dragging along the bottom edge must not snap the marker to the left.
+    const shown = hsvToRgb(picker.h, picker.s, picker.v);
+    if (shown.r !== color.r || shown.g !== color.g || shown.b !== color.b) {
+      const hsv = rgbToHsv(color);
+      // keep the hue slider steady on greys, where hue is undefined
+      picker.h = hsv.s > 0.004 ? hsv.h : picker.h;
+      picker.s = hsv.s;
+      picker.v = hsv.v;
+    }
   }
   picker.a = color.a ?? 1;
 
@@ -461,6 +508,7 @@ function syncColorPanel() {
   thumb.style.left = `${picker.s * 100}%`;
   thumb.style.top = `${(1 - picker.v) * 100}%`;
   thumb.style.background = cssColor(color);
+  field.setAttribute("aria-valuenow", String(Math.round(picker.s * 100)));
   field.setAttribute(
     "aria-valuetext",
     `${t("Saturation")} ${Math.round(picker.s * 100)} %, ${t("Brightness")} ${Math.round(picker.v * 100)} %`
@@ -604,7 +652,16 @@ function buildLayersPanel() {
   // keyboard: Enter/Space selects, F2 renames, arrows move between rows
   list.addEventListener("keydown", (e) => {
     const item = e.target.closest?.(".layer-item");
-    if (!item || e.target !== item) return;
+    if (!item) return;
+    // the buttons in a row (thumbnails, eye, lock) press themselves: the keys
+    // must not also reach the global shortcuts (Enter applies a crop, Space
+    // pans)
+    if (e.target !== item) {
+      if (e.target.tagName === "BUTTON" && (e.key === "Enter" || e.key === " ")) {
+        e.stopPropagation();
+      }
+      return;
+    }
     const index = Number(item.dataset.index);
     const id = state.doc?.layers[index]?.id;
     // keys handled here must not also reach the global shortcuts (Enter
@@ -676,10 +733,26 @@ function startRename(nameEl, index) {
   const layer = state.doc.layers[index];
   if (!layer) return;
   const id = layer.id;
+  // the row is selected before the field appears: selecting rebuilds the
+  // list, and left to the first click into the field it threw the field
+  // away together with the name being typed
+  if (index !== state.doc.activeIndex) {
+    A.setActiveLayer(index);
+    const at = state.doc.indexOfLayer(id);
+    nameEl = $(`#layerList .layer-item[data-index="${at}"] .layer-name`);
+    if (!nameEl) return;
+  }
+  const item = nameEl.closest(".layer-item");
   const input = document.createElement("input");
   input.className = "layer-name-input";
   input.value = layer.name;
   input.setAttribute("aria-label", t("Layer name"));
+  // clicks in the field place the caret — they are not clicks on the row,
+  // and selecting its text must not start dragging the row
+  for (const type of ["click", "dblclick"]) {
+    input.addEventListener(type, (e) => e.stopPropagation());
+  }
+  if (item) item.draggable = false;
   nameEl.replaceWith(input);
   input.focus();
   input.select();
@@ -689,6 +762,7 @@ function startRename(nameEl, index) {
     if (finished) return;
     finished = true;
     input.removeEventListener("blur", onBlur);
+    if (item) item.draggable = true;
     const value = input.value.trim();
     const at = state.doc?.indexOfLayer(id) ?? -1;
     if (save && value && at >= 0) A.setLayerProp(at, "name", value, t("Rename layer"));
@@ -706,12 +780,16 @@ function startRename(nameEl, index) {
   });
 }
 
-/** Put keyboard focus back on a layer row after the list was rebuilt. */
-function focusLayer(id) {
+/**
+ * Put keyboard focus back on a layer row after the list was rebuilt — or on
+ * one of its thumbnails (`pick`: "layer" | "mask") when that had it.
+ */
+function focusLayer(id, pick = null) {
   const doc = state.doc;
   const index = doc?.indexOfLayer(id) ?? -1;
   if (index < 0) return;
-  $(`#layerList .layer-item[data-index="${index}"]`)?.focus();
+  const row = $(`#layerList .layer-item[data-index="${index}"]`);
+  ((pick && row && $(`[data-pick-target="${pick}"]`, row)) || row)?.focus();
 }
 
 function syncLayers() {
@@ -731,17 +809,21 @@ function syncLayers() {
       <div class="layer-item${active ? " is-active" : ""}${
       layer.visible ? "" : " is-hidden"
     }${editingMask ? " is-editing-mask" : ""}" data-index="${i}" draggable="true" role="listitem"
-        tabindex="0" aria-current="${active ? "true" : "false"}" aria-label="${escapeHtml(layer.name)}">
-        <span class="layer-thumb${active && !editingMask ? " is-target" : ""}" data-thumb="${i}" data-pick-target="layer" data-tip="${t("Edit layer pixels")}">${
-          layer.text ? `<span class="layer-badge" aria-label="${t("Text layer")}">T</span>` : ""
-        }</span>
+        tabindex="0" aria-current="${active ? "true" : "false"}" aria-label="${escapeHtml(layer.name)}${
+          layer.text ? ` · ${t("Text layer")}` : ""
+        }">
+        <button type="button" class="layer-thumb${active && !editingMask ? " is-target" : ""}" data-thumb="${i}" data-pick-target="layer" data-tip="${t(
+          "Edit layer pixels"
+        )}" aria-label="${t("Edit layer pixels")}" aria-pressed="${!!active && !editingMask}">${
+          layer.text ? `<span class="layer-badge" aria-hidden="true">T</span>` : ""
+        }</button>
         ${
           layer.mask
-            ? `<span class="layer-thumb mask-thumb${editingMask ? " is-target" : ""}${
+            ? `<button type="button" class="layer-thumb mask-thumb${editingMask ? " is-target" : ""}${
                 layer.maskEnabled ? "" : " is-disabled"
               }" data-mask-thumb="${i}" data-pick-target="mask" data-tip="${t(
                 "Edit mask · Shift-click turns it off"
-              )}"></span>`
+              )}" aria-label="${t("Edit mask")}" aria-pressed="${!!editingMask}"></button>`
             : ""
         }
         <span class="layer-info">
@@ -753,18 +835,21 @@ function syncLayers() {
         <span class="layer-actions">
           <button class="icon-btn xs" data-toggle-layer="visible" data-tip="${
             layer.visible ? t("Hide layer") : t("Show layer")
-          }" aria-label="${t("Toggle visibility")}">${icon(layer.visible ? "i-eye" : "i-eye-off")}</button>
-          <button class="icon-btn xs" data-toggle-layer="locked" data-tip="${
+          }" aria-label="${t("Show layer")}" aria-pressed="${!!layer.visible}">${icon(
+            layer.visible ? "i-eye" : "i-eye-off"
+          )}</button>
+          <button class="icon-btn xs${layer.locked ? " is-active" : ""}" data-toggle-layer="locked" data-tip="${
             layer.locked ? t("Unlock layer") : t("Lock layer")
-          }" aria-label="${t("Toggle lock")}">${icon("i-lock")}</button>
+          }" aria-label="${t("Lock layer")}" aria-pressed="${!!layer.locked}">${icon("i-lock")}</button>
         </span>
       </div>`);
   }
-  // rebuilding the list drops focus: give it back to the same row
-  const focusedIndex = list.contains(document.activeElement)
-    ? document.activeElement.closest?.(".layer-item")?.dataset.index
-    : undefined;
+  // rebuilding the list drops focus: give it back to the same row (or the
+  // same thumbnail in it)
+  const focused = list.contains(document.activeElement) ? document.activeElement : null;
+  const focusedIndex = focused?.closest?.(".layer-item")?.dataset.index;
   const focusedId = focusedIndex !== undefined ? doc.layers[Number(focusedIndex)]?.id : null;
+  const focusedPick = focused?.dataset?.pickTarget || null;
   list.innerHTML = items.join("");
 
   for (const holder of $$("[data-thumb]", list)) {
@@ -775,12 +860,7 @@ function syncLayers() {
     const layer = doc.layers[Number(holder.dataset.maskThumb)];
     holder.appendChild(maskThumb(layer));
   }
-  $$("[data-toggle-layer='locked']", list).forEach((btn) => {
-    const index = Number(btn.closest(".layer-item").dataset.index);
-    btn.classList.toggle("is-active", doc.layers[index].locked);
-    btn.setAttribute("aria-pressed", String(doc.layers[index].locked));
-  });
-  if (focusedId) focusLayer(focusedId);
+  if (focusedId) focusLayer(focusedId, focusedPick);
 
   const active = doc.active;
   if (active) {
@@ -788,11 +868,23 @@ function syncLayers() {
     $("#layerOpacity").value = String(Math.round(active.opacity * 100));
     $("#layerOpacityOut").value = `${Math.round(active.opacity * 100)}%`;
   }
-  $("#mergeLayerBtn").disabled = doc.activeIndex <= 0;
+  $("#mergeLayerBtn").disabled = !canMergeDown(doc);
   $("#delLayerBtn").disabled = doc.layers.length <= 1;
   const maskBtn = $("#maskLayerBtn");
+  const maskAction = active?.mask ? t("Delete layer mask") : t("Add layer mask");
   maskBtn.classList.toggle("is-active", !!active?.mask);
-  maskBtn.dataset.tip = active?.mask ? t("Delete layer mask") : t("Add layer mask");
+  maskBtn.dataset.tip = maskAction;
+  maskBtn.setAttribute("aria-label", maskAction);
+}
+
+/**
+ * Merge down needs a layer below that can take the pixels: one that is
+ * neither locked nor hidden (merging into a hidden layer would make the
+ * result vanish). Shared with the Layer menu.
+ */
+export function canMergeDown(doc = state.doc) {
+  const below = doc?.layers[doc.activeIndex - 1];
+  return !!below && !below.locked && below.visible !== false;
 }
 
 const escapeHtml = (s) =>
@@ -896,21 +988,56 @@ function invalidateFilters() {
   filterTimer = setTimeout(refreshFilterPreviews, 350);
 }
 
+/** Effects whose look comes from the primary/secondary colours (filters.js). */
+const COLOR_EFFECTS = ["duotone"];
+let colorFilterTimer = 0;
+
+/** New colours: redraw just the thumbnails that show them, once they settle. */
+function invalidateColorFilters() {
+  clearTimeout(colorFilterTimer);
+  colorFilterTimer = setTimeout(() => {
+    if (!state.doc) return;
+    const panel = $('[data-panel="filters"]');
+    // a hidden gallery redraws everything when it is shown again
+    if (!panel.classList.contains("is-active")) {
+      filtersDirty = true;
+      return;
+    }
+    for (const id of COLOR_EFFECTS) {
+      $(`[data-preview="${id}"]`, panel)?.replaceChildren(A.filterPreview(id, 112, 70));
+    }
+  }, 350);
+}
+
 /* ================================== tabs ================================== */
 
 function buildTabs() {
-  $$(".tab").forEach((tab) => {
-    tab.addEventListener("click", () => {
-      $$(".tab").forEach((t) => {
-        t.classList.toggle("is-active", t === tab);
-        t.setAttribute("aria-selected", String(t === tab));
-      });
-      $$(".tab-panel").forEach((p) =>
-        p.classList.toggle("is-active", p.dataset.panel === tab.dataset.tab)
-      );
-      if (tab.dataset.tab === "filters") refreshFilterPreviews();
-    });
+  const tabs = $$(".tab");
+  const select = (tab) => {
+    for (const t of tabs) {
+      t.classList.toggle("is-active", t === tab);
+      t.setAttribute("aria-selected", String(t === tab));
+      // one tab stop for the whole tab list; the arrows move inside it
+      t.tabIndex = t === tab ? 0 : -1;
+    }
+    $$(".tab-panel").forEach((p) =>
+      p.classList.toggle("is-active", p.dataset.panel === tab.dataset.tab)
+    );
+    if (tab.dataset.tab === "filters") refreshFilterPreviews();
+  };
+  for (const tab of tabs) tab.addEventListener("click", () => select(tab));
+  $(".tabs").addEventListener("keydown", (e) => {
+    const i = tabs.indexOf(e.target);
+    if (i < 0) return;
+    const to = { ArrowLeft: i - 1, ArrowRight: i + 1, Home: 0, End: tabs.length - 1 }[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const tab = tabs[(to + tabs.length) % tabs.length];
+    select(tab);
+    tab.focus();
   });
+  select(tabs.find((t) => t.classList.contains("is-active")) || tabs[0]);
 }
 
 export function openTab(name) {
@@ -918,7 +1045,64 @@ export function openTab(name) {
   tab?.click();
   // the panel must be visible, also when the panels were hidden
   $(".workspace")?.classList.remove("side-collapsed");
-  $("#sidebar").classList.add("is-open");
+  setSidebarOpen(true);
+}
+
+/* ============================ phone panel sheet =========================== */
+
+const PHONE = window.matchMedia?.("(max-width: 760px)") ?? null;
+
+/** Phones show the panels as a sheet sliding over the stage (layout.css). */
+export const isPhoneLayout = () => !!PHONE?.matches;
+
+/** Slide the panel sheet in or out (on a desktop the panels are a column). */
+export function setSidebarOpen(open) {
+  $("#sidebar").classList.toggle("is-open", open);
+  $(".panel-toggle")?.setAttribute("aria-expanded", String(open));
+}
+
+/* ============================== radio groups ============================== */
+
+/**
+ * Segmented controls marked role="radiogroup" (export format, the Levels and
+ * Curves channels): their own code marks the choice with .is-active on
+ * click. This keeps aria-checked and a single tab stop in step with it and
+ * lets the arrow keys move the choice, by clicking the neighbour.
+ */
+function wireRadioGroup(group) {
+  const radios = () => $$('[role="radio"]', group);
+  const sync = () => {
+    const list = radios();
+    const checked = list.find((b) => b.classList.contains("is-active")) || list[0];
+    for (const b of list) {
+      b.setAttribute("aria-checked", String(b === checked));
+      b.tabIndex = b === checked ? 0 : -1;
+    }
+  };
+  new MutationObserver(sync).observe(group, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+  group.addEventListener("keydown", (e) => {
+    const list = radios();
+    const i = list.indexOf(e.target);
+    if (i < 0) return;
+    const step = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[e.key];
+    const to = step
+      ? (i + step + list.length) % list.length
+      : e.key === "Home"
+      ? 0
+      : e.key === "End"
+      ? list.length - 1
+      : -1;
+    if (to < 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    list[to].click();
+    list[to].focus();
+  });
+  sync();
 }
 
 /* ================================ chrome ================================== */
@@ -931,7 +1115,16 @@ function buildChrome() {
   );
 
   $("#docTitle").addEventListener("change", (e) => {
-    if (state.doc) state.doc.name = e.target.value.trim() || t("Untitled");
+    const doc = state.doc;
+    if (!doc) return;
+    const name = e.target.value.trim() || t("Untitled");
+    e.target.value = name;
+    if (name === doc.name) return;
+    doc.name = name;
+    // the name belongs to the document: unsaved like any edit, and the
+    // autosave keeps it
+    markDirty(true);
+    emit("doc-renamed");
   });
   $("#docTitle").addEventListener("keydown", (e) => {
     e.stopPropagation();
@@ -944,13 +1137,35 @@ function buildChrome() {
   $("#fitBtn").addEventListener("click", () => view.fit());
 
   // panels toggle for narrow screens
+  const sidebar = $("#sidebar");
   const toggle = document.createElement("button");
   toggle.className = "panel-toggle";
   toggle.dataset.tip = t("Panels");
   toggle.setAttribute("aria-label", t("Toggle panels"));
+  toggle.setAttribute("aria-controls", "sidebar");
+  toggle.setAttribute("aria-expanded", String(sidebar.classList.contains("is-open")));
   toggle.innerHTML = icon("i-panel");
-  toggle.addEventListener("click", () => $("#sidebar").classList.toggle("is-open"));
+  toggle.addEventListener("click", () => setSidebarOpen(!sidebar.classList.contains("is-open")));
   $(".stage-hud").prepend(toggle);
+
+  // the open sheet covers that button: it closes from its own header, or
+  // with a tap on the stage beside it — a tap that only closes, paints nothing
+  $("#sidebarClose").addEventListener("click", () => {
+    setSidebarOpen(false);
+    // the focus was inside the sheet that just went away
+    toggle.focus();
+  });
+  $("#stage").addEventListener(
+    "pointerdown",
+    (e) => {
+      if (!isPhoneLayout() || !sidebar.classList.contains("is-open")) return;
+      if (e.target.closest?.("button, input, select, textarea, .taskbar")) return;
+      e.stopPropagation();
+      e.preventDefault();
+      setSidebarOpen(false);
+    },
+    true
+  );
 }
 
 function syncHistoryButtons() {
@@ -1114,6 +1329,7 @@ export function initUI() {
   buildTabs();
   buildChrome();
   initTooltips();
+  $$('[role="radiogroup"]').forEach(wireRadioGroup);
 
   on("tool", () => {
     syncRail();
@@ -1123,7 +1339,11 @@ export function initUI() {
     syncOptionSwatches();
     requestRender();
   });
-  on("color", () => syncColorPanel());
+  on("color", (e) => {
+    syncColorPanel();
+    // switching the edited chip or recording a recent colour changes neither
+    if (e?.which !== "chip" && e?.which !== "recent") invalidateColorFilters();
+  });
   on("theme", () => {
     syncDocMeta();
     invalidateFilters();

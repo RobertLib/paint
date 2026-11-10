@@ -17,9 +17,10 @@ import {
   ctx2d,
   fontString,
   makeCanvas,
+  makeMask,
   paintMasked,
+  releaseCanvas,
   textBounds,
-  transformMask,
   unionRect,
 } from "./doc.js";
 import { gaussData, unsharp } from "./filters.js";
@@ -58,6 +59,10 @@ const stroke = {
   smoothed: null,
   /** document-space area painted so far, or "all" */
   bounds: null,
+  /** the layer (or mask) the stroke started on — it is committed there */
+  target: null,
+  /** last pen pressure seen in this stroke (see pressureOf) */
+  pressure: null,
 };
 
 /** Extra margin around reported stroke areas (anti-aliasing, rounding). */
@@ -68,6 +73,16 @@ const padRect = (r, p) => ({ x: r.x - p, y: r.y - p, w: r.w + p * 2, h: r.h + p 
 const intersects = (a, b) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
+/**
+ * Is `target` (a layer, or a layer's mask) still part of the document? A
+ * stroke stays bound to the target it started on; if that went away
+ * meanwhile, the stroke has nowhere to land.
+ */
+function attached(doc, target) {
+  const host = target?.isMask ? target.layer : target;
+  return !!host && !!doc?.layers.includes(host) && !!target.canvas;
+}
+
 function beginFloating({ mode = "normal", opacity = 1, blend = "source-over" } = {}) {
   const doc = state.doc;
   const buf = makeCanvas(doc.width, doc.height);
@@ -76,6 +91,8 @@ function beginFloating({ mode = "normal", opacity = 1, blend = "source-over" } =
   stroke.residual = 0;
   stroke.active = true;
   stroke.bounds = null;
+  stroke.target = doc.target;
+  stroke.pressure = null;
   doc.setFloating(buf, { mode, opacity, blend });
   return stroke.bctx;
 }
@@ -93,51 +110,50 @@ function strokeChanged(rect = null) {
   doc.floatingChanged(rect);
 }
 
-/** Forget the stroke state; returns the buffer and the painted area. */
+/**
+ * Forget the stroke state; returns the buffer, the painted area and the
+ * target the stroke started on. The caller frees the buffer (releaseCanvas).
+ */
 function takeFloating() {
   const buf = stroke.buf;
   const bounds = stroke.bounds;
+  const target = stroke.target;
   stroke.active = false;
   stroke.buf = null;
   stroke.bctx = null;
   stroke.last = null;
   stroke.smoothed = null;
   stroke.bounds = null;
+  stroke.target = null;
+  stroke.pressure = null;
   state.doc?.clearFloating();
-  return { buf, bounds };
+  return { buf, bounds, target };
 }
 
 function endFloating(label, { erase = false, opacity = 1, blend = "source-over" } = {}) {
   const doc = state.doc;
-  const { buf, bounds } = takeFloating();
-  if (!buf || !bounds) {
-    requestRender();
-    return;
-  }
-  const layer = doc.target;
-  if (!layer || layer.locked) {
-    requestRender();
-    return;
-  }
-  const rect = bounds === "all" ? null : padRect(bounds, BOUNDS_PAD);
+  // commit to the layer the stroke started on, even if another became active
+  const { buf, bounds, target: layer } = takeFloating();
+  const rect = bounds && bounds !== "all" ? padRect(bounds, BOUNDS_PAD) : null;
   // a stroke entirely outside the selection changes nothing: record nothing
-  const sel = doc.selection?.bounds;
-  if (doc.selection && (!sel || (rect && !intersects(rect, sel)))) {
-    requestRender();
-    return;
+  const sel = doc?.selection?.bounds;
+  const outside = !!doc?.selection && (!sel || (rect && !intersects(rect, sel)));
+  if (buf && bounds && attached(doc, layer) && !layer.locked && !outside) {
+    editPixels(
+      label,
+      () => paintMasked(layer, buf, doc.selection, { opacity, blend, erase, rect }),
+      layer,
+      rect
+    );
+    emit("layers", doc);
   }
-  editPixels(
-    label,
-    () => paintMasked(layer, buf, doc.selection, { opacity, blend, erase, rect }),
-    layer,
-    rect
-  );
-  emit("layers", doc);
+  // the stroke is in the layer now (or dropped): free the document-sized buffer
+  releaseCanvas(buf);
   requestRender();
 }
 
 function abortFloating() {
-  takeFloating();
+  releaseCanvas(takeFloating().buf);
   requestRender();
 }
 
@@ -214,12 +230,15 @@ function stampSegment(ctx, from, to, size, hardness, color, spacingFactor) {
 
 /** Pointer pressure, but only from real pens — mice report a constant 0.5. */
 function pressureOf(ev) {
-  if (ev.e?.pointerType === "pen" && ev.e.pressure > 0) return ev.e.pressure;
-  return 1;
+  if (ev.e?.pointerType !== "pen") return 1;
+  // a pen lifting off reports 0: the stroke ends with the last pressure it had
+  if (ev.e.pressure > 0) stroke.pressure = ev.e.pressure;
+  return stroke.pressure ?? 1;
 }
 
-function sizeFor(ev, base) {
-  if (!opt("pressure")) return base;
+/** Tip size for this sample; `toolId` names the tool whose options apply. */
+function sizeFor(ev, base, toolId) {
+  if (!opt("pressure", toolId)) return base;
   const p = pressureOf(ev);
   return Math.max(0.6, base * (0.25 + 0.75 * p));
 }
@@ -286,6 +305,10 @@ function retouchPatch(layer, cx, cy, radius, hardness, alpha, produce, source = 
   const w = Math.min(layer.width, sx0 + size) - x0;
   const h = Math.min(layer.height, sy0 + size) - y0;
   if (w <= 0 || h <= 0) return null;
+  // entirely outside the selection: nothing can change, so touch nothing
+  const sel = state.doc.selection;
+  const selBounds = sel?.bounds;
+  if (sel && (!selBounds || !intersects({ x: x0, y: y0, w, h }, selBounds))) return null;
 
   const patch = makeCanvas(w, h);
   const pc = ctx2d(patch);
@@ -297,7 +320,6 @@ function retouchPatch(layer, cx, cy, radius, hardness, alpha, produce, source = 
   const m = makeCanvas(w, h);
   const mmc = ctx2d(m);
   mmc.drawImage(softMask(size, hardness), sx0 - x0, sy0 - y0);
-  const sel = state.doc.selection;
   if (sel) {
     mmc.globalCompositeOperation = "destination-in";
     mmc.drawImage(sel.canvas, -x0, -y0);
@@ -593,12 +615,14 @@ function paintTool({ id, label, icon, shortcut, group, erase = false, defaults =
     ],
     coalesce: true,
     _opacity: 1,
+    // options are read by tool id, never from state.tool: the eraser end of
+    // a pen runs the eraser whatever tool is selected
     down(ev) {
       const o = {
-        size: opt("size"),
-        opacity: opt("opacity") / 100,
-        hardness: opt("hardness") / 100,
-        smooth: opt("smooth") / 100,
+        size: opt("size", id),
+        opacity: opt("opacity", id) / 100,
+        hardness: opt("hardness", id) / 100,
+        smooth: opt("smooth", id) / 100,
       };
       this._opacity = o.opacity;
       const ctx = beginFloating({
@@ -607,7 +631,7 @@ function paintTool({ id, label, icon, shortcut, group, erase = false, defaults =
       });
       stroke.smoothed = null;
       const p = smoothPoint(ev.p, 0);
-      stamp(ctx, p.x, p.y, sizeFor(ev, o.size), o.hardness, state.primary);
+      stamp(ctx, p.x, p.y, sizeFor(ev, o.size, id), o.hardness, state.primary);
       stroke.residual = Math.max(0.6, o.size * 0.14);
       stroke.last = p;
       strokeChanged(segRect(p, p, o.size));
@@ -616,16 +640,16 @@ function paintTool({ id, label, icon, shortcut, group, erase = false, defaults =
     move(ev, { smooth = true } = {}) {
       if (!stroke.active) return;
       const o = {
-        size: opt("size"),
-        hardness: opt("hardness") / 100,
-        smooth: smooth ? opt("smooth") / 100 : 0,
+        size: opt("size", id),
+        hardness: opt("hardness", id) / 100,
+        smooth: smooth ? opt("smooth", id) / 100 : 0,
       };
       const p = smoothPoint(ev.p, o.smooth * 0.8);
       stampSegment(
         stroke.bctx,
         stroke.last,
         p,
-        sizeFor(ev, o.size),
+        sizeFor(ev, o.size, id),
         o.hardness,
         state.primary,
         0.14
@@ -711,21 +735,22 @@ function pixelSegment(ctx, from, to, size) {
 }
 
 pencil.down = function down(ev) {
-  const size = opt("size");
-  this._opacity = opt("opacity") / 100;
+  const size = opt("size", this.id);
+  this._opacity = opt("opacity", this.id) / 100;
   const ctx = beginFloating({ opacity: this._opacity });
   stroke.smoothed = null;
   const p = smoothPoint(ev.p, 0);
-  pixelStamp(ctx, p.x, p.y, sizeFor(ev, size));
+  pixelStamp(ctx, p.x, p.y, sizeFor(ev, size, this.id));
   stroke.last = p;
   strokeChanged(segRect(p, p, size));
   requestRender();
 };
 pencil.move = function move(ev, { smooth = true } = {}) {
   if (!stroke.active) return;
-  const p = smoothPoint(ev.p, smooth ? (opt("smooth") / 100) * 0.8 : 0);
-  pixelSegment(stroke.bctx, stroke.last, p, sizeFor(ev, opt("size")));
-  strokeChanged(segRect(stroke.last, p, opt("size")));
+  const size = opt("size", this.id);
+  const p = smoothPoint(ev.p, smooth ? (opt("smooth", this.id) / 100) * 0.8 : 0);
+  pixelSegment(stroke.bctx, stroke.last, p, sizeFor(ev, size, this.id));
+  strokeChanged(segRect(stroke.last, p, size));
   stroke.last = p;
   requestRender();
 };
@@ -753,12 +778,13 @@ const airbrush = {
   _timer: 0,
   _pos: null,
   down(ev) {
-    beginFloating({ opacity: opt("opacity") / 100 });
+    this._opacity = opt("opacity", this.id) / 100;
+    beginFloating({ opacity: this._opacity });
     this._pos = ev.p;
     const spray = () => {
       if (!stroke.active || !this._pos) return;
-      const size = opt("size");
-      const flow = opt("flow") / 100;
+      const size = opt("size", this.id);
+      const flow = opt("flow", this.id) / 100;
       const ctx = stroke.bctx;
       const r = size / 2;
       const dots = Math.max(1, Math.round(flow * size * 0.4));
@@ -776,7 +802,6 @@ const airbrush = {
       strokeChanged(segRect(this._pos, this._pos, size + dotR * 2));
       requestRender();
     };
-    this._opacity = opt("opacity") / 100;
     spray();
     this._timer = setInterval(spray, 45);
   },
@@ -822,15 +847,16 @@ const bucket = {
     const y = Math.floor(ev.p.y);
     if (x < 0 || y < 0 || x >= doc.width || y >= doc.height) return;
 
-    const source = opt("sampleAll") ? doc.composite() : layer.canvas;
+    const id = this.id;
+    const source = opt("sampleAll", id) ? doc.composite() : layer.canvas;
     const img = source
       .getContext("2d")
       .getImageData(0, 0, doc.width, doc.height);
-    const mask = floodMask(img, x, y, opt("tolerance"), !!opt("contiguous"));
+    const mask = floodMask(img, x, y, opt("tolerance", id), !!opt("contiguous", id));
     if (!mask) return;
 
     let maskCanvas = maskToCanvas(mask, doc.width, doc.height);
-    const grow = opt("grow");
+    const grow = opt("grow", id);
     if (grow > 0) {
       // dilate slightly so fills tuck under anti-aliased outlines
       const grown = makeCanvas(doc.width, doc.height);
@@ -841,6 +867,7 @@ const bucket = {
           gc.drawImage(maskCanvas, dx, dy);
         }
       }
+      releaseCanvas(maskCanvas);
       maskCanvas = grown;
     }
 
@@ -850,15 +877,18 @@ const bucket = {
     pc.fillRect(0, 0, doc.width, doc.height);
     pc.globalCompositeOperation = "destination-in";
     pc.drawImage(maskCanvas, 0, 0);
+    releaseCanvas(maskCanvas);
 
     editPixels(
       t("Fill"),
       () =>
         paintMasked(layer, paint, doc.selection, {
-          opacity: opt("opacity") / 100,
+          opacity: opt("opacity", id) / 100,
         }),
       layer
     );
+    // the fill is in the layer now: free its document-sized buffer at once
+    releaseCanvas(paint);
     emit("layers", doc);
     requestRender();
   },
@@ -903,7 +933,7 @@ const gradient = {
     if (!state.doc.target || state.doc.target.locked) return;
     this._start = ev.p;
     this._length = 0;
-    this._opacity = opt("opacity") / 100;
+    this._opacity = opt("opacity", this.id) / 100;
     beginFloating({ opacity: this._opacity });
     this.move(ev);
   },
@@ -921,7 +951,7 @@ const gradient = {
     }
     this._length = Math.hypot(b.x - a.x, b.y - a.y);
 
-    const kind = opt("colors");
+    const kind = opt("colors", this.id);
     const c1 = kind === "fadeIn" ? { ...state.primary, a: 0 } : state.primary;
     const c2 =
       kind === "duo"
@@ -931,7 +961,7 @@ const gradient = {
         : state.primary;
 
     let g;
-    if (opt("type") === "radial") {
+    if (opt("type", this.id) === "radial") {
       const r = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
       g = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, r);
     } else {
@@ -961,7 +991,29 @@ const gradient = {
 
 /* ------------------------------ retouch tools ----------------------------- */
 
-function retouchTool({ id, label, icon, shortcut, defaults = {}, produce, useSnapshot = false }) {
+/**
+ * Tools that only change colours have nothing to work on in a mask (masks
+ * are alpha only): say so instead of recording a step that changes nothing.
+ */
+function refusesMask(tool, target) {
+  if (!tool.pixelsOnly || !target?.isMask) return false;
+  const msg = t("{tool} works on layer pixels — click the layer thumbnail first", {
+    tool: tool.label,
+  });
+  emit("toast", { msg, kind: "info" });
+  return true;
+}
+
+function retouchTool({
+  id,
+  label,
+  icon,
+  shortcut,
+  defaults = {},
+  produce,
+  useSnapshot = false,
+  pixelsOnly = false,
+}) {
   return {
     id,
     label,
@@ -971,12 +1023,15 @@ function retouchTool({ id, label, icon, shortcut, defaults = {}, produce, useSna
     cursor: "none",
     brushCursor: true,
     needsLayer: true,
+    pixelsOnly,
     opts: [
       sizeOpt(defaults.size ?? 60),
       RANGE("strength", t("Strength"), 1, 100, defaults.strength ?? 50, { unit: "%" }),
       hardnessOpt(defaults.hardness ?? 50),
     ],
     _edit: null,
+    /** the target the stroke started on — the edit belongs to it */
+    _layer: null,
     _last: null,
     _snap: null,
     _stamped: false,
@@ -984,7 +1039,9 @@ function retouchTool({ id, label, icon, shortcut, defaults = {}, produce, useSna
     down(ev) {
       const layer = state.doc.target;
       if (!layer || layer.locked) return;
+      if (refusesMask(this, layer)) return;
       this._edit = beginPixelEdit(layer);
+      this._layer = layer;
       // the edit's "before" bitmap is exactly the untouched source we need
       this._snap = useSnapshot ? this._edit.before : null;
       this._last = ev.p;
@@ -994,10 +1051,12 @@ function retouchTool({ id, label, icon, shortcut, defaults = {}, produce, useSna
     },
     move(ev) {
       if (!this._edit) return;
-      const layer = state.doc.target;
-      const size = opt("size");
-      const strength = opt("strength") / 100;
-      const hardness = opt("hardness") / 100;
+      // keep working on the layer the stroke started on, wherever focus went
+      const layer = this._layer;
+      if (!attached(state.doc, layer)) return;
+      const size = opt("size", id);
+      const strength = opt("strength", id) / 100;
+      const hardness = opt("hardness", id) / 100;
       const spacing = Math.max(1.5, size * 0.2);
       const from = this._last || ev.p;
       const dist = Math.hypot(ev.p.x - from.x, ev.p.y - from.y);
@@ -1031,6 +1090,7 @@ function retouchTool({ id, label, icon, shortcut, defaults = {}, produce, useSna
       if (!this._edit) return;
       this._edit.commit(label, this._bounds);
       this._edit = null;
+      this._layer = null;
       this._last = null;
       this._snap = null;
       this._bounds = null;
@@ -1039,6 +1099,7 @@ function retouchTool({ id, label, icon, shortcut, defaults = {}, produce, useSna
     cancel() {
       if (this._edit) this._edit.rollback();
       this._edit = null;
+      this._layer = null;
       this._last = null;
       this._snap = null;
       this._bounds = null;
@@ -1063,6 +1124,8 @@ const sharpenTool = retouchTool({
   icon: "i-sharpen",
   shortcut: "k",
   defaults: { strength: 40 },
+  // sharpening works on colour; a mask has none
+  pixelsOnly: true,
   produce: ({ layer, x, y, radius, hardness, strength }) =>
     retouchPatch(layer, x, y, radius, hardness, Math.min(1, strength * 0.7), (patch) =>
       unsharp(patch, strength * 1.1, 1)
@@ -1130,11 +1193,13 @@ function withSource(tool, setMsg, missingMsg) {
       requestRender();
       return;
     }
+    // before the offset is taken: a refused click must not anchor the next stroke
+    if (refusesMask(this, state.doc.target)) return;
     if (!this._source) {
       emit("toast", { msg: missingMsg, kind: "err" });
       return;
     }
-    if (!this._offset || !opt("aligned")) {
+    if (!this._offset || !opt("aligned", this.id)) {
       this._offset = { dx: this._source.x - ev.p.x, dy: this._source.y - ev.p.y };
     }
     baseDown.call(this, ev);
@@ -1158,6 +1223,8 @@ const healTool = withSource(
     icon: "i-heal",
     defaults: { strength: 100, hardness: 50, size: 50 },
     useSnapshot: true,
+    // healing blends colour and keeps the alpha: on a mask it would do nothing
+    pixelsOnly: true,
     produce: ({ layer, x, y, radius, hardness, strength, tool, snapshot }) => {
       if (!tool._offset) return null;
       const { dx, dy } = tool._offset;
@@ -1299,9 +1366,14 @@ function spotHealRegion(target, strokeBuf, bounds, selection, size) {
 
   // hole = painted pixels (slightly grown), limited to the selection
   const raw = new Uint8Array(w * h);
+  let painted = false;
   for (let i = 0; i < w * h; i++) {
     raw[i] = strokeA[i * 4 + 3] > 24 && (!selA || selA[i * 4 + 3] > 127) ? 1 : 0;
+    if (raw[i]) painted = true;
   }
+  // painted only outside the selection (or barely at all): leave the layer
+  // untouched, so no undo step is recorded either
+  if (!painted) return;
   const hole = new Uint8Array(w * h);
   const grow = 2;
   for (let yy = 0; yy < h; yy++) {
@@ -1401,7 +1473,7 @@ const spotHeal = {
       return;
     }
     const ctx = beginFloating({ opacity: 0.5 });
-    const size = opt("size");
+    const size = opt("size", this.id);
     stroke.smoothed = null;
     stamp(ctx, ev.p.x, ev.p.y, size, 0.85, this._color);
     stroke.residual = Math.max(0.6, size * 0.12);
@@ -1411,7 +1483,7 @@ const spotHeal = {
   },
   move(ev) {
     if (!stroke.active) return;
-    const size = opt("size");
+    const size = opt("size", this.id);
     stampSegment(stroke.bctx, stroke.last, ev.p, size, 0.85, this._color, 0.12);
     strokeChanged(segRect(stroke.last, ev.p, size));
     stroke.last = ev.p;
@@ -1419,27 +1491,30 @@ const spotHeal = {
   },
   up() {
     const doc = state.doc;
-    const { buf } = takeFloating();
-    const target = doc.target;
-    if (!buf || !target || target.locked || target.isMask) {
-      requestRender();
-      return;
+    // the repair goes to the layer the stroke started on
+    const { buf, bounds, target } = takeFloating();
+    // the stroke already knows where it painted: whole pixels inside the canvas
+    let b = null;
+    if (buf && bounds && bounds !== "all") {
+      const x = Math.max(0, Math.floor(bounds.x));
+      const y = Math.max(0, Math.floor(bounds.y));
+      const w = Math.min(buf.width, Math.ceil(bounds.x + bounds.w)) - x;
+      const h = Math.min(buf.height, Math.ceil(bounds.y + bounds.h)) - y;
+      if (w > 0 && h > 0) b = { x, y, w, h };
     }
-    const b = alphaBounds(buf, 24);
-    if (!b) {
-      requestRender();
-      return;
+    if (b && attached(doc, target) && !target.locked && !target.isMask) {
+      const size = opt("size", this.id);
+      // the repair reaches a little past the painted area (see spotHealRegion)
+      const reach = Math.ceil(size * 0.8) + 8;
+      editPixels(
+        t("Spot healing"),
+        () => spotHealRegion(target, buf, b, doc.selection, size),
+        target,
+        padRect(b, reach)
+      );
+      emit("layers", doc);
     }
-    const size = opt("size");
-    // the repair reaches a little past the painted area (see spotHealRegion)
-    const reach = Math.ceil(size * 0.8) + 8;
-    editPixels(
-      t("Spot healing"),
-      () => spotHealRegion(target, buf, b, doc.selection, size),
-      target,
-      padRect(b, reach)
-    );
-    emit("layers", doc);
+    releaseCanvas(buf);
     requestRender();
   },
   cancel: abortFloating,
@@ -1452,6 +1527,8 @@ const dodgeTool = retouchTool({
   label: t("Dodge / Burn"),
   icon: "i-dodge",
   defaults: { strength: 30, hardness: 30, size: 80 },
+  // lightening and darkening change colour; a mask has none
+  pixelsOnly: true,
   produce: ({ layer, x, y, radius, hardness, strength, tool }) => {
     const burn = (opt("mode", "dodge") === "burn") !== !!tool._alt;
     const range = opt("range", "dodge");
@@ -1539,7 +1616,20 @@ cloneTool.opts = [
 
 /* ------------------------------- shape tools ------------------------------ */
 
-function shapeTool({ id, label, icon, shortcut, extraOpts = [], draw }) {
+/** `b` moved onto the nearest 45° ray from `a`, at the same distance. */
+function snapAngle(a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+  const len = Math.hypot(dx, dy);
+  return { x: a.x + Math.cos(ang) * len, y: a.y + Math.sin(ang) * len };
+}
+
+/**
+ * `endpoints` shapes (line, arrow) are drawn from `a` to `b`: Shift snaps
+ * their angle instead of squaring a box, and a click still leaves a mark.
+ */
+function shapeTool({ id, label, icon, shortcut, extraOpts = [], draw, endpoints = false }) {
   return {
     id,
     label,
@@ -1557,53 +1647,67 @@ function shapeTool({ id, label, icon, shortcut, extraOpts = [], draw }) {
     _start: null,
     _prevRect: null,
     _opacity: 1,
+    /** the shape drawn so far covers no area (a click without a drag) */
+    _empty: true,
     down(ev) {
       if (!state.doc.target || state.doc.target.locked) return;
       this._start = ev.p;
       this._prevRect = null;
-      this._opacity = opt("opacity") / 100;
+      this._empty = true;
+      this._opacity = opt("opacity", id) / 100;
       beginFloating({ opacity: this._opacity });
       this.move(ev);
     },
     move(ev) {
       if (!stroke.active || !this._start) return;
       const ctx = stroke.bctx;
-      const rect = normalizedRect(this._start, ev.p, {
+      const a = this._start;
+      // the end actually drawn: lines and arrows snap to 45° with Shift
+      const b = endpoints && ev.shift ? snapAngle(a, ev.p) : ev.p;
+      const rect = normalizedRect(a, ev.p, {
         square: ev.shift,
         fromCenter: ev.alt,
       });
-      const width = opt("width");
+      const width = opt("width", id);
+      const fillMode = opt("fillMode", id);
       // everything this shape can cover: its box, the stroke and an arrowhead
       const span = {
-        x: Math.min(rect.x, rect.x + rect.w, this._start.x, ev.p.x),
-        y: Math.min(rect.y, rect.y + rect.h, this._start.y, ev.p.y),
+        x: Math.min(rect.x, rect.x + rect.w, a.x, b.x),
+        y: Math.min(rect.y, rect.y + rect.h, a.y, b.y),
       };
-      span.w = Math.max(rect.x, rect.x + rect.w, this._start.x, ev.p.x) - span.x;
-      span.h = Math.max(rect.y, rect.y + rect.h, this._start.y, ev.p.y) - span.y;
+      span.w = Math.max(rect.x, rect.x + rect.w, a.x, b.x) - span.x;
+      span.h = Math.max(rect.y, rect.y + rect.h, a.y, b.y) - span.y;
       const area = padRect(span, Math.max(8, width * 4) + 4);
       // clear only what the previous frame drew
       const clear = this._prevRect ? unionRect(this._prevRect, area) : area;
       ctx.clearRect(clear.x, clear.y, clear.w, clear.h);
       draw(ctx, {
-        a: this._start,
-        b: ev.p,
+        a,
+        b,
         rect,
         o: {
-          fillMode: opt("fillMode"),
+          fillMode,
           width,
-          radius: opt("radius") ?? 0,
-          sides: opt("sides") ?? 5,
+          radius: opt("radius", id) ?? 0,
+          sides: opt("sides", id) ?? 5,
         },
         ev,
       });
+      // a box with no area paints nothing (a flat one still strokes a line)
+      const w = Math.abs(rect.w);
+      const h = Math.abs(rect.h);
+      this._empty = !endpoints && ((w < 1 && h < 1) || (fillMode === "fill" && (w < 1 || h < 1)));
       strokeChanged(clear);
       this._prevRect = area;
       requestRender();
     },
     up() {
+      const empty = this._empty;
       this._start = null;
       this._prevRect = null;
-      endFloating(label, { opacity: this._opacity });
+      // a click without a drag: nothing to record (nor a text layer to flatten)
+      if (empty) abortFloating();
+      else endFloating(label, { opacity: this._opacity });
     },
     cancel() {
       this._start = null;
@@ -1617,23 +1721,16 @@ const lineShape = shapeTool({
   label: t("Line"),
   icon: "i-line",
   shortcut: "l",
-  draw(ctx, { a, b, o, ev }) {
-    let end = b;
-    if (ev.shift) {
-      // snap to 45° increments
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
-      const len = Math.hypot(dx, dy);
-      end = { x: a.x + Math.cos(ang) * len, y: a.y + Math.sin(ang) * len };
-    }
+  // Shift snaps to 45° increments (in shapeTool, so the cleared area follows)
+  endpoints: true,
+  draw(ctx, { a, b, o }) {
     ctx.save();
     ctx.strokeStyle = cssColor(state.primary);
     ctx.lineWidth = o.width;
     ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
-    ctx.lineTo(end.x, end.y);
+    ctx.lineTo(b.x, b.y);
     ctx.stroke();
     ctx.restore();
   },
@@ -1644,6 +1741,8 @@ const arrowShape = shapeTool({
   id: "arrow",
   label: t("Arrow"),
   icon: "i-arrow",
+  // Shift constrains the angle to 45° steps, like the line
+  endpoints: true,
   draw(ctx, { a, b, o }) {
     const head = Math.max(8, o.width * 3.4);
     const ang = Math.atan2(b.y - a.y, b.x - a.x);
@@ -2007,19 +2106,22 @@ registerSession({
     return false;
   },
   drop: () => text.discard(),
+  // an open text box hides the layer it edits and holds the unsaved text:
+  // autosave waits until it is closed
+  busy: () => !!text._editor,
 });
 
 /* ----------------------------- selection tools ---------------------------- */
 
-function selectionModeFrom(ev) {
+function selectionModeFrom(ev, toolId) {
   if (ev.shift) return "add";
   if (ev.alt) return "subtract";
-  return opt("mode") || "replace";
+  return opt("mode", toolId) || "replace";
 }
 
-function applySelection(next, mode, label) {
+function applySelection(next, mode, label, toolId) {
   const doc = state.doc;
-  const feather = opt("feather") || 0;
+  const feather = opt("feather", toolId) || 0;
   editSelection(label, () => {
     let sel = next;
     if (feather > 0) sel = sel.feather(feather);
@@ -2050,7 +2152,7 @@ function marqueeTool({ id, label, icon, shortcut, kind }) {
     down(ev) {
       this._start = ev.p;
       // the modifier held when the drag starts decides, as in other editors
-      this._mode = selectionModeFrom(ev);
+      this._mode = selectionModeFrom(ev, id);
       overlay.marquee = { kind, rect: { x: ev.p.x, y: ev.p.y, w: 0, h: 0 } };
       requestRender();
     },
@@ -2078,7 +2180,7 @@ function marqueeTool({ id, label, icon, shortcut, kind }) {
         kind === "ellipse"
           ? Selection.fromEllipse(doc.width, doc.height, rect)
           : Selection.fromRect(doc.width, doc.height, rect);
-      applySelection(next, mode, label);
+      applySelection(next, mode, label, id);
     },
     cancel() {
       overlay.marquee = null;
@@ -2116,7 +2218,7 @@ const lasso = {
   _mode: "replace",
   down(ev) {
     this._points = [ev.p];
-    this._mode = selectionModeFrom(ev);
+    this._mode = selectionModeFrom(ev, this.id);
     overlay.marquee = { kind: "lasso", points: this._points, close: true };
     requestRender();
   },
@@ -2141,7 +2243,8 @@ const lasso = {
       requestRender();
       return;
     }
-    applySelection(Selection.fromPath(doc.width, doc.height, points), mode, t("Lasso select"));
+    const next = Selection.fromPath(doc.width, doc.height, points);
+    applySelection(next, mode, t("Lasso select"), this.id);
   },
   cancel() {
     this._points = null;
@@ -2170,16 +2273,16 @@ const wand = {
     const x = Math.floor(ev.p.x);
     const y = Math.floor(ev.p.y);
     if (x < 0 || y < 0 || x >= doc.width || y >= doc.height) return;
-    const source = opt("sampleAll") ? doc.composite() : doc.active.canvas;
+    const id = this.id;
+    const source = opt("sampleAll", id) ? doc.composite() : doc.active.canvas;
     const img = source.getContext("2d").getImageData(0, 0, doc.width, doc.height);
-    const mask = floodMask(img, x, y, opt("tolerance"), !!opt("contiguous"));
+    const mask = floodMask(img, x, y, opt("tolerance", id), !!opt("contiguous", id));
     if (!mask) return;
-    const sel = Selection.fromMask(
-      doc.width,
-      doc.height,
-      maskToCanvas(mask, doc.width, doc.height)
-    );
-    applySelection(sel, selectionModeFrom(ev), t("Magic wand"));
+    const maskCanvas = maskToCanvas(mask, doc.width, doc.height);
+    // the selection keeps a copy: the temporary can go at once
+    const sel = Selection.fromMask(doc.width, doc.height, maskCanvas);
+    releaseCanvas(maskCanvas);
+    applySelection(sel, selectionModeFrom(ev, id), t("Magic wand"), id);
   },
   move() {},
   up() {},
@@ -2230,6 +2333,7 @@ const move = {
     },
   ],
   _edit: null,
+  _layer: null,
   _base: null,
   _cut: null,
   _start: null,
@@ -2246,12 +2350,14 @@ const move = {
     this._start = ev.p;
     this._delta = { x: 0, y: 0 };
 
-    const sel = opt("target") === "layer" ? null : doc.selection;
+    const sel = opt("target", this.id) === "layer" ? null : doc.selection;
     // moving the whole layer keeps text editable and carries the mask along
     this._text = !sel && !target.isMask && layer.text ? { ...layer.text } : null;
     this._mask = !sel && !target.isMask && layer.mask ? copyCanvas(layer.mask) : null;
     // moving part of a text layer turns it into pixels (only if it moves)
     this._dropText = !!(sel && !target.isMask && layer.text);
+    // the drag stays with this layer even if another one becomes active
+    this._layer = layer;
     this._target = target;
 
     const orig = copyCanvas(target.canvas);
@@ -2268,6 +2374,7 @@ const move = {
       bc.globalCompositeOperation = "destination-out";
       bc.drawImage(sel.canvas, 0, 0);
       this._base = base;
+      releaseCanvas(orig);
     } else {
       this._cut = orig;
       this._base = null;
@@ -2276,7 +2383,6 @@ const move = {
   },
   move(ev) {
     if (!this._edit) return;
-    const doc = state.doc;
     const target = this._target;
     let dx = ev.p.x - this._start.x;
     let dy = ev.p.y - this._start.y;
@@ -2290,7 +2396,7 @@ const move = {
     this._delta = { x: dx, y: dy };
 
     if (this._dropText) {
-      doc.active.text = null;
+      this._layer.text = null;
       this._dropText = false;
     }
     const c = target.ctx;
@@ -2309,7 +2415,8 @@ const move = {
       c.drawImage(this._cut, dx, dy);
     }
     c.restore();
-    if (this._mask) drawShiftedMask(doc.active.maskCtx, this._mask, dx, dy);
+    const maskCtx = this._mask && this._layer.maskCtx;
+    if (maskCtx) drawShiftedMask(maskCtx, this._mask, dx, dy);
     target.touch();
 
     if (this._sel) {
@@ -2336,28 +2443,70 @@ const move = {
         emit("selection", doc);
       }
       if (this._text) {
-        const layer = doc.active;
+        const layer = this._layer;
         layer.text = { ...this._text, x: this._text.x + dx, y: this._text.y + dy };
       }
       this._edit.commit(t("Move"));
     }
     this._edit = null;
-    this._cut = this._base = this._sel = this._mask = this._text = this._target = null;
-    this._dropText = false;
+    this._release();
     emit("layers", doc);
     requestRender();
   },
   cancel() {
     if (this._edit) this._edit.rollback();
     this._edit = null;
-    this._cut = this._base = this._sel = this._mask = this._text = this._target = null;
-    this._dropText = false;
+    this._release();
     overlay.floatFrame = null;
     requestRender();
+  },
+  /** Forget the drag and free its document-sized copies (history has its own). */
+  _release() {
+    releaseCanvas(this._cut);
+    releaseCanvas(this._base);
+    releaseCanvas(this._mask);
+    this._cut = this._base = this._sel = this._mask = this._text = this._target = null;
+    this._layer = null;
+    this._dropText = false;
   },
 };
 
 /* -------------------------------- transform ------------------------------- */
+
+/**
+ * A transformed mask whose uncovered area is revealed — transformMask() from
+ * doc.js, but drawn into buffers the transform session keeps (`bufs`), so a
+ * drag does not allocate document-sized canvases on every pointer move. The
+ * uncovered area lies in the output frame: it is added without the transform.
+ */
+function transformMaskLive(bufs, src, w, h, m) {
+  if (!bufs.moved) {
+    bufs.moved = makeCanvas(w, h);
+    bufs.rest = makeCanvas(w, h);
+    // a fully revealing mask the size of the source: the area it covers
+    bufs.full = makeMask(src.width, src.height, true);
+  }
+  const mc = ctx2d(bufs.moved);
+  const rc = ctx2d(bufs.rest);
+  for (const c of [mc, rc]) {
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalCompositeOperation = "source-over";
+    c.clearRect(0, 0, w, h);
+  }
+  mc.setTransform(m);
+  mc.drawImage(src, 0, 0);
+  // what the moved source covers, then inverted: white wherever it is not
+  rc.setTransform(m);
+  rc.drawImage(bufs.full, 0, 0);
+  rc.setTransform(1, 0, 0, 1, 0, 0);
+  rc.globalCompositeOperation = "xor";
+  rc.fillStyle = "#fff";
+  rc.fillRect(0, 0, w, h);
+  mc.setTransform(1, 0, 0, 1, 0, 0);
+  mc.globalCompositeOperation = "lighter";
+  mc.drawImage(bufs.rest, 0, 0);
+  return bufs.moved;
+}
 
 const HANDLES = [
   [-1, -1], [0, -1], [1, -1],
@@ -2427,6 +2576,7 @@ const transform = {
       pc.globalCompositeOperation = "destination-in";
       pc.drawImage(sel.canvas, -b.x, -b.y);
       const inner = alphaBounds(probe, 0);
+      releaseCanvas(probe);
       b = inner ? { x: b.x + inner.x, y: b.y + inner.y, w: inner.w, h: inner.h } : null;
     }
     this._preview = { key, b };
@@ -2501,6 +2651,8 @@ const transform = {
       base,
       selPatch,
       mask: !sel && !target.isMask && layer.mask ? copyCanvas(layer.mask) : null,
+      /** preview buffers for a transformed mask, reused on every move */
+      live: {},
       origin: { x: b.x, y: b.y },
       w: b.w,
       h: b.h,
@@ -2541,10 +2693,7 @@ const transform = {
     c.setTransform(1, 0, 0, 1, 0, 0);
     if (s.target.isMask && !s.base) {
       // the area a transformed mask no longer covers is revealed
-      const moved = transformMask(s.patch, s.target.width, s.target.height, (cc, src) => {
-        cc.setTransform(m);
-        cc.drawImage(src, 0, 0);
-      });
+      const moved = transformMaskLive(s.live, s.patch, s.target.width, s.target.height, m);
       c.globalCompositeOperation = "copy";
       c.drawImage(moved, 0, 0);
     } else {
@@ -2563,10 +2712,7 @@ const transform = {
       if (layer?.maskCtx) {
         // the mask lives in document space: map it with the same transform
         const mm = m.multiply(new DOMMatrix().translateSelf(-s.origin.x, -s.origin.y));
-        const moved = transformMask(s.mask, s.mask.width, s.mask.height, (cc, src) => {
-          cc.setTransform(mm);
-          cc.drawImage(src, 0, 0);
-        });
+        const moved = transformMaskLive(s.live, s.mask, s.mask.width, s.mask.height, mm);
         layer.maskCtx.save();
         layer.maskCtx.globalCompositeOperation = "copy";
         layer.maskCtx.drawImage(moved, 0, 0);
@@ -2630,8 +2776,9 @@ const transform = {
         if (Math.abs(dx) > Math.abs(dy)) dy = 0;
         else dx = 0;
       }
-      s.cx = s0.cx + dx;
-      s.cy = s0.cy + dy;
+      // whole pixels, like the Move tool: a plain move must not resample
+      s.cx = s0.cx + Math.round(dx);
+      s.cy = s0.cy + Math.round(dy);
     } else if (d.hit.kind === "rotate") {
       const a0 = Math.atan2(d.start.y - s0.cy, d.start.x - s0.cx);
       const a1 = Math.atan2(ev.p.y - s0.cy, ev.p.x - s0.cx);
@@ -2706,6 +2853,7 @@ const transform = {
     if (this._identity(s)) {
       // nothing moved: put this one layer back exactly, record nothing
       s.edit.rollback();
+      this._free(s);
       this._afterSession();
       return;
     }
@@ -2723,6 +2871,7 @@ const transform = {
       emit("toast", { msg: t("Text layer converted to pixels"), kind: "info" });
     }
     s.edit.commit(t("Transform"));
+    this._free(s);
     emit("layers", doc);
     this._afterSession();
   },
@@ -2733,15 +2882,26 @@ const transform = {
     this._drag = null;
     overlay.transform = null;
     s.edit.rollback();
+    this._free(s);
     this._afterSession();
   },
   /** The document was replaced: forget the session without touching pixels. */
   drop() {
-    this._s?.edit.dispose();
+    if (this._s) {
+      this._s.edit.dispose();
+      this._free(this._s);
+    }
     this._s = null;
     this._drag = null;
     this._preview = null;
     overlay.transform = null;
+  },
+  /** Free a finished session's copies (the undo entry keeps its own). */
+  _free(s) {
+    const { live } = s;
+    for (const c of [s.patch, s.base, s.selPatch, s.mask, live.moved, live.rest, live.full]) {
+      releaseCanvas(c);
+    }
   },
   _afterSession() {
     // still on the tool: show the box around the result, ready for more
@@ -2762,6 +2922,18 @@ registerSession({
   drop: () => transform.drop(),
   busy: () => !!transform._s,
 });
+
+/**
+ * A crop frame in whole pixels inside a W × H canvas. The edges are rounded,
+ * not the size, so the frame can never reach one pixel past the canvas.
+ */
+function fitCrop(r, W, H) {
+  const x = clamp(Math.round(r.x), 0, W - 1);
+  const y = clamp(Math.round(r.y), 0, H - 1);
+  const x2 = clamp(Math.round(r.x + r.w), x + 1, W);
+  const y2 = clamp(Math.round(r.y + r.h), y + 1, H);
+  return { x, y, w: x2 - x, h: y2 - y };
+}
 
 const crop = {
   id: "crop",
@@ -2804,6 +2976,8 @@ const crop = {
     },
   ],
   _drag: null,
+  /** the canvas size the frame was made for, e.g. "400x300" */
+  _size: "",
   activate() {
     const doc = state.doc;
     if (!doc) return;
@@ -2816,6 +2990,24 @@ const crop = {
           w: Math.round(doc.width * 0.84),
           h: Math.round(doc.height * 0.84),
         };
+    this._size = `${doc.width}x${doc.height}`;
+    requestRender();
+  },
+  /**
+   * The document changed under the frame (rotate, resize, canvas size, an
+   * undo…). The frame is in document coordinates: on a new canvas size it
+   * starts over, otherwise it is kept inside the canvas.
+   */
+  _docChanged() {
+    const doc = state.doc;
+    const size = doc ? `${doc.width}x${doc.height}` : "";
+    const resized = size !== this._size;
+    this._size = size;
+    if (!overlay.crop) return;
+    this._drag = null;
+    if (!doc || state.tool !== "crop") overlay.crop = null;
+    else if (resized) this.activate();
+    else overlay.crop = fitCrop(overlay.crop, doc.width, doc.height);
     requestRender();
   },
   deactivate() {
@@ -2891,15 +3083,10 @@ const crop = {
       if (mode.includes("n")) y1 = clamp(y1 + dy, 0, H);
       if (mode.includes("s")) y2 = clamp(y2 + dy, 0, H);
       r = { x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
-      const ratio = Number(opt("ratio"));
+      const ratio = Number(opt("ratio", this.id));
       if (ratio) r = this._withRatio(mode, { x1, y1, x2, y2 }, orig, ratio, W, H);
     }
-    overlay.crop = {
-      x: Math.round(r.x),
-      y: Math.round(r.y),
-      w: Math.max(1, Math.round(r.w)),
-      h: Math.max(1, Math.round(r.h)),
-    };
+    overlay.crop = fitCrop(r, W, H);
     requestRender();
   },
   /**
@@ -2976,7 +3163,7 @@ const crop = {
   },
   /** A new ratio reshapes the current frame around its centre. */
   onOptsChange() {
-    const ratio = Number(opt("ratio"));
+    const ratio = Number(opt("ratio", this.id));
     const c = overlay.crop;
     const doc = state.doc;
     if (!ratio || !c || !doc) return;
@@ -2989,19 +3176,15 @@ const crop = {
     h *= k;
     const x = clamp(cx - w / 2, 0, doc.width - w);
     const y = clamp(cy - h / 2, 0, doc.height - h);
-    overlay.crop = { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
+    overlay.crop = fitCrop({ x, y, w, h }, doc.width, doc.height);
     requestRender();
   },
   apply() {
     const r = overlay.crop;
     const doc = state.doc;
     if (!doc || !r || r.w < 1 || r.h < 1) return;
-    const rect = {
-      x: clamp(Math.round(r.x), 0, doc.width - 1),
-      y: clamp(Math.round(r.y), 0, doc.height - 1),
-      w: Math.max(1, Math.round(r.w)),
-      h: Math.max(1, Math.round(r.h)),
-    };
+    // never more than the canvas: a crop must not add transparent margins
+    const rect = fitCrop(r, doc.width, doc.height);
     overlay.crop = null;
     emit("crop-apply", rect);
   },
@@ -3034,24 +3217,40 @@ const eyedropper = {
     },
   ],
   _which: null,
+  /** both colours as they were when the gesture began */
+  _before: null,
   down(ev) {
+    // a gesture cut short (a second finger makes it a pinch) puts them back
+    this._before = { primary: { ...state.primary }, secondary: { ...state.secondary } };
+    this._sample(ev);
+  },
+  move(ev) {
+    if (ev.buttons && this._before) this._sample(ev);
+  },
+  _sample(ev) {
     this._which = ev.alt
       ? state.activeChip === "primary"
         ? "secondary"
         : "primary"
       : state.activeChip;
-    sampleColor(ev.p, this._which, opt("source") === "layer");
-  },
-  move(ev) {
-    if (ev.buttons) this.down(ev);
+    sampleColor(ev.p, this._which, opt("source", this.id) === "layer");
   },
   up() {
     // dragging the dropper walks over many pixels; keep only where it stopped
     if (this._which) recordRecent(this._which);
     this._which = null;
+    this._before = null;
   },
   cancel() {
+    const before = this._before;
     this._which = null;
+    this._before = null;
+    if (!before) return;
+    for (const which of ["primary", "secondary"]) {
+      const c = state[which];
+      const b = before[which];
+      if (c.r !== b.r || c.g !== b.g || c.b !== b.b || c.a !== b.a) setColor(b, which);
+    }
   },
 };
 
@@ -3279,6 +3478,10 @@ export function initInput(canvas) {
 
   canvas.addEventListener("pointerdown", (e) => {
     if (!state.doc) return;
+    // palm rejection: a hand resting on the screen while the pen draws is
+    // neither a pinch nor a new stroke (nor counted towards the next one)
+    const penDrag = !!drag && pointers.get(drag.pointerId)?.pointerType === "pen";
+    if (e.pointerType === "touch" && penDrag) return;
     canvas.setPointerCapture?.(e.pointerId);
     pointers.set(e.pointerId, e);
 
@@ -3519,6 +3722,9 @@ for (const event of ["layers", "selection", "target"]) {
     if (state.tool === "transform" && !transform._s) transform._showPreview();
   });
 }
+/* document changes that may give the canvas a new size (see crop._docChanged) */
+const RESIZING = new Set(["geometry", "undo", "redo", "restore", "open"]);
 on("doc", ({ reason }) => {
   if (reason === "open") transform.drop();
+  if (RESIZING.has(reason)) crop._docChanged();
 });

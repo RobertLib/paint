@@ -84,7 +84,6 @@ export default {
   "Keyboard shortcuts · ?": "Klávesové zkratky · ?",
   "Zoom out · ⌘−": "Oddálit · ⌘−",
   "Zoom in · ⌘+": "Přiblížit · ⌘+",
-  "Reset to 100%": "Zpět na 100 %",
   "Reset to 100% · ⌘1": "Zpět na 100 % · ⌘1",
   "Fit to screen": "Přizpůsobit obrazovce",
   "Fit to screen · ⌘0": "Přizpůsobit obrazovce · ⌘0",
@@ -128,11 +127,9 @@ export default {
   "Show layer": "Zobrazit vrstvu",
   "Lock layer": "Zamknout vrstvu",
   "Unlock layer": "Odemknout vrstvu",
-  "Toggle visibility": "Přepnout viditelnost",
-  "Toggle lock": "Přepnout zámek",
   Reset: "Vynulovat",
   Apply: "Použít",
-  "Apply {name}": "Použít {name}",
+  "Apply {name}": "Použít filtr {name}",
   "Adjustments preview live on the active layer and apply inside the selection when one exists.":
     "Korekce se živě zobrazují na aktivní vrstvě a při existujícím výběru působí jen uvnitř něj.",
   "Filters apply to the active layer — or to the selected area only.":
@@ -184,7 +181,7 @@ export default {
   "Pencil sketch": "Kresba tužkou",
   Bloom: "Záře",
   Pixelate: "Pixelizace",
-  "Applying {name}…": "Používám {name}…",
+  "Applying {name}…": "Používám filtr {name}…",
   "{name} applied": "{name}: hotovo",
   "{label} applied": "{label}: hotovo",
 
@@ -341,6 +338,8 @@ export default {
   "Alt-click to set the healing source first": "Nejdřív Alt+klikem nastavte zdroj retuše",
   "Spot healing works on layer pixels — click the layer thumbnail first":
     "Bodová retuš pracuje s pixely vrstvy – nejdřív klikněte na náhled vrstvy",
+  "{tool} works on layer pixels — click the layer thumbnail first":
+    "Nástroj „{tool}“ pracuje s pixely vrstvy – nejdřív klikněte na náhled vrstvy",
   "Nothing to transform on this layer": "Na této vrstvě není co transformovat",
   "Text layer converted to pixels": "Textová vrstva převedena na pixely",
   "New {w} × {h} document": "Nový dokument {w} × {h}",
@@ -356,10 +355,11 @@ export default {
   "Writing PSD…": "Ukládám PSD…",
   "Opened the flattened PSD image — its layer data could not be read":
     "Otevřen sloučený obraz PSD – vrstvy se nepodařilo načíst",
+  // no "s/se {n}": the preposition would depend on how the number is read
   "Opened PSD with {n} layers": {
-    one: "Otevřeno PSD s 1 vrstvou",
-    few: "Otevřeno PSD se {n} vrstvami",
-    many: "Otevřeno PSD s {n} vrstvami",
+    one: "Otevřeno PSD ({n} vrstva)",
+    few: "Otevřeno PSD ({n} vrstvy)",
+    many: "Otevřeno PSD ({n} vrstev)",
   },
   "Could not read that PSD file: {msg}": "Soubor PSD se nepodařilo načíst: {msg}",
   "Not a Photoshop file": "Nejde o soubor Photoshopu",
@@ -367,17 +367,14 @@ export default {
   "Unknown PSD version": "Neznámá verze PSD",
   "CMYK PSD files are not supported": "PSD v režimu CMYK nejsou podporované",
   "Only RGB and grayscale PSD files are supported": "Podporované jsou jen PSD v RGB a ve stupních šedi",
-  "Only 8- and 16-bit PSD files are supported": "Podporované jsou jen 8bitové a 16bitové PSD",
   "This PSD is too large to open in a browser": "Toto PSD je na otevření v prohlížeči příliš velké",
   "This PSD uses compression that cannot be read here": "Toto PSD používá kompresi, kterou zde nelze přečíst",
-  "Damaged PSD layer record": "Poškozený záznam vrstvy v PSD",
-  "Image was very large — scaled down to 8000px": "Obrázek byl velmi velký – zmenšen na 8000 px",
   "Place image": "Vložit obrázek",
   "Placed “{name}” as a new layer": "„{name}“ vloženo jako nová vrstva",
   Pasted: "Vloženo",
   "Pasted as a new document": "Vloženo jako nový dokument",
   "Nothing usable on the clipboard": "Ve schránce není nic použitelného",
-  "Press ⌘V / Ctrl+V to paste an image": "Obrázek vložíte klávesami ⌘V / Ctrl+V",
+  "Press ⌘V to paste an image": "Obrázek vložíte klávesami ⌘V",
   "No image found on the clipboard": "Ve schránce není žádný obrázek",
   "Clipboard access was blocked — use ⌘V instead": "Přístup ke schránce byl zablokován – použijte ⌘V",
   "Copied to clipboard": "Zkopírováno do schránky",
@@ -401,6 +398,10 @@ export default {
   "Nothing to redo": "Není co opakovat",
   "Restored “{name}”": "Obnoveno „{name}“",
   "The saved session could not be restored": "Uloženou relaci se nepodařilo obnovit",
+  "This document is too large to be autosaved — save the project to keep your work":
+    "Tento dokument je na automatické ukládání příliš velký – uložte projekt, abyste o práci nepřišli",
+  "Autosave failed — this browser's storage may be full or blocked. Save the project to keep your work":
+    "Automatické uložení selhalo – úložiště prohlížeče je možná plné nebo blokované. Uložte projekt, abyste o práci nepřišli",
   "The largest supported size is 8000 × 8000 px": "Největší podporovaná velikost je 8000 × 8000 px",
   "Copied {hex}": "Zkopírováno {hex}",
 
@@ -429,7 +430,6 @@ export default {
   Flattened: "Sloučeno",
 
   // ----------------------------------------------------------- welcome
-  Studio: "Studio",
   "A complete image editor in your browser. Layers, selections, retouching and filters — nothing ever leaves your device.":
     "Kompletní editor obrázků v prohlížeči. Vrstvy, výběry, retuš a filtry – nic neopouští vaše zařízení.",
   "New canvas": "Nové plátno",
@@ -558,6 +558,8 @@ export default {
   "The project was too large for this device — scaled down to {w} × {h}":
     "Projekt byl pro toto zařízení příliš velký – zmenšen na {w} × {h}",
   "The layer below is locked": "Vrstva pod ní je zamčená",
+  "The layer below is hidden": "Vrstva pod ní je skrytá",
+  "Nothing to apply the effect to — the area is empty": "Efekt není na co použít – oblast je prázdná",
   "That is larger than this device supports — using {w} × {h}":
     "Takovou velikost toto zařízení nezvládne – použije se {w} × {h}",
   "Restoring…": "Obnovuji…",
@@ -584,4 +586,17 @@ export default {
   "This PSD file is damaged": "Soubor PSD je poškozený",
   "Only 8-, 16- and 32-bit PSD files are supported": "Podporované jsou jen 8bitové, 16bitové a 32bitové PSD",
   "Linear dodge (add)": "Lineární zesvětlení (přidat)",
+
+  /* --- UI review fixes --- */
+  "Close panels": "Zavřít panely",
+  "Next steps": "Další kroky",
+  "Edit mask": "Upravovat masku",
+  // canvas-size anchor cells ("Left" / "Right" above)
+  "Top left": "Vlevo nahoře",
+  Top: "Nahoře",
+  "Top right": "Vpravo nahoře",
+  Middle: "Uprostřed",
+  "Bottom left": "Vlevo dole",
+  Bottom: "Dole",
+  "Bottom right": "Vpravo dole",
 };

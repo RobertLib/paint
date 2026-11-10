@@ -89,18 +89,26 @@ const ATTRS = ["aria-label", "data-tip", "title", "placeholder", "alt"];
 /** Tooltips read "Label · shortcut": translate the label, keep the keys. */
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
+/** Modifier glyphs in the order Windows and Linux name them: Ctrl+Alt+Shift+…. */
+const MODIFIERS = [
+  [/[⌘⌃]/, "Ctrl"],
+  [/⌥/, "Alt"],
+  [/⇧/, "Shift"],
+];
+
 /**
  * Shortcut glyphs in hand-written markup are Mac-style (⌘, ⌥, ⇧); elsewhere
- * they read Ctrl+…, Alt+…, Shift+….
+ * they read Ctrl+…, Alt+…, Shift+…. A run of modifiers may come in any order
+ * and spaced ("⇧ ⌘ E", "⌥⌘T"): it always reads "Ctrl+Shift+E", "Ctrl+Alt+T".
  */
 export function platformKeys(s) {
-  if (isMac || !/[⌘⌥⇧⌫]/.test(s)) return s;
+  if (isMac || !/[⌘⌃⌥⇧⌫]/.test(s)) return s;
   return s
-    .replace(/⇧⌘/g, "Ctrl+Shift+")
-    .replace(/⌥⌘/g, "Ctrl+Alt+")
-    .replace(/⌘\s?/g, "Ctrl+")
-    .replace(/⌥\s?/g, "Alt+")
-    .replace(/⇧\s?/g, "Shift+")
+    .replace(/[⌘⌃⌥⇧](?:\s?[⌘⌃⌥⇧])*\s?/g, (run) =>
+      MODIFIERS.filter(([glyph]) => glyph.test(run))
+        .map(([, name]) => `${name}+`)
+        .join("")
+    )
     .replace(/⌫/g, "Backspace");
 }
 

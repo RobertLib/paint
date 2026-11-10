@@ -8,7 +8,7 @@
    has to land here.
    ========================================================================== */
 
-import { HANDOFF_KEY, idbSet } from "./store.js";
+import { handoffKey, idbSet } from "./store.js";
 
 const cfgEl = document.getElementById("dropConfig");
 const cfg = cfgEl ? JSON.parse(cfgEl.textContent) : null;
@@ -16,9 +16,33 @@ const drop = document.querySelector("[data-drop]");
 const busy = document.querySelector("[data-busy]");
 const error = document.querySelector("[data-error]");
 
-/** Images, Photoshop files and the editor's own .paint projects. */
-const OPENABLE = /\.(png|jpe?g|webp|gif|bmp|svg|avif|heic|heif|psd|paint|ico|tiff?)$/i;
-const isOpenable = (f) => !!f && (f.type.startsWith("image/") || OPENABLE.test(f.name));
+/*
+ * What the editor opens (isOpenable in js/actions.js): the images every
+ * browser decodes, HEIC photos (decoded on demand), Photoshop files and its
+ * own .paint projects — recognised by extension or by type.
+ */
+const OPENABLE = /\.(png|jpe?g|webp|gif|bmp|svg|avif|ico|heic|heif|psd|paint)$/i;
+const OPENABLE_TYPE = new Set([
+  "image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/svg+xml", "image/avif",
+  "image/x-icon", "image/vnd.microsoft.icon", "image/heic", "image/heif", "image/heic-sequence",
+  "image/heif-sequence", "image/vnd.adobe.photoshop", "application/x-photoshop",
+]);
+const isOpenable = (f) => !!f && (OPENABLE.test(f.name) || OPENABLE_TYPE.has(f.type));
+/** Other images (TIFF, camera RAW…) the editor takes only when the browser can decode them. */
+const isOtherImage = (f) => f.type.startsWith("image/") || /\.tiff?$/i.test(f.name);
+
+/** Ask the browser to decode `file`, as the editor will: true when it can. */
+function decodes(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = img.onerror = (e) => {
+      URL.revokeObjectURL(url);
+      resolve(e.type === "load");
+    };
+    img.src = url;
+  });
+}
 
 let opening = false;
 
@@ -33,15 +57,18 @@ function say(text) {
 
 async function openInEditor(file) {
   if (!cfg || !file || opening) return;
-  if (!isOpenable(file)) {
+  opening = true;
+  if (!isOpenable(file) && !(isOtherImage(file) && (await decodes(file)))) {
+    opening = false;
     say(cfg.notOpenable || "");
     return;
   }
   say("");
-  opening = true;
   drop?.classList.add("is-busy");
   if (busy) busy.hidden = false;
-  const stored = await idbSet(HANDOFF_KEY, {
+  // a key of its own per drop: two tabs dropping at once never swap files
+  const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  const stored = await idbSet(handoffKey(id), {
     file,
     name: file.name,
     type: file.type,
@@ -50,7 +77,7 @@ async function openInEditor(file) {
   const q = new URLSearchParams({ lang: cfg.lang });
   if (cfg.task) q.set("task", cfg.task);
   // without storage the editor still opens and asks for the file itself
-  if (stored !== null) q.set("open", "1");
+  if (stored !== null) q.set("open", id);
   location.href = `${cfg.editor}?${q}`;
 }
 

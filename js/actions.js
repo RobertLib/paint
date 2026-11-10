@@ -19,12 +19,14 @@ import {
   maskToGray,
   maxCanvasPixels,
   paintMasked,
+  releaseCanvas,
 } from "./doc.js";
 import {
   ADJUST_DEFAULTS,
   applyAdjustments,
   applyEffect,
   EFFECTS,
+  effectArea,
   hasAdjustments,
 } from "./filters.js";
 import {
@@ -37,9 +39,10 @@ import {
   history,
   pushCommand,
   registerSession,
+  sessionsBusy,
   settleSessions,
 } from "./history.js";
-import { t, tn } from "./i18n.js";
+import { platformKeys, t, tn } from "./i18n.js";
 import { overlay, requestRender } from "./render.js";
 import { emit, markDirty, state } from "./state.js";
 import { track } from "./track.js";
@@ -85,7 +88,9 @@ export function newDocument({ width, height, background = "#ffffff" }) {
 }
 
 export function confirmDiscard() {
-  if (!state.dirty || !state.doc) return true;
+  // a live preview or transform is unsaved work too, though nothing is
+  // recorded (or marked dirty) until it is applied
+  if ((!state.dirty && !sessionsBusy()) || !state.doc) return true;
   return window.confirm(
     t("You have unsaved changes in this document. Discard them and continue?")
   );
@@ -286,8 +291,13 @@ function docFromImage(img, name) {
 export function placeImage(img, name = t("Image")) {
   const doc = state.doc;
   if (!doc) return;
-  const iw = img.naturalWidth || img.width;
-  const ih = img.naturalHeight || img.height;
+  let iw = img.naturalWidth || img.width;
+  let ih = img.naturalHeight || img.height;
+  // an SVG without width/height has no intrinsic size (as in docFromImage)
+  if (!iw || !ih) {
+    iw = 1200;
+    ih = 900;
+  }
   const scale = Math.min(1, doc.width / iw, doc.height / ih);
   const w = Math.round(iw * scale);
   const h = Math.round(ih * scale);
@@ -331,8 +341,9 @@ export async function pasteImage(source) {
 }
 
 export async function pasteFromClipboard() {
+  // the shortcut reads Ctrl+V outside Apple devices
   if (!navigator.clipboard?.read) {
-    toast(t("Press ⌘V / Ctrl+V to paste an image"), "info");
+    toast(platformKeys(t("Press ⌘V to paste an image")), "info");
     return;
   }
   try {
@@ -346,7 +357,7 @@ export async function pasteFromClipboard() {
     }
     toast(t("No image found on the clipboard"), "err");
   } catch {
-    toast(t("Clipboard access was blocked — use ⌘V instead"), "err");
+    toast(platformKeys(t("Clipboard access was blocked — use ⌘V instead")), "err");
   }
 }
 
@@ -374,9 +385,9 @@ export async function copyToClipboard() {
 
 /**
  * Pixels inside the selection, cropped to its bounds — of the whole picture
- * by default, or only of the active layer (as it shows, mask applied).
+ * by default, or only of `layer` (as it shows, mask applied).
  */
-function selectionCanvas({ layerOnly = false } = {}) {
+function selectionCanvas({ layer = null } = {}) {
   const doc = state.doc;
   const sel = doc?.selection;
   if (!sel) return null;
@@ -384,7 +395,7 @@ function selectionCanvas({ layerOnly = false } = {}) {
   if (!b) return null;
   const out = makeCanvas(b.w, b.h);
   const c = ctx2d(out);
-  c.drawImage(layerOnly ? doc.active.maskedPixels() : doc.composite(), -b.x, -b.y);
+  c.drawImage(layer ? layer.maskedPixels() : doc.composite(), -b.x, -b.y);
   c.globalCompositeOperation = "destination-in";
   c.drawImage(sel.canvas, -b.x, -b.y);
   return out;
@@ -519,12 +530,114 @@ export function saveProject() {
   track("save-project");
 }
 
+/** Projects at least this big are read layer by layer (see readProject). */
+const BIG_PROJECT = 64 * 1024 * 1024;
+
+/**
+ * Parse a .paint file. A project can be larger than the longest string a
+ * browser can hold (about 512 MB) — projectBlob writes it in parts for that
+ * reason — so a big file is never read as one string: the top-level "layers"
+ * array is found by scanning the bytes, and each layer object is parsed on
+ * its own when Doc.fromJSON gets to it.
+ */
+async function readProject(file) {
+  if (file.size < BIG_PROJECT) return JSON.parse(await file.text());
+  const found = await findLayers(file);
+  if (!found) throw new Error("Not a Paint Studio project file");
+  // everything else is small: parse it with an empty array in their place
+  const rest = new Blob([file.slice(0, found.start), "[]", file.slice(found.end)]);
+  const json = JSON.parse(await rest.text());
+  if (json && typeof json === "object") {
+    json.layers = (async function* () {
+      for (const [a, b] of found.items) yield JSON.parse(await file.slice(a, b).text());
+    })();
+  }
+  return json;
+}
+
+/**
+ * Byte ranges of the top-level "layers" array of a JSON file and of every
+ * object in it, found by reading the file in chunks while tracking strings,
+ * escapes and nesting. JSON's structural characters are ASCII, which never
+ * occurs inside a multi-byte UTF-8 sequence, so no decoding is needed.
+ */
+async function findLayers(file, chunk = 8 * 1024 * 1024) {
+  const QUOTE = 34;
+  const BACKSLASH = 92;
+  let depth = 0;
+  let inString = false;
+  // the previous chunk ended on a backslash: skip the character it escapes
+  let escaped = false;
+  // where the string being read began, if it is a key of the top-level object
+  let keyStart = -1;
+  let key = null;
+  // `"layers":` was just read, so an array starting now is the one
+  let wantLayers = false;
+  let start = -1;
+  let item = -1;
+  const items = [];
+  for (let off = 0; off < file.size; off += chunk) {
+    const bytes = new Uint8Array(await file.slice(off, off + chunk).arrayBuffer());
+    let i = escaped ? 1 : 0;
+    escaped = false;
+    while (i < bytes.length) {
+      if (inString) {
+        // jump straight to the closing quote: a layer is mostly one long string
+        const q = bytes.indexOf(QUOTE, i);
+        const bs = bytes.subarray(i, q < 0 ? bytes.length : q).indexOf(BACKSLASH);
+        if (bs >= 0) {
+          i += bs + 2;
+          if (i > bytes.length) escaped = true;
+          continue;
+        }
+        if (q < 0) break;
+        inString = false;
+        if (keyStart >= 0) {
+          const end = off + q;
+          key = end - keyStart <= 64 ? await file.slice(keyStart, end).text() : null;
+        }
+        i = q + 1;
+        continue;
+      }
+      const c = bytes[i];
+      if (depth === 1 && c !== 32 && c !== 10 && c !== 13 && c !== 9) {
+        if (c === 58) {
+          // ":" after a key
+          wantLayers = key === "layers";
+          i++;
+          continue;
+        }
+        if (c === 91 && wantLayers && start < 0) start = off + i;
+        wantLayers = false;
+      }
+      if (c === QUOTE) {
+        inString = true;
+        keyStart = depth === 1 ? off + i + 1 : -1;
+      } else if (c === 123 || c === 91) {
+        // "{" or "[": a layer object starts directly inside the array
+        if (c === 123 && depth === 2 && start >= 0) item = off + i;
+        depth++;
+      } else if (c === 125 || c === 93) {
+        depth--;
+        if (depth === 2 && item >= 0 && c === 125) {
+          items.push([item, off + i + 1]);
+          item = -1;
+        } else if (depth === 1 && start >= 0 && c === 93) {
+          return { start, end: off + i + 1, items };
+        }
+      }
+      i++;
+    }
+  }
+  return null;
+}
+
 export async function openProjectFile(file) {
   if (!file) return false;
   if (!confirmDiscard()) return false;
   emit("busy", t("Opening project…"));
   try {
-    const doc = await Doc.fromJSON(JSON.parse(await file.text()));
+    const doc = await Doc.fromJSON(await readProject(file));
     setDocument(doc);
     toast(t("Opened project “{name}”", { name: doc.name }), "ok");
     if (doc.scaledFrom) {
@@ -549,14 +662,37 @@ function download(blob, filename) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // iOS Safari fetches the file only after its download sheet is answered:
+  // revoking the URL early fails that with "WebKitBlobResource error 1"
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+/**
+ * A file name from a document name: only what file systems refuse goes
+ * (\ / : * ? " < > |, control characters, dots and spaces at either end);
+ * spaces (tabs too) become dashes.
+ */
 const sanitize = (s) =>
-  (s || "untitled").trim().replace(/[^\p{L}\p{N}\-. ]+/gu, "").replace(/\s+/g, "-") ||
-  "untitled";
+  String(s || "")
+    .replace(/[\\/:*?"<>|]|(?!\s)\p{Cc}/gu, "")
+    .replace(/^[.\s]+|[.\s]+$/g, "")
+    .replace(/\s+/g, "-") || "untitled";
 
 /* ================================ layers ================================= */
+
+/**
+ * Finish live sessions before a command on `layer` and return its index
+ * afterwards, or -1 when it is gone. Finishing an open text box can add a
+ * layer (and make it active) or delete an emptied one, so an index read
+ * before it may name another layer: a command keeps acting on the layer the
+ * user picked, and does nothing once that layer no longer exists.
+ */
+function settleLayer(layer) {
+  const doc = state.doc;
+  settleSessions();
+  if (!layer || !doc || state.doc !== doc) return -1;
+  return doc.layers.indexOf(layer);
+}
 
 export function addLayer() {
   const doc = state.doc;
@@ -569,19 +705,29 @@ export function addLayer() {
 export function duplicateLayer() {
   const doc = state.doc;
   if (!doc) return;
-  editDoc(t("Duplicate layer"), () => doc.duplicateLayer());
+  const index = settleLayer(doc.active);
+  if (index < 0) return;
+  editDoc(t("Duplicate layer"), () => doc.duplicateLayer(index));
   emit("layers", doc);
   requestRender();
 }
 
 export function deleteLayer(index = state.doc?.activeIndex) {
   const doc = state.doc;
-  if (!doc || !doc.layers[index]) return;
+  const layer = doc?.layers[index];
+  if (!layer) return;
   if (doc.layers.length <= 1) {
     toast(t("A document needs at least one layer"), "err");
     return;
   }
-  editDoc(t("Delete layer"), () => doc.removeLayer(index));
+  // an emptied text box deletes its own layer when it is finished
+  const at = settleLayer(layer);
+  if (at < 0) return;
+  if (doc.layers.length <= 1) {
+    toast(t("A document needs at least one layer"), "err");
+    return;
+  }
+  editDoc(t("Delete layer"), () => doc.removeLayer(at));
   emit("layers", doc);
   requestRender();
 }
@@ -589,31 +735,60 @@ export function deleteLayer(index = state.doc?.activeIndex) {
 export function mergeDown() {
   const doc = state.doc;
   if (!doc) return;
-  if (doc.activeIndex <= 0) {
+  const index = settleLayer(doc.active);
+  if (index < 0) return;
+  if (index === 0) {
     toast(t("Nothing below this layer to merge into"), "err");
     return;
   }
-  if (doc.layers[doc.activeIndex - 1].locked) {
+  const below = doc.layers[index - 1];
+  if (below.locked) {
     toast(t("The layer below is locked"), "err");
     return;
   }
-  editDoc(t("Merge down"), () => doc.mergeDown());
+  // the merged layer takes the lower one's visibility: everything would vanish
+  if (!below.visible) {
+    toast(t("The layer below is hidden"), "err");
+    return;
+  }
+  editDoc(t("Merge down"), () => doc.mergeDown(index));
   emit("layers", doc);
   requestRender();
 }
 
 export function flattenImage() {
   const doc = state.doc;
-  if (!doc || doc.layers.length === 1) return;
+  if (!doc) return;
+  // an open text box becomes a layer of its own first: count it
+  settleSessions();
+  if (doc.layers.length === 1) return;
   editDoc(t("Flatten image"), () => doc.flatten());
   emit("layers", doc);
   requestRender();
 }
 
+/** Move the layer at `from` so that it ends up at index `to`. */
 export function moveLayer(from, to) {
   const doc = state.doc;
-  if (!doc || from === to) return;
-  editDoc(t("Reorder layers"), () => doc.moveLayer(from, to));
+  const layer = doc?.layers[from];
+  if (!layer || from === to) return;
+  // remember the place by its neighbours, which keep their order when
+  // finishing a text box adds or removes a layer
+  const others = doc.layers.filter((l) => l !== layer);
+  const at = Math.max(0, Math.min(others.length, to));
+  const above = others[at] || null;
+  const below = others[at - 1] || null;
+  const index = settleLayer(layer);
+  if (index < 0) return;
+  const rest = doc.layers.filter((l) => l !== layer);
+  let target;
+  if (above && rest.includes(above)) target = rest.indexOf(above);
+  else if (below && rest.includes(below)) target = rest.indexOf(below) + 1;
+  else if (!below) target = 0;
+  else if (!above) target = rest.length;
+  else return;
+  if (target === index) return;
+  editDoc(t("Reorder layers"), () => doc.moveLayer(index, target));
   emit("layers", doc);
   requestRender();
 }
@@ -655,6 +830,7 @@ export function setLayerProp(index, prop, value, label = t("Layer settings")) {
   const doc = state.doc;
   const layer = doc?.layers[index];
   if (!layer || layer[prop] === value) return;
+  if (settleLayer(layer) < 0 || layer[prop] === value) return;
   const id = layer.id;
   const before = layer[prop];
 
@@ -697,6 +873,11 @@ export function addMask(mode = state.doc?.selection ? "selection" : "reveal") {
     toast(t("This layer already has a mask"), "info");
     return;
   }
+  if (layer.locked) {
+    toast(t("This layer is locked"), "err");
+    return;
+  }
+  if (settleLayer(layer) < 0 || layer.mask) return;
   editDoc(t("Add layer mask"), () => {
     let mask;
     if (mode === "selection" && doc.selection) {
@@ -723,6 +904,11 @@ export function deleteMask() {
   const doc = state.doc;
   const layer = doc?.active;
   if (!layer?.mask) return;
+  if (layer.locked) {
+    toast(t("This layer is locked"), "err");
+    return;
+  }
+  if (settleLayer(layer) < 0 || !layer.mask) return;
   editDoc(t("Delete layer mask"), () => {
     layer.setMask(null);
     layer.touch();
@@ -740,6 +926,7 @@ export function applyLayerMask() {
     toast(t("This layer is locked"), "err");
     return;
   }
+  if (settleLayer(layer) < 0 || !layer.mask) return;
   editDoc(t("Apply layer mask"), () => doc.applyMask(layer));
   emit("layers", doc);
   emit("target", doc.target);
@@ -754,6 +941,7 @@ export function invertMask() {
     toast(t("This layer is locked"), "err");
     return;
   }
+  if (settleLayer(layer) < 0 || !layer.mask) return;
   const target = layer.maskTarget;
   editPixels(
     t("Invert mask"),
@@ -935,7 +1123,7 @@ export function duplicateSelectionToLayer() {
   const doc = state.doc;
   if (!doc) return;
   // like "Layer via Copy": the active layer's pixels, not the whole picture
-  const cut = selectionCanvas({ layerOnly: true });
+  const cut = selectionCanvas({ layer: doc.active });
   if (!cut) {
     toast(t("Make a selection first"), "err");
     return;
@@ -1250,17 +1438,24 @@ registerSession({
  * Live preview for dialog-driven edits (Levels, Curves). `update(produce)`
  * re-renders from the untouched original on the next frame — `produce`
  * receives that original (as grayscale for masks) and the selection bounds,
- * and returns the processed canvas. commit() records one undo step.
+ * and returns the processed canvas; `update(null)` shows the original again
+ * (the settings change nothing). commit() records one undo step, if anything
+ * changed.
  */
 export function beginPreview(label) {
   const doc = state.doc;
-  const target = doc?.target;
+  if (!doc) return null;
+  previewSession?.cancel();
+  // other live work (a text box, a transform) is finished before the target
+  // is read — finishing it can change which layer is active
+  settleSessions();
+  if (state.doc !== doc) return null;
+  const target = doc.target;
   if (!target) return null;
   if (target.locked) {
     toast(t("This layer is locked"), "err");
     return null;
   }
-  previewSession?.cancel();
   const edit = beginPixelEdit(target);
   const isMask = !!target.isMask;
   const orig = isMask ? maskToGray(edit.before) : edit.before;
@@ -1271,18 +1466,22 @@ export function beginPreview(label) {
   let open = true;
 
   const render = () => {
-    if (!pending || !open) return;
-    let processed = pending(orig, region);
-    if (isMask) processed = grayToMask(processed);
+    if (!open) return;
     const c = target.ctx;
     c.save();
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.globalCompositeOperation = "copy";
     c.drawImage(edit.before, 0, 0);
     c.restore();
-    paintMasked(target, processed, doc.selection, { replace: true });
+    if (pending) {
+      let processed = pending(orig, region);
+      if (isMask) processed = grayToMask(processed);
+      paintMasked(target, processed, doc.selection, { replace: true });
+    } else {
+      target.touch();
+    }
     doc.invalidate();
-    changed = true;
+    changed = !!pending;
     requestRender();
   };
 
@@ -1297,8 +1496,10 @@ export function beginPreview(label) {
     orig,
     region,
     update(produce) {
-      pending = produce;
+      pending = produce || null;
       if (frame || !open) return;
+      // nothing shown yet and nothing to show: no repaint needed
+      if (!pending && !changed) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
         render();
@@ -1358,6 +1559,25 @@ export async function heavy(label, fn) {
 
 let filtering = false;
 
+/** True when `canvas` has no visible pixel inside `rect` (default: anywhere). */
+function isClear(canvas, rect = null) {
+  const r = rect || { x: 0, y: 0, w: canvas.width, h: canvas.height };
+  const c = canvas.getContext("2d");
+  // a strip at a time: a layer with content answers after the first one
+  for (let y = r.y; y < r.y + r.h; y += 64) {
+    const { data } = c.getImageData(r.x, y, r.w, Math.min(64, r.y + r.h - y));
+    for (let i = 3; i < data.length; i += 4) if (data[i] !== 0) return false;
+  }
+  return true;
+}
+
+/** A copy of the `r` part of a canvas. */
+function cropCanvas(src, r) {
+  const out = makeCanvas(r.w, r.h);
+  ctx2d(out).drawImage(src, -r.x, -r.y);
+  return out;
+}
+
 /** Apply a filter to the paint target (inside the selection when there is one). */
 export async function applyFilter(id, params = {}) {
   if (filtering) return false;
@@ -1372,6 +1592,12 @@ export async function applyFilter(id, params = {}) {
   }
   const effect = EFFECTS.find((e) => e.id === id);
   if (!effect) return false;
+  // effects keep transparent pixels transparent: an empty layer stays as it is
+  const cover = doc.selection?.coverBounds || null;
+  if (!target.isMask && isClear(target.canvas, cover)) {
+    toast(t("Nothing to apply the effect to — the area is empty"), "info");
+    return false;
+  }
 
   filtering = true;
   let done = false;
@@ -1380,14 +1606,24 @@ export async function applyFilter(id, params = {}) {
       // the document or target may have changed while the busy overlay showed
       if (state.doc !== doc || doc.target !== target) return false;
       const isMask = !!target.isMask;
+      const W = target.width;
+      const H = target.height;
+      const opts = { primary: state.primary, secondary: state.secondary, ...params };
+      // inside a selection, an effect that only looks at nearby pixels runs
+      // on the selected area and the margin it reads — the same result there
+      const sel = doc.selection?.coverBounds;
+      const area = sel ? effectArea(id, sel, W, H, opts) : null;
       // effects may work in place: never hand them the layer itself
-      const src = isMask ? maskToGray(target.canvas) : copyCanvas(target.canvas);
-      let out = applyEffect(id, src, {
-        primary: state.primary,
-        secondary: state.secondary,
-        ...params,
-      });
+      let src = area ? cropCanvas(target.canvas, area) : null;
+      if (isMask) src = maskToGray(src || target.canvas);
+      else src ||= copyCanvas(target.canvas);
+      let out = applyEffect(id, src, area ? { ...opts, image: { width: W, height: H } } : opts);
       if (isMask) out = grayToMask(out);
+      if (area) {
+        const full = makeCanvas(W, H);
+        ctx2d(full).drawImage(out, area.x, area.y);
+        out = full;
+      }
       editPixels(
         effect.name,
         () => paintMasked(target, out, doc.selection, { replace: true }),
@@ -1407,17 +1643,25 @@ export async function applyFilter(id, params = {}) {
   return true;
 }
 
-/** Small preview of an effect for the filter gallery. */
-export function filterPreview(id, w, h) {
-  const doc = state.doc;
-  const base = makeCanvas(w, h);
-  const c = ctx2d(base);
-  if (!doc) return base;
-  const scale = Math.max(w / doc.width, h / doc.height);
+/** doc → { key, canvas }: weak, so a closed document is not kept alive */
+const thumbBases = new WeakMap();
+
+/**
+ * The picture shrunk to a w × h thumbnail (centred crop). The gallery shows
+ * every effect on the same thumbnail, so the downscale of the full-size
+ * composite runs once per change of the document, not once per effect.
+ */
+function previewBase(doc, w, h, scale) {
+  const composite = doc.composite();
+  const key = `${doc.compositeVersion}|${w}x${h}`;
+  const cached = thumbBases.get(doc);
+  if (cached?.key === key) return cached.canvas;
+  if (cached) releaseCanvas(cached.canvas);
+  const canvas = makeCanvas(w, h);
   const sw = w / scale;
   const sh = h / scale;
-  c.drawImage(
-    doc.composite(),
+  ctx2d(canvas).drawImage(
+    composite,
     (doc.width - sw) / 2,
     (doc.height - sh) / 2,
     sw,
@@ -1427,6 +1671,17 @@ export function filterPreview(id, w, h) {
     w,
     h
   );
+  thumbBases.set(doc, { key, canvas });
+  return canvas;
+}
+
+/** Small preview of an effect for the filter gallery. */
+export function filterPreview(id, w, h) {
+  const doc = state.doc;
+  if (!doc) return makeCanvas(w, h);
+  const scale = Math.max(w / doc.width, h / doc.height);
+  // effects may work in place: each gets its own copy of the shared base
+  const base = copyCanvas(previewBase(doc, w, h, scale));
   if (!id) return base;
   return applyEffect(id, base, {
     primary: state.primary,
@@ -1465,7 +1720,15 @@ export function undo() {
 
 export function redo() {
   if (state.dragging) return;
+  const could = history.canRedo;
   cancelSessions();
-  if (!refitIfResized(() => history.redo())) toast(t("Nothing to redo"), "info");
+  // finishing an open text box records it, which ends the redo branch: the
+  // user saw something to redo, so no "nothing to redo" for that
+  if (!history.canRedo) {
+    if (!could) toast(t("Nothing to redo"), "info");
+    requestRender();
+    return;
+  }
+  refitIfResized(() => history.redo());
   requestRender();
 }

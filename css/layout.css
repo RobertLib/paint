@@ -11,6 +11,16 @@
   --safe-l: env(safe-area-inset-left, 0px);
 }
 
+/* The closed phone sidebar waits off-screen to the right. body's own
+   overflow: hidden does not stop mobile Chrome from widening the layout
+   viewport to take it in (714 px on a 390 px phone), which pushed every fixed
+   and top-layer element — dialogs, toasts, menus — off-screen. Clipping the
+   root keeps the layout viewport at the screen width. */
+html {
+  overflow: hidden; /* browsers without overflow: clip */
+  overflow: clip;
+}
+
 .app {
   display: grid;
   grid-template-rows:
@@ -93,11 +103,13 @@
   color: var(--text-2);
 }
 
+/* the menus keep their room: the document name gives way first (and on
+   narrow screens, where the name is hidden, the menu bar scrolls) */
 .menubar {
   display: flex;
   align-items: center;
   gap: 1px;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
@@ -114,6 +126,9 @@
   min-width: 0;
   flex: 1 1 auto;
   justify-content: center;
+  overflow: hidden;
+  overflow: clip;
+  overflow-clip-margin: 4px; /* the name's focus ring */
 }
 
 .doc-title {
@@ -140,7 +155,12 @@
   text-align: left;
 }
 
+/* short of room the size goes before the name does */
 .doc-meta {
+  flex: 0 100 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 11px;
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
@@ -172,6 +192,24 @@
 
 .optionsbar::-webkit-scrollbar {
   display: none;
+}
+
+/* Bars that scroll sideways with a hidden scrollbar fade out at the edge
+   where more is hidden (ui.js sets the classes and turns the mouse wheel
+   sideways over them). */
+.more-end {
+  -webkit-mask-image: linear-gradient(to left, transparent, #000 32px);
+  mask-image: linear-gradient(to left, transparent, #000 32px);
+}
+
+.more-start {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 32px);
+  mask-image: linear-gradient(to right, transparent, #000 32px);
+}
+
+.more-start.more-end {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
 }
 
 .opt-title {
@@ -542,15 +580,30 @@
   .topbar-doc {
     display: none;
   }
+
+  /* without the name the menu bar is the one that gives way: tighter
+     buttons, then sideways scrolling */
+  .menubar {
+    flex: 0 1 auto;
+  }
+
+  /* (components.css comes later: a bare .menu-btn here would lose to it) */
+  .menubar .menu-btn {
+    padding: 0 6px;
+  }
 }
 
 @media (max-width: 760px) {
-  .workspace {
+  .workspace,
+  .workspace.side-collapsed {
     grid-template-columns: calc(var(--w-rail) + var(--safe-l)) minmax(0, 1fr);
   }
 
-  /* the panels slide in over the stage; their width includes the right inset */
-  .sidebar {
+  /* the panels slide in over the stage; their width includes the right inset.
+     Closed, they are also invisible, so Tab does not wander into them. */
+  .sidebar,
+  .workspace.side-collapsed .sidebar {
+    display: flex;
     position: fixed;
     top: calc(var(--h-top) + var(--safe-t) + var(--h-options));
     right: 0;
@@ -558,12 +611,16 @@
     width: calc(min(320px, 88vw) + var(--safe-r));
     box-shadow: var(--sh-3);
     transform: translateX(101%);
-    transition: transform var(--t-slow);
+    visibility: hidden;
+    transition: transform var(--t-slow), visibility 0s linear var(--t-slow);
     z-index: 40;
   }
 
-  .sidebar.is-open {
+  .sidebar.is-open,
+  .workspace.side-collapsed .sidebar.is-open {
     transform: none;
+    visibility: visible;
+    transition: transform var(--t-slow);
   }
 
   .statusbar {
@@ -584,10 +641,6 @@
   #helpBtn,
   .topbar-actions .sep {
     display: none;
-  }
-
-  .menu-btn {
-    padding: 0 7px;
   }
 }
 

@@ -50,6 +50,18 @@ function drawHistogram(canvas, hist, color) {
 const sessionHistogram = (session) =>
   histogram(session.orig, session.region, state.doc?.selection?.canvas || null);
 
+/** True when the tables leave every value as it is. */
+const isIdentity = (luts) =>
+  [luts.r, luts.g, luts.b].every((lut) => lut.every((v, i) => v === i));
+
+/**
+ * What the preview shows for a set of tables: nothing at all for tables that
+ * change nothing, so applying them records no step (and keeps a text layer
+ * editable).
+ */
+const lutPreview = (luts) =>
+  isIdentity(luts) ? null : (orig, region) => applyLUTs(orig, luts, region);
+
 /** Wire a dialog to a preview session: Apply commits, anything else cancels. */
 function sessionDialog(dialog, label, onOpen) {
   let session = null;
@@ -61,8 +73,21 @@ function sessionDialog(dialog, label, onOpen) {
     session = null;
   });
   $$("[data-close]", dialog).forEach((b) => b.addEventListener("click", () => dialog.close()));
+  // a click on the backdrop cancels — but only one that started there too:
+  // releasing a slider or a text selection outside the box is not a click on
+  // the backdrop (the same rule as wireDialog in menus.js)
+  let downOutside = false;
+  const outside = (e) => {
+    if (e.target !== dialog) return false;
+    const r = dialog.getBoundingClientRect();
+    return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+  };
+  dialog.addEventListener("pointerdown", (e) => {
+    downOutside = outside(e);
+  });
   dialog.addEventListener("click", (e) => {
-    if (e.target === dialog) dialog.close();
+    if (downOutside && outside(e)) dialog.close();
+    downOutside = false;
   });
   $("[data-apply]", dialog).addEventListener("click", () => {
     applied = true;
@@ -146,8 +171,7 @@ function syncLevels() {
 
 function updateLevels() {
   syncLevels();
-  const luts = levelsLuts();
-  levels.ctl.session?.update((orig, region) => applyLUTs(orig, luts, region));
+  levels.ctl.session?.update(lutPreview(levelsLuts()));
 }
 
 function autoLevelsValues(hist) {
@@ -222,11 +246,9 @@ export function openLevels({ auto = false, apply = false } = {}) {
   if (apply) {
     const session = A.beginPreview(t("Auto levels"));
     if (!session) return;
-    const luts = (() => {
-      levels.values = autoLevelsValues(sessionHistogram(session));
-      return levelsLuts();
-    })();
-    session.update((orig, region) => applyLUTs(orig, luts, region));
+    levels.values = autoLevelsValues(sessionHistogram(session));
+    // already balanced: the commit then records nothing
+    session.update(lutPreview(levelsLuts()));
     session.commit();
     return;
   }
@@ -308,8 +330,7 @@ function drawCurves() {
 
 function updateCurves() {
   drawCurves();
-  const luts = curvesLuts();
-  curves.ctl.session?.update((orig, region) => applyLUTs(orig, luts, region));
+  curves.ctl.session?.update(lutPreview(curvesLuts()));
 }
 
 function curvePos(e) {

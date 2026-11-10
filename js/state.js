@@ -136,42 +136,79 @@ function pushRecent(c) {
 
 /* --------------------------------- theme --------------------------------- */
 
-export function setTheme(theme) {
+/**
+ * The theme the user picked ("light" | "dark"), or null to follow the
+ * system's — live, so an OS switching to dark mode at sunset is followed.
+ * Only a choice is saved (as `themeChoice`).
+ */
+let themeChoice = null;
+
+const BAR_COLOR = { light: "#f4f5f9", dark: "#0e0f14" };
+const systemLight = window.matchMedia?.("(prefers-color-scheme: light)") || null;
+const systemTheme = () => (systemLight?.matches ? "light" : "dark");
+
+function applyTheme(theme) {
   state.theme = theme === "light" ? "light" : "dark";
   document.documentElement.dataset.theme = state.theme;
-  // the browser chrome follows the chosen theme, not the system one
-  const bar = state.theme === "light" ? "#f4f5f9" : "#0e0f14";
   for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
-    meta.setAttribute("content", bar);
+    // a chosen theme paints the browser chrome whatever the system uses;
+    // following the system, every tag keeps the colour of the scheme its
+    // media query names
+    const media = meta.getAttribute("media") || "";
+    const own = /light/.test(media) ? "light" : /dark/.test(media) ? "dark" : state.theme;
+    meta.setAttribute("content", BAR_COLOR[themeChoice ? state.theme : own]);
   }
-  savePrefs();
   emit("theme", state.theme);
 }
+
+/** The user picked a theme (the toolbar and menu toggles): kept from now on. */
+export function setTheme(theme) {
+  themeChoice = theme === "light" ? "light" : "dark";
+  applyTheme(themeChoice);
+  savePrefs();
+}
+
+systemLight?.addEventListener?.("change", () => {
+  if (!themeChoice) applyTheme(systemTheme());
+});
 
 /* ------------------------------ persistence ------------------------------ */
 
 let saveTimer = 0;
 
+/** Preferences are written a moment after the last change… */
 export function savePrefs() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(
-        PREFS_KEY,
-        JSON.stringify({
-          tool: state.tool,
-          primary: state.primary,
-          secondary: state.secondary,
-          recent: state.recent,
-          opts: state.opts,
-          theme: state.theme,
-        })
-      );
-    } catch {
-      /* private mode / quota — preferences are a nicety, never fatal */
-    }
-  }, 250);
+  saveTimer = setTimeout(flushPrefs, 250);
 }
+
+/** …or right away when the page is hidden or closed (the timer may never fire). */
+function flushPrefs() {
+  if (!saveTimer) return;
+  clearTimeout(saveTimer);
+  saveTimer = 0;
+  try {
+    localStorage.setItem(
+      PREFS_KEY,
+      JSON.stringify({
+        tool: state.tool,
+        primary: state.primary,
+        secondary: state.secondary,
+        recent: state.recent,
+        opts: state.opts,
+        // absent while following the system theme
+        themeChoice: themeChoice || undefined,
+      })
+    );
+  } catch {
+    /* private mode / quota — preferences are a nicety, never fatal */
+  }
+}
+
+window.addEventListener("pagehide", flushPrefs);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushPrefs();
+});
 
 export function loadPrefs() {
   let saved = null;
@@ -180,8 +217,6 @@ export function loadPrefs() {
   } catch {
     saved = null;
   }
-  const prefersLight =
-    window.matchMedia?.("(prefers-color-scheme: light)").matches ?? false;
 
   if (saved && typeof saved === "object") {
     // stored data is checked piece by piece: one bad value must not keep the
@@ -209,8 +244,13 @@ export function loadPrefs() {
       }
     }
     if (typeof saved.tool === "string") state.tool = saved.tool;
+    // the old `theme` field was written on every visit, chosen or not: only
+    // an explicit choice counts
+    if (saved.themeChoice === "light" || saved.themeChoice === "dark") {
+      themeChoice = saved.themeChoice;
+    }
   }
-  setTheme(saved?.theme || (prefersLight ? "light" : "dark"));
+  applyTheme(themeChoice || systemTheme());
 }
 
 /* -------------------------------- helpers -------------------------------- */

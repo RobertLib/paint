@@ -58,22 +58,42 @@ export function parseColor(input) {
   if (s === "white") return { r: 255, g: 255, b: 255, a: 1 };
   if (s === "black") return { r: 0, g: 0, b: 0, a: 1 };
   if (s.startsWith("#")) return hexToRgb(s);
-  const m = s.match(/^rgba?\(([^)]+)\)$/);
+  const m = s.match(/^rgba?\(([^)]*)\)$/);
   if (m) {
-    const parts = m[1].split(/[,/\s]+/).filter(Boolean);
-    if (parts.length < 3 || parts.length > 4) return null;
-    // components clamp to 0..255 and alpha to 0..1; percentages are accepted
+    const parts = rgbArgs(m[1]);
+    if (!parts) return null;
+    // channels clamp to 0..255 and round to whole numbers, alpha clamps to
+    // 0..1; percentages are accepted
     const p = parts.map((part, i) => {
       const pct = part.endsWith("%");
       const v = Number(pct ? part.slice(0, -1) : part);
-      if (!Number.isFinite(v)) return NaN;
-      if (i < 3) return clamp(pct ? v * 2.55 : v, 0, 255);
+      if (i < 3) return Math.round(clamp(pct ? v * 2.55 : v, 0, 255));
       return clamp(pct ? v / 100 : v, 0, 1);
     });
-    if (p.some((v) => Number.isNaN(v))) return null;
     return { r: p[0], g: p[1], b: p[2], a: p[3] ?? 1 };
   }
   return hexToRgb(s);
+}
+
+const NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?%?$/;
+
+/**
+ * The arguments of rgb()/rgba(): "r, g, b[, a]" or "r g b[ / a]", each a
+ * number or a percentage. Null for anything else ("1,,2,3", "1, 2 3").
+ */
+function rgbArgs(body) {
+  let parts;
+  if (body.includes(",")) {
+    parts = body.split(",").map((part) => part.trim());
+  } else {
+    const [rgb, alpha, extra] = body.split("/");
+    if (extra !== undefined) return null;
+    parts = rgb.trim().split(/\s+/);
+    if (parts.length !== 3) return null;
+    if (alpha !== undefined) parts.push(alpha.trim());
+  }
+  if (parts.length < 3 || parts.length > 4) return null;
+  return parts.every((part) => NUMBER.test(part)) ? parts : null;
 }
 
 /** r,g,b 0..255 → h 0..360, s 0..1, v 0..1 */

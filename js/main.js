@@ -11,11 +11,12 @@ import {
   loadAutosave,
   relativeTime,
 } from "./autosave.js";
+import { sessionsBusy } from "./history.js";
 import { t } from "./i18n.js";
 import { initMenus, openNewDialog, showWelcome, showWelcomeDialog } from "./menus.js";
 import { initRender, requestRender } from "./render.js";
 import { emit, loadPrefs, on, registerDefaults, state } from "./state.js";
-import { HANDOFF_KEY, HANDOFF_TTL, idbDelete, idbGet } from "./store.js";
+import { HANDOFF_KEY, HANDOFF_TTL, handoffKey, idbDelete, idbGet, idbSweep } from "./store.js";
 import { isBlankTask, isTask, startTask } from "./tasks.js";
 import { initTone } from "./tone.js";
 import { TOOL_DEFAULTS, TOOLS, initInput, switchTool } from "./tools.js";
@@ -58,8 +59,12 @@ window.addEventListener("resize", () => {
   requestRender();
 });
 
+/* work on screen that is not in the document yet — a live adjustment or
+   filter preview, a transform, typed text — would be lost as well */
+const pendingWork = () => sessionsBusy() || !!TOOLS.text._editor?.value.trim();
+
 window.addEventListener("beforeunload", (e) => {
-  if (!state.dirty) return;
+  if (!state.dirty && !pendingWork()) return;
   e.preventDefault();
   e.returnValue = "";
 });
@@ -69,25 +74,39 @@ window.addEventListener("beforeunload", (e) => {
 const params = new URLSearchParams(location.search);
 const task = params.get("task");
 
+const handoffStale = (entry) => !(Math.abs(Date.now() - (entry?.at || 0)) <= HANDOFF_TTL);
+
 /** A file a landing page left for us, if it is fresh. */
 async function takeHandoff() {
-  if (!params.has("open")) return null;
-  const entry = await idbGet(HANDOFF_KEY);
-  await idbDelete(HANDOFF_KEY);
-  if (!entry?.file || Date.now() - (entry.at || 0) > HANDOFF_TTL) return null;
+  const id = params.get("open");
+  // ?open=1 with the one shared key: landing pages from before per-drop keys
+  // (an older service worker may still serve them from its cache)
+  const key = id === "1" ? HANDOFF_KEY : handoffKey(id);
+  if (!key) return null;
+  const entry = await idbGet(key);
+  await idbDelete(key);
+  if (!entry?.file || handoffStale(entry)) return null;
   const { file, name, type } = entry;
   return file instanceof File ? file : new File([file], name || "image", { type: type || file.type });
 }
 
-async function restore(slot = SLOT_CURRENT) {
+/**
+ * The default name is stored in the language it was given in: either
+ * language's "Untitled" shows in the current one.
+ */
+const shownName = (name) => (!name || name === "Untitled" || name === "Bez názvu" ? t("Untitled") : name);
+
+/** Restore the session in `slot` — or, given `sid`, that session wherever it is now. */
+async function restore(slot = SLOT_CURRENT, sid = null) {
   if (state.doc && !A.confirmDiscard()) return false;
   emit("busy", t("Restoring…"));
   try {
-    const doc = await loadAutosave(slot);
+    const doc = await loadAutosave(slot, sid);
     if (!doc) {
       emit("toast", { msg: t("That session is no longer available"), kind: "err" });
       return false;
     }
+    doc.name = shownName(doc.name);
     A.setDocument(doc, { restored: true });
     emit("toast", { msg: t("Restored “{name}”", { name: doc.name }), kind: "ok" });
     track("restore");
@@ -103,7 +122,12 @@ async function restore(slot = SLOT_CURRENT) {
   }
 }
 
-on("restore-autosave", (slot) => restore(slot || SLOT_CURRENT));
+/* a restore card sends { slot, sid } — another tab may have moved that
+   session to the other slot since the card was drawn; older callers: a slot */
+on("restore-autosave", (arg) => {
+  const { slot, sid } = arg && typeof arg === "object" ? arg : { slot: arg };
+  restore(slot || SLOT_CURRENT, sid || null);
+});
 
 const thumbUrls = [];
 
@@ -120,8 +144,9 @@ async function renderSessions() {
       card.removeAttribute("id");
       card.hidden = false;
       card.dataset.slot = saved.slot;
+      card.dataset.sid = saved.sid || "";
       if (i > 0) card.querySelector("strong").textContent = t("An earlier session");
-      card.querySelector("[data-restore-name]").textContent = saved.name || t("Untitled");
+      card.querySelector("[data-restore-name]").textContent = shownName(saved.name);
       card.querySelector("[data-restore-meta]").textContent = t("{w} × {h} · {when}", {
         w: saved.width,
         h: saved.height,
@@ -154,6 +179,8 @@ async function boot() {
   let opened = false;
   let restored = false;
   const file = await takeHandoff().catch(() => null);
+  // files left for an editor that never opened (an aborted navigation)
+  idbSweep(HANDOFF_KEY, handoffStale).catch(() => {});
   if (file) opened = await A.openImageFile(file);
   if (!opened && params.get("restore") === "1") opened = restored = await restore();
   if (!opened && task && isBlankTask(task)) {
@@ -168,7 +195,7 @@ async function boot() {
     const earlier = (await listSessions())[0];
     if (earlier) {
       emit("toast", {
-        msg: t("Your earlier work “{name}” is kept", { name: earlier.name || t("Untitled") }),
+        msg: t("Your earlier work “{name}” is kept", { name: shownName(earlier.name) }),
         kind: "info",
         action: { label: t("Show"), onClick: () => emit("show-sessions") },
       });

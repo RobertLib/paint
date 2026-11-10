@@ -90,7 +90,7 @@ export const PAGES = [
     slug: { en: "blur-image", cs: "rozmazat-fotku" },
     related: ["photo-filters", "crop-image", "retouch-photo"],
     brief:
-      "Editor opens with the Rectangle select tool and a task bar: select the area (faces, licence plates, addresses, screenshots with personal data), then click Blur or Pixelate — strength scales with the size of the selection, so it fully hides the content. Ellipse select, Lasso and Magic wand are available too; Feather softens the edge. Without a selection the whole image is blurred. There is also a Blur brush for painting softness, and Soft blur / Pixelate in the filter gallery.",
+      "Editor opens with the Rectangle select tool and a task bar: select the area (faces, licence plates, addresses, screenshots with personal data), then click Blur or Pixelate — strength scales with the size of the selection, so it fully hides the content. Ellipse select, Lasso and Magic wand are available too; Feather softens the edge. Blur/Pixelate need a selection: without one the editor shows “Select what to hide first” and changes nothing. There is also a Blur brush for painting softness, and Soft blur / Pixelate in the filter gallery.",
   },
   {
     id: "add-text-to-photo",
@@ -99,7 +99,7 @@ export const PAGES = [
     slug: { en: "add-text-to-photo", cs: "pridat-text-do-fotky" },
     related: ["draw-on-image", "photo-filters", "crop-image"],
     brief:
-      "Editor opens with the Text tool. Click on the image and type directly on the canvas, in the final font. Options: font (System sans, Serif, Monospace, Impact, Handwritten, Trebuchet), size 6–400 px, align left/center/right, bold, italic, opacity; colour = primary colour. ⌘/Ctrl+Enter commits. Each text becomes its own text layer that stays editable (click it again with the Text tool) until you paint on it, rotate or flip it. Move tool repositions it. Good for memes, captions, watermarks.",
+      "Editor opens with the Text tool. Click on the image and type directly on the canvas, in the final font. Options: font (System sans, Serif, Monospace, Impact, Handwritten, Trebuchet), size 6–400 px, align left/center/right, bold, italic, opacity; colour = primary colour. ⌘/Ctrl+Enter commits. Each text becomes its own text layer that stays editable (click it again with the Text tool) until its pixels change: painting, filters, Adjust, Levels/Curves, any Transform-tool change, rotating/flipping the image (or a non-proportional Image size), Merge down, Apply mask, or the Move tool while a selection exists all turn it into pixels. Move tool without a selection, crop, Canvas size and proportional Image size keep it editable. Good for memes, captions, watermarks.",
   },
   {
     id: "black-and-white-photo",
@@ -153,7 +153,7 @@ export const PAGES = [
     slug: { en: "color-picker-from-image", cs: "zjistit-barvu-z-obrazku" },
     related: ["image-converter", "photo-filters", "draw-on-image"],
     brief:
-      "Editor opens with the Eyedropper. Click (or drag) anywhere on the image; the task bar shows the HEX and RGB values with a Copy HEX button (only HEX is copied; on phones the task-bar text is hidden), and the Color panel shows the colour too. Sample from all layers or only the active layer. Picked colours are kept in the Recent row. Zoom in (scroll, pinch) to hit single pixels.",
+      "Editor opens with the Eyedropper. Click (or drag) anywhere on the image; the task bar shows the HEX and RGB values with a Copy HEX button (only HEX is copied), on phones too, and the Color panel shows the colour too. Sample from all layers or only the active layer. Picked colours are kept in the Recent row. Zoom in (scroll, pinch) to hit single pixels.",
   },
   {
     id: "draw-on-image",
@@ -162,7 +162,7 @@ export const PAGES = [
     slug: { en: "draw-on-image", cs: "kresleni-do-fotky" },
     related: ["add-text-to-photo", "paint-online", "blur-image"],
     brief:
-      "Editor opens with the Brush on the photo. Tip: add a new layer to keep drawings separate. Tools: brush (size, opacity, hardness, smoothing, pen pressure), pencil, airbrush, eraser, line, arrow, rectangle (rounded corners), ellipse, polygon, star (outline/solid/both), highlighter-like effect with low opacity + Multiply blend. Good for annotating screenshots, marking things on maps/plans, arrows for tutorials.",
+      "Editor opens with the Brush on the photo. Tip: add a new layer to keep drawings separate. Tools: brush (size, opacity, hardness, smoothing, pen pressure), pencil, airbrush, eraser, line and arrow (width + opacity only; Shift snaps the angle), rectangle (rounded corners), ellipse, polygon (3–16 sides) and star (3–16 points) — these four as outline/solid/both, drawn into a dragged box (Shift = regular/square, Alt = from the centre), highlighter-like effect with low opacity + Multiply blend. Good for annotating screenshots, marking things on maps/plans, arrows for tutorials.",
   },
   {
     id: "paint-online",
@@ -172,7 +172,7 @@ export const PAGES = [
     related: ["draw-on-image", "add-text-to-photo", "photo-filters"],
     needsFile: false,
     brief:
-      "No file needed: the button opens a blank white 1600×1000 canvas with the Brush. Brushes with pen pressure (stylus/tablet/Apple Pencil in the browser), pencil, airbrush, eraser, fill bucket, linear/radial gradient, shapes, text, unlimited layers with 16 blend modes, undo, zoom to 3200%, pinch-zoom on touch screens. Work is autosaved in the browser and can be saved as a .paint project or exported as PNG/JPEG/WebP/PSD. Suitable for kids and adults; works on Chromebooks, tablets, phones.",
+      "No file needed: the button opens a blank white 1600×1000 canvas with the Brush. Brushes with pen pressure (stylus/tablet/Apple Pencil in the browser), pencil, airbrush, eraser, fill bucket, linear/radial gradient, shapes, text, unlimited layers with 17 blend modes (Normal included), undo (up to 80 steps, fewer on big documents — memory budget), zoom to 3200%, pinch-zoom on touch screens. Work is autosaved in the browser (except documents whose layers × width × height exceed 192 MP) and can be saved as a .paint project or exported as PNG/JPEG/WebP/PSD. Suitable for kids and adults; works on Chromebooks, tablets, phones.",
   },
   {
     id: "open-psd-online",

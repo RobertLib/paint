@@ -782,6 +782,8 @@ export class Doc {
     this._belowKey = null;
     this._compositeKey = null;
     this._floatVersion = 0;
+    /** bumped whenever composite() renders anew — for caches of the picture */
+    this.compositeVersion = 0;
     this._allocBuffers();
   }
 
@@ -800,6 +802,11 @@ export class Doc {
   _scratch(name) {
     if (!this[name]) this[name] = makeCanvas(this.width, this.height);
     return this[name];
+  }
+
+  /** The 2D context of a scratch canvas (CanvasTooLargeError when refused). */
+  _scratchCtx(name) {
+    return ctx2d(this._scratch(name));
   }
 
   static blank(w, h, fill = "#ffffff") {
@@ -895,10 +902,11 @@ export class Doc {
       c.globalCompositeOperation = "destination-in";
       c.drawImage(layer.mask, 0, 0);
       c.restore();
+      layer.text = null;
+      layer.touch();
     }
+    // a disabled mask hides nothing: the pixels (and editable text) stay
     layer.setMask(null);
-    layer.text = null;
-    layer.touch();
   }
 
   /** Merge layer i into i-1. Returns false when there is nothing below. */
@@ -978,7 +986,7 @@ export class Doc {
     const m = mask || (layer.mask && layer.maskEnabled ? layer.mask : null);
     if (m) {
       const tmp = this._scratch("_maskTmp");
-      const mc = tmp.getContext("2d");
+      const mc = this._scratchCtx("_maskTmp");
       mc.setTransform(1, 0, 0, 1, 0, 0);
       mc.globalAlpha = 1;
       mc.globalCompositeOperation = "copy";
@@ -1003,7 +1011,7 @@ export class Doc {
     const { mode, opacity, blend } = this.floating;
     if (this.selection) {
       // preview what pointer-up will commit: paint only inside the selection
-      const sc = this._scratch("_selTmp").getContext("2d");
+      const sc = this._scratchCtx("_selTmp");
       sc.setTransform(1, 0, 0, 1, 0, 0);
       sc.globalAlpha = 1;
       sc.globalCompositeOperation = "copy";
@@ -1014,7 +1022,7 @@ export class Doc {
       fc = this._selTmp;
     }
     const tmp = this._scratch("_tmp");
-    const c = tmp.getContext("2d");
+    const c = this._scratchCtx("_tmp");
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.globalAlpha = 1;
     c.globalCompositeOperation = "copy";
@@ -1037,7 +1045,7 @@ export class Doc {
     const f = this.floating;
     if (!f || !this.target?.isMask || !layer.maskEnabled) return null;
     const prev = this._scratch("_maskPrev");
-    const pc = prev.getContext("2d");
+    const pc = this._scratchCtx("_maskPrev");
     if (f.fresh) {
       pc.globalCompositeOperation = "copy";
       pc.drawImage(layer.mask, 0, 0);
@@ -1060,6 +1068,7 @@ export class Doc {
   composite() {
     const key = this._key();
     if (key === this._compositeKey) return this._composite;
+    this.compositeVersion++;
 
     const ctx = this._compositeCtx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1071,7 +1080,7 @@ export class Doc {
     let belowKey = `${ai}`;
     for (let i = 0; i < ai; i++) belowKey += layerKey(this.layers[i]);
     if (ai > 0 && belowKey !== this._belowKey) {
-      const bc = this._scratch("_below").getContext("2d");
+      const bc = this._scratchCtx("_below");
       bc.setTransform(1, 0, 0, 1, 0, 0);
       bc.globalCompositeOperation = "source-over";
       bc.globalAlpha = 1;
@@ -1314,6 +1323,9 @@ export class Doc {
       if (!p) {
         p = new Promise((r) => c.toBlob(r, "image/png"));
         cache.set(key, p);
+        // a failed encoding is not remembered: the next save tries again
+        const forget = () => cache.get(key) === p && cache.delete(key);
+        p.then((b) => b || forget(), forget);
       }
       return p;
     };
@@ -1328,8 +1340,10 @@ export class Doc {
       const layers = [];
       for (const p of pending) {
         const data = await p.data;
-        if (!data) throw new Error("Could not encode a layer");
-        layers.push({ ...p.meta, data, mask: p.mask ? await p.mask : null });
+        const mask = p.mask ? await p.mask : null;
+        // a lost mask would show hidden pixels after a restore: fail instead
+        if (!data || (p.mask && !mask)) throw new Error("Could not encode a layer");
+        layers.push({ ...p.meta, data, mask });
       }
       return { ...meta, layers };
     })();
@@ -1365,7 +1379,10 @@ export class Doc {
       c.drawImage(image, 0, 0, image.naturalWidth * k, image.naturalHeight * k);
     };
     doc.name = typeof json.name === "string" && json.name ? json.name : t("Untitled");
-    for (const spec of Array.isArray(json.layers) ? json.layers : []) {
+    // big project files hand the layers over one at a time (async iterable)
+    const specs = json.layers;
+    const list = Array.isArray(specs) || specs?.[Symbol.asyncIterator] ? specs : [];
+    for await (const spec of list) {
       if (!spec || typeof spec !== "object") continue;
       const image = await load(spec.data);
       const layer = new Layer(doc.width, doc.height, {

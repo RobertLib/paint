@@ -26,6 +26,26 @@ export const view = {
     this.stage = stage;
     this.ctx = canvas.getContext("2d");
     this.resize();
+    this._watchPixelRatio();
+  },
+
+  /**
+   * Moving the window to a screen with another pixel ratio changes no CSS
+   * size, so no resize is observed and the canvas would stay blurry: watch
+   * the ratio itself. The query matches one exact ratio, so it is renewed
+   * every time it changes.
+   */
+  _watchPixelRatio() {
+    const query = window.matchMedia?.(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+    query?.addEventListener?.(
+      "change",
+      () => {
+        this.resize();
+        emit("dpr", this.dpr);
+        this._watchPixelRatio();
+      },
+      { once: true }
+    );
   },
 
   resize() {

@@ -4,22 +4,33 @@
    Reading covers what a pixel editor can honour: 8-, 16- and 32-bit RGB or
    grayscale; raw, RLE (PackBits) and ZIP channels (with or without
    prediction); pixel layers with names (including Unicode), opacity and fill
-   opacity, visibility, blend modes, user masks (including "hide all" masks)
-   and clipping masks, which are baked into the clipped layers' pixels.
-   Groups are flattened into a plain stack (a hidden group hides its
-   children; a group's opacity and mask carry over to them). Text, shape and smart-object layers arrive as the pixels
-   Photoshop stored for them; adjustment layers have no pixels and are left
-   out (`doc.psdSkipped` counts them). 32-bit documents (linear light) are
-   converted to 8-bit sRGB. A document larger than `maxDim` is scaled down
-   while it is decoded, a band of rows at a time, so the full-size image is
-   never held in memory. When the layer data cannot be used, the flattened
-   composite is used instead (`doc.psdFlattened`).
+   opacity, visibility, blend modes, user masks (including "hide all" masks,
+   density and feather) and clipping masks, which are baked into the clipped
+   layers' pixels. Groups are flattened into a plain stack (a hidden group
+   hides its children; a group's opacity and mask carry over to them). Text,
+   shape and smart-object layers arrive as the pixels Photoshop stored for
+   them; adjustment layers have no pixels and are left out (`doc.psdSkipped`
+   counts them). 32-bit documents (linear light) are converted to 8-bit
+   sRGB. A document larger than `maxDim` is scaled down while it is decoded,
+   a band of rows at a time, so the full-size image is never held in memory.
+   When the layer data cannot be used (damaged, or more canvases than the
+   browser grants), the flattened composite is used instead
+   (`doc.psdFlattened`).
 
    Writing produces an 8-bit RGB PSD with one RLE-compressed layer per layer,
    masks included, plus a flattened composite for apps that only read that.
    ========================================================================== */
 
-import { Doc, Layer, alphaBounds, ctx2d, makeCanvas } from "./doc.js";
+import {
+  CanvasTooLargeError,
+  Doc,
+  Layer,
+  alphaBounds,
+  blurAlpha,
+  ctx2d,
+  makeCanvas,
+  releaseCanvas,
+} from "./doc.js";
 import { t } from "./i18n.js";
 
 const BLEND_FROM_PSD = {
@@ -127,6 +138,12 @@ class Reader {
     this.need(4);
     const v = this.view.getUint32(this.pos);
     this.pos += 4;
+    return v;
+  }
+  f64() {
+    this.need(8);
+    const v = this.view.getFloat64(this.pos);
+    this.pos += 8;
     return v;
   }
   str(n) {
@@ -239,6 +256,21 @@ function readLayerRecord(r, end) {
         bottom: r.i32(),
         right: r.i32(),
       };
+    }
+    // the user mask's density and feather, which Photoshop applies when it
+    // renders the mask (stored after the real mask, whatever the spec says)
+    mask.density = 1;
+    mask.feather = 0;
+    if (mask.flags & 16 && r.pos < maskEnd) {
+      const params = r.u8();
+      const size = (params & 1) + (params & 2 ? 8 : 0) + (params & 4 ? 1 : 0) + (params & 8 ? 8 : 0);
+      if (r.pos + size <= maskEnd) {
+        if (params & 1) mask.density = r.u8() / 255;
+        if (params & 2) {
+          const feather = r.f64();
+          mask.feather = feather > 0 ? Math.min(feather, 1000) : 0; // NaN → 0
+        }
+      }
     }
   }
   r.pos = maskEnd;
@@ -450,9 +482,30 @@ function unpredict(row, w, depth, shuffled) {
   return row;
 }
 
+/** Deflate never expands data more than this (a 258-byte match in ~2 bits). */
+const MAX_DEFLATE_RATIO = 1032;
+/** Compressed bytes handed to the inflater at a time: each yields ≤ ~17 MB. */
+const ZIP_CHUNK = 1 << 14;
+
+/**
+ * Compressed bytes as a stream of small chunks, pulled only as the inflater
+ * needs them — the inflater turns each chunk into output all at once, so a
+ * small chunk bounds the memory even for extremely compressible data.
+ */
+function chunkStream(data) {
+  let p = 0;
+  return new ReadableStream({
+    pull(ctrl) {
+      if (p >= data.length) ctrl.close();
+      else ctrl.enqueue(data.slice(p, (p += ZIP_CHUNK)));
+    },
+  });
+}
+
 /**
  * ZIP data is inflated as a stream, a row at a time, never all at once.
- * Rows from `alphaFrom` on hold transparency or mask values.
+ * Rows from `alphaFrom` on hold transparency or mask values. The stream
+ * stops after row `h`.
  */
 function zipRows(data, w, h, depth, predict, alphaFrom, lx, cw) {
   if (typeof DecompressionStream !== "function") throw damaged();
@@ -462,7 +515,7 @@ function zipRows(data, w, h, depth, predict, alphaFrom, lx, cw) {
   const alphaConv = converter(depth, true);
   const row = new Uint8Array(rowBytes);
   const shuffled = depth === 32 && predict ? new Uint8Array(rowBytes) : null;
-  const reader = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate")).getReader();
+  const reader = chunkStream(data).pipeThrough(new DecompressionStream("deflate")).getReader();
   let chunk = new Uint8Array(0);
   let cp = 0;
   let next = 0; // next row to inflate
@@ -510,9 +563,6 @@ function zipRows(data, w, h, depth, predict, alphaFrom, lx, cw) {
   };
 }
 
-/** Row source over a fully decoded 8-bit plane. */
-const planeRows = (plane, cw) => async (y0, y1) => plane.subarray(y0 * cw, y1 * cw);
-
 /**
  * Row source for one layer channel (`ch` from the layer info) of a w × h
  * rectangle, or null when the channel has no data. Throws PsdError when the
@@ -540,6 +590,8 @@ function channelRows(src, ch, w, h, alpha, lx, cw) {
     return rleRows(bytes, rowStarts, end, w, depth, alpha, lx, cw);
   }
   if (compression === 2 || compression === 3) {
+    // more than deflate can expand to: not a real channel
+    if ((end - start) * MAX_DEFLATE_RATIO < rowBytes * h) throw damaged();
     return zipRows(bytes.subarray(start, end), w, h, depth, compression === 3, alpha ? 0 : Infinity, lx, cw);
   }
   throw damaged();
@@ -570,27 +622,31 @@ async function paintBands(ctx, x, y, w, h, kx, ky, band) {
   const step = Math.max(1, Math.floor((BAND_PIXELS / w) * ky));
   let tmp = null;
   let tc = null;
-  for (let a = ty0; a < ty1; a += step) {
-    const b = Math.min(ty1, a + step);
-    const s0 = Math.max(0, Math.floor(a / ky) - y - margin);
-    const s1 = Math.min(h, Math.ceil(b / ky) - y + margin);
-    if (s1 <= s0) continue;
-    if (!tmp || tmp.height !== s1 - s0) {
-      if (tmp) tmp.width = tmp.height = 0;
-      tmp = makeCanvas(w, s1 - s0);
-      tc = ctx2d(tmp);
+  try {
+    for (let a = ty0; a < ty1; a += step) {
+      const b = Math.min(ty1, a + step);
+      const s0 = Math.max(0, Math.floor(a / ky) - y - margin);
+      const s1 = Math.min(h, Math.ceil(b / ky) - y + margin);
+      if (s1 <= s0) continue;
+      if (!tmp || tmp.height !== s1 - s0) {
+        releaseCanvas(tmp);
+        tmp = makeCanvas(w, s1 - s0);
+        tc = ctx2d(tmp);
+      }
+      const img = tc.createImageData(w, s1 - s0);
+      await band(img.data, s0, s1);
+      tc.putImageData(img, 0, 0);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, a, ctx.canvas.width, b - a);
+      ctx.clip();
+      ctx.drawImage(tmp, x * kx, (y + s0) * ky, w * kx, (s1 - s0) * ky);
+      ctx.restore();
     }
-    const img = tc.createImageData(w, s1 - s0);
-    await band(img.data, s0, s1);
-    tc.putImageData(img, 0, 0);
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, a, ctx.canvas.width, b - a);
-    ctx.clip();
-    ctx.drawImage(tmp, x * kx, (y + s0) * ky, w * kx, (s1 - s0) * ky);
-    ctx.restore();
+  } finally {
+    // also when decoding fails: the composite fallback needs the memory
+    releaseCanvas(tmp);
   }
-  if (tmp) tmp.width = tmp.height = 0;
 }
 
 /** The part of a document-space rectangle that lies on the canvas. */
@@ -645,12 +701,42 @@ function grayToAlpha(canvas) {
   }
 }
 
+/** Feather radii above this blur a reduced copy of the mask instead. */
+const FEATHER_FULL = 8;
+
+/**
+ * Photoshop's mask feather: a Gaussian blur of the mask, done in place. A
+ * wide radius blurs a reduced copy (the result is smooth anyway), so no
+ * canvas padded by three radii on each side is ever needed.
+ */
+function featherMask(canvas, radius) {
+  const f = Math.min(1, FEATHER_FULL / radius);
+  let small = canvas;
+  if (f < 1) {
+    small = makeCanvas(canvas.width * f, canvas.height * f);
+    ctx2d(small).drawImage(canvas, 0, 0, small.width, small.height);
+  }
+  let blurred = null;
+  try {
+    blurred = blurAlpha(small, radius * f);
+    const ctx = ctx2d(canvas);
+    ctx.save();
+    ctx.globalCompositeOperation = "copy";
+    ctx.drawImage(blurred, 0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  } finally {
+    if (small !== canvas) releaseCanvas(small);
+    releaseCanvas(blurred);
+  }
+}
+
 /**
  * A layer's (or group's) mask as a target-size canvas: filled with its
  * default colour, so a "hide all" mask without any pixel data still hides,
  * then its data at its rectangle. On a layer, a mask rendered from a vector
  * mask is already part of the layer's alpha (shape layers) and is skipped;
- * when there is also a user mask, that one is in channel −3.
+ * when there is also a user mask, that one is in channel −3. The user mask's
+ * density and feather are applied.
  */
 async function buildMask(rec, src, isGroup = false) {
   const m = rec.mask;
@@ -659,37 +745,53 @@ async function buildMask(rec, src, isGroup = false) {
   if (!realData && !isGroup && m.flags & 8) return null;
   const info = realData ? m.real : m;
   const ch = realData || rec.channels.find((c) => c.id === -2);
+  // density lightens what the mask hides: visibility = 1 − density × (1 − mask)
+  const density = m.density ?? 1;
+  const dense = density < 1 ? Uint8Array.from({ length: 256 }, (_, v) => 255 - density * (255 - v) + 0.5) : null;
   const canvas = makeCanvas(src.tw, src.th);
-  const ctx = ctx2d(canvas);
-  const def = info.defaultColor;
-  const exact = src.kx === 1 && src.ky === 1;
-  // scaled masks are drawn as opaque grey (so resampled edges blend with the
-  // default colour around them) and turned into alpha afterwards
-  ctx.fillStyle = exact ? `rgba(255,255,255,${def / 255})` : `rgb(${def},${def},${def})`;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  const c = onCanvas(src, info);
-  const rows = c && channelRows(src, ch, c.w, c.h, true, c.lx, c.cw);
-  if (rows) {
-    await paintBands(ctx, c.x, c.y, c.cw, c.ch, src.kx, src.ky, async (data, y0, y1) => {
-      const M = await rows(c.ly + y0, c.ly + y1);
-      for (let i = 0, p = 0; i < M.length; i++, p += 4) {
-        if (exact) {
-          data[p] = data[p + 1] = data[p + 2] = 255;
-          data[p + 3] = M[i];
-        } else {
-          data[p] = data[p + 1] = data[p + 2] = M[i];
-          data[p + 3] = 255;
+  try {
+    const ctx = ctx2d(canvas);
+    const def = dense ? dense[info.defaultColor] : info.defaultColor;
+    const exact = src.kx === 1 && src.ky === 1;
+    // scaled masks are drawn as opaque grey (so resampled edges blend with the
+    // default colour around them) and turned into alpha afterwards
+    ctx.fillStyle = exact ? `rgba(255,255,255,${def / 255})` : `rgb(${def},${def},${def})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const c = onCanvas(src, info);
+    const rows = c && channelRows(src, ch, c.w, c.h, true, c.lx, c.cw);
+    if (rows) {
+      await paintBands(ctx, c.x, c.y, c.cw, c.ch, src.kx, src.ky, async (data, y0, y1) => {
+        const M = await rows(c.ly + y0, c.ly + y1);
+        for (let i = 0, p = 0; i < M.length; i++, p += 4) {
+          const v = dense ? dense[M[i]] : M[i];
+          if (exact) {
+            data[p] = data[p + 1] = data[p + 2] = 255;
+            data[p + 3] = v;
+          } else {
+            data[p] = data[p + 1] = data[p + 2] = v;
+            data[p + 3] = 255;
+          }
         }
-      }
-    });
+      });
+    }
+    if (!exact) grayToAlpha(canvas);
+    // the feather radius is in document pixels
+    const feather = (m.feather || 0) * src.kx;
+    if (feather >= 0.5) featherMask(canvas, feather);
+  } catch (err) {
+    releaseCanvas(canvas);
+    throw err;
   }
-  if (!exact) grayToAlpha(canvas);
   return { canvas, enabled: !(info.flags & 2) };
 }
 
 /**
  * A clipped layer shows only where its base (the nearest unclipped layer
- * below) is visible: bake that into its pixels, with the base's opacity.
+ * below) shows: bake the base's own pixels and own mask into its pixels and
+ * take on the base's opacity — not its fill, which fades only the base's own
+ * pixels (a Fill 0 % base is the usual "photo inside text" stencil). Runs
+ * before the group masks are baked in, so those — like a group's opacity —
+ * count once.
  */
 function bakeClipping(records) {
   for (let i = 0; i < records.length; i++) {
@@ -697,82 +799,109 @@ function bakeClipping(records) {
     if (!rec.clipping || !rec.layer) continue;
     let j = i - 1;
     while (j >= 0 && records[j].clipping && records[j].section === 0) j--;
-    const base = records[j]?.section === 0 ? records[j].layer : null;
+    const baseRec = records[j]?.section === 0 ? records[j] : null;
+    const base = baseRec?.layer;
     if (!base) continue; // clipped to a group or an adjustment layer: left as is
+    const shape = base.maskedPixels();
     const c = rec.layer.ctx;
     c.save();
     c.globalCompositeOperation = "destination-in";
-    c.drawImage(base.maskedPixels(), 0, 0);
+    c.drawImage(shape, 0, 0);
     c.restore();
-    rec.layer.opacity = Math.round(rec.layer.opacity * base.opacity * 100) / 100;
+    if (shape !== base.canvas) releaseCanvas(shape);
+    rec.alpha *= baseRec.opacity;
     if (!base.visible) rec.layer.visible = false;
   }
 }
 
+/** Free a layer's canvases now (its import failed or is not used). */
+function releaseLayer(layer) {
+  releaseCanvas(layer.canvas);
+  releaseCanvas(layer.mask);
+}
+
 /**
  * Build the layers. Returns null when the composite shows the document
- * better (only adjustment or fill layers without stored pixels).
+ * better (only adjustment or fill layers without stored pixels). On any
+ * error the canvases created so far are released before it is rethrown.
  */
 async function importLayers(src, records) {
-  // walk top → bottom to resolve group visibility, opacity and masks
-  const effective = new Map();
-  const stack = [];
-  const top = { hidden: false, opacity: 1, masks: [] };
-  for (let i = records.length - 1; i >= 0; i--) {
-    const rec = records[i];
-    if (rec.section === 1 || rec.section === 2) {
-      const parent = stack[stack.length - 1] || top;
-      const mask = rec.hidden || parent.hidden ? null : await buildMask(rec, src, true);
-      stack.push({
-        hidden: parent.hidden || rec.hidden,
-        opacity: parent.opacity * rec.opacity,
-        masks: mask?.enabled ? [...parent.masks, mask.canvas] : parent.masks,
-      });
-    } else if (rec.section === 3) {
-      stack.pop();
-    } else {
-      effective.set(rec, stack[stack.length - 1] || top);
-    }
-  }
-
   const layers = [];
-  let skipped = 0;
-  let pixels = false;
-  for (const rec of records) {
-    if (rec.section !== 0) continue;
-    const hasPixels = rec.right > rec.left && rec.bottom > rec.top;
-    if (rec.adjustment || (rec.fillLayer && !hasPixels)) {
-      skipped++;
-      continue;
+  const groupMasks = [];
+  try {
+    // walk top → bottom to resolve group visibility, opacity and masks
+    const effective = new Map();
+    const stack = [];
+    const top = { hidden: false, opacity: 1, masks: [] };
+    for (let i = records.length - 1; i >= 0; i--) {
+      const rec = records[i];
+      if (rec.section === 1 || rec.section === 2) {
+        const parent = stack[stack.length - 1] || top;
+        const mask = rec.hidden || parent.hidden ? null : await buildMask(rec, src, true);
+        if (mask) groupMasks.push(mask.canvas);
+        stack.push({
+          hidden: parent.hidden || rec.hidden,
+          opacity: parent.opacity * rec.opacity,
+          masks: mask?.enabled ? [...parent.masks, mask.canvas] : parent.masks,
+        });
+      } else if (rec.section === 3) {
+        stack.pop();
+      } else {
+        effective.set(rec, stack[stack.length - 1] || top);
+      }
     }
-    const group = effective.get(rec);
-    const layer = new Layer(src.tw, src.th, { name: rec.name || t("Layer") });
-    if (hasPixels) {
-      await paintLayer(layer.ctx, src, rec);
-      pixels = true;
+
+    let skipped = 0;
+    let pixels = false;
+    for (const rec of records) {
+      if (rec.section !== 0) continue;
+      const hasPixels = rec.right > rec.left && rec.bottom > rec.top;
+      if (rec.adjustment || (rec.fillLayer && !hasPixels)) {
+        skipped++;
+        continue;
+      }
+      const group = effective.get(rec);
+      const layer = new Layer(src.tw, src.th, { name: rec.name || t("Layer") });
+      layers.push(layer);
+      if (hasPixels) {
+        await paintLayer(layer.ctx, src, rec);
+        pixels = true;
+      }
+      layer.visible = !rec.hidden && !group.hidden;
+      // fill opacity equals opacity for a normal layer without layer effects
+      rec.alpha = rec.opacity * rec.fill * group.opacity;
+      layer.blend = rec.blend;
+      const mask = await buildMask(rec, src);
+      if (mask) {
+        layer.setMask(mask.canvas);
+        layer.maskEnabled = mask.enabled;
+      }
+      rec.layer = layer;
     }
-    layer.visible = !rec.hidden && !group.hidden;
-    // fill opacity equals opacity for a normal layer without layer effects
-    layer.opacity = Math.round(rec.opacity * rec.fill * group.opacity * 100) / 100;
-    layer.blend = rec.blend;
-    const mask = await buildMask(rec, src);
-    if (mask) {
-      layer.setMask(mask.canvas);
-      layer.maskEnabled = mask.enabled;
+    if (!pixels && skipped) {
+      for (const layer of layers.splice(0)) releaseLayer(layer);
+      return null;
     }
-    // groups are flattened: a group's mask becomes part of its layers' pixels
-    for (const groupMask of group.masks) {
-      layer.ctx.save();
-      layer.ctx.globalCompositeOperation = "destination-in";
-      layer.ctx.drawImage(groupMask, 0, 0);
-      layer.ctx.restore();
+    bakeClipping(records);
+    for (const rec of records) {
+      const layer = rec.layer;
+      if (!layer) continue;
+      layer.opacity = Math.round(rec.alpha * 100) / 100;
+      // groups are flattened: a group's mask becomes part of its layers' pixels
+      for (const groupMask of effective.get(rec).masks) {
+        layer.ctx.save();
+        layer.ctx.globalCompositeOperation = "destination-in";
+        layer.ctx.drawImage(groupMask, 0, 0);
+        layer.ctx.restore();
+      }
     }
-    rec.layer = layer;
-    layers.push(layer);
+    return { layers, skipped };
+  } catch (err) {
+    for (const layer of layers) releaseLayer(layer);
+    throw err;
+  } finally {
+    for (const canvas of groupMasks) releaseCanvas(canvas);
   }
-  if (!pixels && skipped) return null;
-  bakeClipping(records);
-  return { layers, skipped };
 }
 
 /** The flattened composite ("merged image data") at the end of the file. */
@@ -801,10 +930,14 @@ async function paintComposite(ctx, src, start, channelCount, mergedAlpha) {
       rleRows(bytes, starts.subarray(c * height, (c + 1) * height + 1), bytes.length, width, depth, c === colors, 0, width)
     );
   } else if (compression === 2 || compression === 3) {
-    // one stream holds every channel in turn: decode the wanted ones whole
-    const all = zipRows(bytes.subarray(data), width, channelCount * height, depth, compression === 3, colors * height, 0, width);
-    rows = [];
-    for (const c of wanted) rows.push(planeRows(await all(c * height, (c + 1) * height), width));
+    // one stream holds every channel in turn: each channel inflates it on its
+    // own, skipping the channels before it, so only a band of rows is ever
+    // held — never a whole channel, at any document size
+    const zip = bytes.subarray(data);
+    rows = wanted.map((c) => {
+      const get = zipRows(zip, width, (c + 1) * height, depth, compression === 3, colors * height, 0, width);
+      return (y0, y1) => get(c * height + y0, c * height + y1);
+    });
   } else {
     return false;
   }
@@ -864,12 +997,16 @@ export async function readPSD(buffer, { maxDim = 8000, maxPixels = Infinity, max
   let records = info?.records || [];
 
   // a file that cannot even hold its composite image is not what it claims
-  // to be — refuse it before allocating a document of the claimed size
-  const colorBytes = (mode === 1 ? 1 : 3) * height * width * (depth >> 3);
+  // to be — refuse it before allocating a document of the claimed size. ZIP
+  // data must hold every channel the reader inflates (the colours, and the
+  // transparency when there is one) at no more than deflate's expansion
   const compression = sectionEnd + 2 <= r.bytes.length ? r.view.getUint16(sectionEnd) : -1;
-  const ratio = compression === 0 ? 2 : compression === 1 ? 128 : compression > 1 ? 2064 : Infinity;
+  const colors = mode === 1 ? 1 : 3;
+  const planes = compression > 1 && info?.mergedAlpha && channelCount > colors ? colors + 1 : colors;
+  const decoded = planes * height * width * (depth >> 3);
+  const ratio = compression === 0 ? 2 : compression === 1 ? 128 : compression > 1 ? MAX_DEFLATE_RATIO : Infinity;
   const table = compression === 1 ? channelCount * height * 2 : 0;
-  if (r.bytes.length - sectionEnd - 2 < table + colorBytes / ratio) throw damaged();
+  if (r.bytes.length - sectionEnd - 2 < table + decoded / ratio) throw damaged();
 
   const k = Math.min(1, maxDim / Math.max(width, height), Math.sqrt(maxPixels / (width * height)));
   const tw = Math.max(1, Math.round(width * k));
@@ -902,7 +1039,9 @@ export async function readPSD(buffer, { maxDim = 8000, maxPixels = Infinity, max
     try {
       imported = await importLayers(src, records);
     } catch (err) {
-      if (!(err instanceof PsdError)) throw err;
+      // damaged layer data, or more canvases than the browser grants (iOS
+      // Safari caps their total memory): the composite needs only one
+      if (!(err instanceof PsdError || err instanceof CanvasTooLargeError)) throw err;
       imported = null;
     }
   }

@@ -4,13 +4,21 @@
    - Pages are stored and looked up by origin + pathname only, so tracking
      parameters (?fbclid=, ?utm_*) and the editor's ?task=…&lang=… never add
      cache entries, and every offline lookup of a page ignores its query.
+   - The network is asked with cache: "no-cache": the browser revalidates its
+     HTTP copy (a cheap 304) instead of serving it unchecked — GitHub Pages
+     lets it keep a file for 10 minutes, long after a deploy. What the page
+     gets is marked no-cache too, so its memory cache cannot skip this worker.
    - A navigation waits for the network at most NAV_TIMEOUT when a cached copy
-     exists; a slow connection then gets the cached page.
+     exists; a slow connection then gets the cached page. Such a page also
+     gets its scripts, styles and images from the cache (refreshed behind it
+     for the next visit), so it never runs with files from a newer deploy.
    - Offline, a page that was never cached redirects to one that was (the
      language's landing page, else the editor) — never another page's HTML at
-     this URL, whose relative ../js/ links would resolve to the wrong place. */
+     this URL, whose relative ../js/ links would resolve to the wrong place.
+   - A shell that cannot be cached completely fails the install: the worker
+     before keeps running with its complete cache, and the next visit retries. */
 
-const CACHE = "paint-studio-v4";
+const CACHE = "paint-studio-v5";
 const NAV_TIMEOUT = 4000;
 
 const SHELL = [
@@ -53,8 +61,9 @@ self.addEventListener("install", (event) => {
       .open(CACHE)
       // straight from the network: the HTTP cache may still hold the old shell
       .then((cache) => cache.addAll(SHELL.map((url) => new Request(url, { cache: "reload" }))))
+      // only now: a failed precache rejects, and activating anyway would
+      // delete the old, complete cache
       .then(() => self.skipWaiting())
-      .catch(() => self.skipWaiting())
   );
 });
 
@@ -76,7 +85,8 @@ const keyOf = (url) => url.origin + url.pathname;
  * is stored — even when a cached response was already served.
  */
 function fetchAndStore(event, key) {
-  const fetched = fetch(event.request).then((response) => {
+  // (a navigation request turns into a same-origin one here, as it should)
+  const fetched = fetch(new Request(event.request, { cache: "no-cache" })).then((response) => {
     if (!response.ok || response.type !== "basic") return [response, null];
     const copy = response.clone();
     return [response, caches.open(CACHE).then((cache) => cache.put(key, copy))];
@@ -103,31 +113,75 @@ async function offlineRedirect(url) {
   return Response.error();
 }
 
+/** Pages (client ids) that were served from the cache: their files come from it too. */
+const pinned = new Set();
+
 async function navigate(event, url) {
   const network = fetchAndStore(event, keyOf(url));
   network.catch(() => {}); // a failure is handled below, once the cache has answered
   const cached = await caches.match(keyOf(url));
   if (!cached) return network.catch(() => offlineRedirect(url));
+  const fromCache = () => {
+    if (event.resultingClientId) pinned.add(event.resultingClientId);
+    return cached;
+  };
   let timer;
   const slow = new Promise((resolve) => {
-    timer = setTimeout(() => resolve(cached), NAV_TIMEOUT);
+    timer = setTimeout(() => resolve(fromCache()), NAV_TIMEOUT);
   });
-  return Promise.race([network.catch(() => cached), slow]).finally(() => clearTimeout(timer));
+  return Promise.race([network.catch(fromCache), slow]).finally(() => clearTimeout(timer));
 }
 
 async function asset(event, url) {
+  const key = keyOf(url);
+  if (pinned.has(event.clientId)) {
+    // the page came from the cache: its modules must match it, not whatever
+    // the network has now — which is still fetched, for the next visit
+    const cached = await caches.match(key);
+    if (cached) {
+      fetchAndStore(event, key).catch(() => {});
+      return cached;
+    }
+  }
   try {
-    return await fetchAndStore(event, keyOf(url));
+    return await fetchAndStore(event, key);
   } catch (err) {
-    const cached = await caches.match(keyOf(url));
+    const cached = await caches.match(key);
     if (cached) return cached;
     throw err;
   }
+}
+
+/**
+ * The browser keeps scripts and styles in its memory cache and reuses them
+ * on the next page of the tab without asking this worker, for as long as the
+ * server's max-age allows: a page from a new deploy would run the old
+ * modules. Marked no-cache, every load of them comes through here.
+ */
+async function revalidated(response) {
+  if (response.type !== "basic" || response.status !== 200) return response;
+  const headers = new Headers(response.headers);
+  headers.set("Cache-Control", "no-cache");
+  // the body passes through as a stream where a response can be built on one
+  const body = streamBodies() ? response.body : await response.blob();
+  return new Response(body, { status: response.status, statusText: response.statusText, headers });
+}
+
+let canStream;
+function streamBodies() {
+  if (canStream === undefined) {
+    try {
+      canStream = !!new Response(new ReadableStream()).body;
+    } catch {
+      canStream = false;
+    }
+  }
+  return canStream;
 }
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== location.origin) return;
-  event.respondWith(request.mode === "navigate" ? navigate(event, url) : asset(event, url));
+  event.respondWith(request.mode === "navigate" ? navigate(event, url) : asset(event, url).then(revalidated));
 });

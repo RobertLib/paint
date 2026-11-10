@@ -6,8 +6,11 @@ export const SITE = {
   name: "Paint Studio",
   /**
    * Absolute address of the site root, with a trailing slash. Canonical URLs,
-   * hreflang, Open Graph and the sitemap are built from it. Switching to a
-   * custom domain is: change this, add a CNAME file, rebuild.
+   * hreflang, Open Graph and the sitemap are built from it, and the build sets
+   * the "id" of manifest.json to its path ("/paint/" here — the id resolves
+   * against the origin, so it must name the path). Switching to a custom
+   * domain is: change this, add a CNAME file, rebuild (which moves the
+   * manifest id to the new path, e.g. "/"), update robots.txt — see README.
    */
   base: "https://robertlib.github.io/paint/",
   github: "https://github.com/RobertLib/paint",

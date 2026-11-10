@@ -40,11 +40,11 @@ export default {
     features: [
       {
         h2: "Layers, blend modes and masks",
-        p: "Build images the way you would in a desktop editor. Add as many layers as you need, drag them to reorder, rename, lock or hide them and set opacity per layer. Sixteen blend modes such as Multiply, Screen, Overlay and Soft light composite without touching the pixels below. Layer masks hide parts of a layer non-destructively: paint black to hide, white to reveal, then apply or delete the mask when you are done.",
+        p: "Build images the way you would in a desktop editor. Add as many layers as you need, drag them to reorder, rename, lock or hide them and set opacity per layer. Seventeen blend modes such as Multiply, Screen, Overlay and Soft light composite without touching the pixels below. Layer masks hide parts of a layer non-destructively: paint black to hide, white to reveal, then apply or delete the mask when you are done.",
       },
       {
         h2: "Brushes, shapes and text",
-        p: "The Brush has size, opacity, hardness, smoothing and pen pressure, and sits next to the Pencil, Airbrush, Eraser, Fill and a linear or radial Gradient. Line, Arrow, Rectangle with rounded corners, Ellipse, Polygon and Star draw as outline, solid or both. The Text tool types straight onto the canvas in the final font, and every text layer stays editable, so a typo is never a reason to start over.",
+        p: "The Brush has size, opacity, hardness, smoothing and pen pressure, and sits next to the Pencil, Airbrush, Eraser, Fill and a linear or radial Gradient. Rectangle with rounded corners, Ellipse, Polygon and Star draw as outline, solid or both, while Line and Arrow draw straight strokes with an adjustable width. The Text tool types straight onto the canvas in the final font, and every text layer stays editable, so a typo is never a reason to start over.",
       },
       {
         h2: "Retouching tools",
@@ -60,7 +60,7 @@ export default {
       },
       {
         h2: "Crop, resize and transform",
-        p: "Crop with ratio presets and rule-of-thirds guides, change the pixel dimensions in Image size…, or extend the canvas in Canvas size… with an anchor that decides where the picture sits. Rotate by 90° or 180°, flip, trim transparent edges automatically, or use the Transform tool to move, scale and rotate a layer by any angle. Documents can be up to 8000 × 8000 pixels.",
+        p: "Crop with ratio presets and rule-of-thirds guides, change the pixel dimensions in Image size…, or extend the canvas in Canvas size… with an anchor that decides where the picture sits. Rotate by 90° or 180°, flip, trim transparent edges automatically, or use the Transform tool to move, scale and rotate a layer by any angle. Documents can be up to 8000 × 8000 pixels, within the browser’s canvas limit (about 16.7 megapixels on iPhone and iPad).",
       },
       {
         h2: "Opens almost anything, exports what you need",
@@ -82,7 +82,7 @@ export default {
       },
       {
         q: "Does it work offline?",
-        a: "Yes, after your first visit. The editor is a progressive web app: it caches itself in the browser and can be installed to your desktop, dock or home screen. Work in progress is autosaved in the browser’s own storage, and the next time you open Paint Studio it offers to restore it.",
+        a: "Yes, after your first visit. The editor is a progressive web app: it caches itself in the browser and can be installed to your desktop, dock or home screen. Work in progress is autosaved in the browser’s own storage, and the next time you open Paint Studio it offers to restore it. Very large documents are the exception: once all layers together exceed about 192 megapixels (say, ten layers of a 24-megapixel photo), autosave is skipped, so save a .paint project instead.",
       },
       {
         q: "Can I use it on a phone, tablet or Chromebook?",
@@ -94,7 +94,7 @@ export default {
       },
       {
         q: "How large can an image be?",
-        a: "Documents can be up to 8000 × 8000 pixels, which covers photos from most phones and cameras. Bigger images are scaled down to fit within 8000 px when they are opened, so you can still edit them, just at a slightly lower resolution.",
+        a: "Up to 8000 × 8000 pixels on a computer, which covers photos from most phones and cameras. The browser also caps how large a canvas may be: Safari on iPhone and iPad stops at about 16.7 megapixels. Anything bigger is scaled down to fit when it opens, so you can still edit it, just at a lower resolution.",
       },
       {
         q: "Does it have AI features like automatic background removal?",
@@ -102,7 +102,7 @@ export default {
       },
       {
         q: "Which languages and themes are available?",
-        a: "The interface is available in English and Czech, with a dark and a light theme. Keyboard shortcuts work the same in both languages; press <kbd>?</kbd> in the editor to see the full list of shortcuts.",
+        a: "The interface is available in English and Czech, with a dark and a light theme that follows your system setting until you pick one. Keyboard shortcuts work the same in both languages; press <kbd>?</kbd> in the editor to see the full list of shortcuts.",
       },
     ],
   },
@@ -151,7 +151,7 @@ export default {
         },
         {
           q: "Can I undo a crop?",
-          a: "Yes, as long as you are still in the editor. Press <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Z</kbd> to step back; the history keeps up to 60 steps. The exported file contains only the cropped area, while the original file on your device stays exactly as it was.",
+          a: "Yes, as long as you are still in the editor. Press <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Z</kbd> to step back; the history keeps up to 80 steps, fewer on large photos, where memory sets the limit. The exported file contains only the cropped area, while the original file on your device stays exactly as it was.",
         },
       ],
     },
@@ -191,7 +191,7 @@ export default {
         },
         {
           q: "Can I make a small image bigger without losing quality?",
-          a: "You can enlarge it up to 8000 × 8000 pixels, but no editor can recreate detail the original never captured, and Paint Studio has no AI upscaling. Small enlargements usually look fine on screen; large ones look noticeably soft.",
+          a: "You can enlarge it up to 8000 × 8000 pixels (less on iPhone and iPad, where Safari caps a canvas at about 16.7 megapixels), but no editor can recreate detail the original never captured, and Paint Studio has no AI upscaling. Small enlargements usually look fine on screen; large ones look noticeably soft.",
         },
         {
           q: "What is the difference between resizing and compressing?",
@@ -505,7 +505,7 @@ export default {
         },
         {
           h2: "Selecting exactly what to hide",
-          p: "Rectangle select is ideal for text, plates and screenshots. Use Ellipse select for faces, the Lasso for irregular shapes, or the Magic wand to pick an area of similar color. Hold <kbd>Shift</kbd> while selecting to add more areas, so you can blur several faces in one go. Feather softens the selection edge, so a blurred patch fades into the photo instead of ending in a hard line. If nothing is selected, the whole image is blurred.",
+          p: "Rectangle select is ideal for text, plates and screenshots. Use Ellipse select for faces, the Lasso for irregular shapes, or the Magic wand to pick an area of similar color. Hold <kbd>Shift</kbd> while selecting to add more areas, so you can blur several faces in one go. Feather softens the selection edge, so a blurred patch fades into the photo instead of ending in a hard line. Blur and Pixelate always need a selection; with nothing selected, the editor asks you to select what to hide first.",
         },
         {
           h2: "Blurring a background and other effects",
@@ -553,7 +553,7 @@ export default {
         },
         {
           h2: "Editing, moving and layering text",
-          p: "Every piece of text becomes its own text layer in the Layers panel. Click it again with the Text tool to fix a typo or change the wording, and use the Move tool to reposition it. The layer stays editable until you paint on it, rotate it or flip it; after that it becomes ordinary pixels. To make text readable on a busy photo, add a new layer below it, draw a solid black or white Rectangle and lower that layer’s opacity to create a soft band behind the words.",
+          p: "Every piece of text becomes its own text layer in the Layers panel. Click it again with the Text tool to fix a typo or change the wording, and use the Move tool to reposition it. The layer stays editable until something changes its pixels — painting, filters, adjustments including Levels and Curves, the Transform tool, rotating or flipping the image, Merge down, Apply mask, or moving it while a selection is active. After that it is ordinary pixels. To make text readable on a busy photo, add a new layer below it, draw a solid black or white Rectangle and lower that layer’s opacity to create a soft band behind the words.",
         },
         {
           h2: "Memes and watermarks",
@@ -563,7 +563,7 @@ export default {
       faq: [
         {
           q: "Can I edit the text after adding it?",
-          a: "Yes. Each text is a separate text layer; select the Text tool and click the text to change the words, font, size or color. It stays editable until you paint on that layer, rotate it or flip it. Save a .paint project to keep all layers for later.",
+          a: "Yes. Each text is a separate text layer; select the Text tool and click the text to change the words, font, size or color. It stays editable until its pixels change: painting, filters and adjustments, the Transform tool, rotating or flipping, Merge down or Apply mask turn it into ordinary pixels. Save a .paint project to keep all layers for later.",
         },
         {
           q: "Which fonts are available?",
@@ -699,7 +699,7 @@ export default {
       faq: [
         {
           q: "Can I remove a filter after applying it?",
-          a: "Yes. Click Undo or press <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Z</kbd>; each filter is a single step and the history keeps up to 60 of them. Filters stacked on top can be undone one by one, in reverse order.",
+          a: "Yes. Click Undo or press <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Z</kbd>; each filter is a single step, and the history keeps up to 80 steps — fewer on large photos, where memory sets the limit. Filters stacked on top can be undone one by one, in reverse order.",
         },
         {
           q: "How does the Duotone filter choose its colors?",
@@ -829,7 +829,7 @@ export default {
         },
         {
           h2: "Photos, logos and screenshots",
-          p: "In a photograph, neighboring pixels rarely have exactly the same color, and JPEG compression adds small variations on top. Sample a few points and pick the one that represents the area best. For brand colors, use the cleanest source you have, such as an original PNG or SVG logo rather than a compressed screenshot. To pick a color from a website or app, take a screenshot and paste it with <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd>. Paint Studio reads the stored RGB values without color management, so results can differ slightly from tools that convert color profiles.",
+          p: "In a photograph, neighboring pixels rarely have exactly the same color, and JPEG compression adds small variations on top. Sample a few points and pick the one that represents the area best. For brand colors, use the cleanest source you have, such as an original PNG or SVG logo rather than a compressed screenshot. To pick a color from a website or app, take a screenshot and paste it with <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd>. Paint Studio works in sRGB and has no color management of its own, so results can differ slightly from tools that use the image’s embedded color profile.",
         },
         {
           h2: "Layers and recent colors",
@@ -869,7 +869,7 @@ export default {
       sections: [
         {
           h2: "Annotating screenshots and plans",
-          p: "For tutorials and bug reports, the Arrow points at exactly the button you mean, and Rectangle or Ellipse in outline mode draws a clean frame around it; give the Rectangle rounded corners for a softer look. Line draws straight connections, and holding <kbd>Shift</kbd> constrains the angle of lines and the proportions of shapes. On maps and floor plans, outline an area with the Polygon, or switch to solid or both to fill it. Red or bright yellow at a medium size stands out on most backgrounds.",
+          p: "For tutorials and bug reports, the Arrow points at exactly the button you mean, and Rectangle or Ellipse in outline mode draws a clean frame around it; give the Rectangle rounded corners for a softer look. Line draws straight connections, and holding <kbd>Shift</kbd> constrains the angle of lines and the proportions of shapes. On maps and floor plans, mark a spot with the Ellipse or a room with the Rectangle, and switch to solid or both at a lower opacity to tint it. Polygon and Star fit a shape with 3 to 16 sides or points into the box you drag. Red or bright yellow at a medium size stands out on most backgrounds.",
         },
         {
           h2: "A highlighter effect",
@@ -917,7 +917,7 @@ export default {
         },
         {
           h2: "Layers for cleaner artwork",
-          p: "Work the way digital artists do: sketch on one layer, ink on a second and color on a third below the line art, so you can fix the colors without damaging the outlines. There is no limit on the number of layers, and 16 blend modes, such as Multiply for shading or Screen for light effects, help you build up a painting. Lock a finished layer to protect it, hide one to compare, and merge or flatten when you are done. Undo goes back up to 60 steps.",
+          p: "Work the way digital artists do: sketch on one layer, ink on a second and color on a third below the line art, so you can fix the colors without damaging the outlines. There is no limit on the number of layers, and 17 blend modes, such as Multiply for shading or Screen for light effects, help you build up a painting. Lock a finished layer to protect it, hide one to compare, and merge or flatten when you are done. Undo goes back up to 80 steps, fewer on very large canvases.",
         },
         {
           h2: "Painting on a tablet, Chromebook or phone",
@@ -931,7 +931,7 @@ export default {
         },
         {
           q: "How do I save my painting?",
-          a: "Use Save project in the File menu to keep a .paint file with all layers, so you can continue later. To share the picture, click Export and choose PNG, JPEG or WebP; you can also save a layered PSD. Unsaved work is autosaved in your browser too.",
+          a: "Use Save project in the File menu to keep a .paint file with all layers, so you can continue later. To share the picture, click Export and choose PNG, JPEG or WebP; you can also save a layered PSD. Unsaved work is autosaved in your browser too, unless the document is extremely large (more than about 192 megapixels across all layers).",
         },
         {
           q: "Is it suitable for kids?",
@@ -939,7 +939,7 @@ export default {
         },
         {
           q: "Can I change the canvas size?",
-          a: "Yes. Choose Canvas size… in the Image menu to make the canvas bigger or smaller, with an anchor that decides where your painting sits. You can also start a new document from the File menu with your own dimensions, up to 8000 × 8000 pixels.",
+          a: "Yes. Choose Canvas size… in the Image menu to make the canvas bigger or smaller, with an anchor that decides where your painting sits. You can also start a new document from the File menu with your own dimensions, up to 8000 × 8000 pixels, or about 16.7 megapixels in Safari on iPhone and iPad.",
         },
       ],
     },

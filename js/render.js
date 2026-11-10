@@ -23,7 +23,8 @@ export const overlay = {
   transform: null,
 };
 
-let pending = false;
+/** the requested animation frame, 0 when none */
+let pending = 0;
 let antPhase = 0;
 let antTimer = 0;
 let checker = null;
@@ -32,8 +33,13 @@ let checkerColors = null;
 
 export function requestRender() {
   if (pending) return;
-  pending = true;
-  requestAnimationFrame(draw);
+  pending = requestAnimationFrame(draw);
+}
+
+/** Draw right now (a frame already requested is not needed any more). */
+function drawNow() {
+  if (pending) cancelAnimationFrame(pending);
+  draw();
 }
 
 export function initRender(canvas, stage) {
@@ -47,11 +53,15 @@ export function initRender(canvas, stage) {
     checkerColors = null;
     requestRender();
   });
+  // resizing the canvas clears it, and observers run after this frame's
+  // animation callbacks: drawing later would show one blank frame
   const ro = new ResizeObserver(() => {
     view.resize();
-    requestRender();
+    drawNow();
   });
   ro.observe(stage);
+  // a move to a screen with another pixel ratio resizes the canvas too
+  on("dpr", drawNow);
   requestRender();
 }
 
@@ -148,7 +158,7 @@ function ants(ctx, path, dash = 5, { clip = false } = {}) {
 /* ---------------------------------- draw --------------------------------- */
 
 function draw(now = 0) {
-  pending = false;
+  pending = 0;
   const ctx = view.ctx;
   if (!ctx) return;
 
