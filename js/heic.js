@@ -11,6 +11,9 @@
 const SRC = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
 const INTEGRITY = "sha384-OTofQ0MEeiSgh62havBcemCIK0gqj809wX6UA0uPISNMRnR6NZyCdGzX3SbLrgwL";
 
+/** Give up on a download that has not finished after this long. */
+const TIMEOUT = 20000;
+
 let loading = null;
 
 function loadDecoder() {
@@ -18,16 +21,25 @@ function loadDecoder() {
   if (loading) return loading;
   loading = new Promise((resolve, reject) => {
     const s = document.createElement("script");
+    // every failure forgets the attempt, so the next photo tries again
+    const fail = (message) => {
+      clearTimeout(timer);
+      s.onload = s.onerror = null;
+      s.remove();
+      loading = null;
+      reject(new Error(message));
+    };
+    const timer = setTimeout(() => fail("HEIC decoder download timed out"), TIMEOUT);
     s.src = SRC;
     s.integrity = INTEGRITY;
     s.crossOrigin = "anonymous";
     s.async = true;
-    s.onload = () =>
-      window.heic2any ? resolve(window.heic2any) : reject(new Error("HEIC decoder unavailable"));
-    s.onerror = () => {
-      loading = null;
-      reject(new Error("HEIC decoder could not be downloaded"));
+    s.onload = () => {
+      if (!window.heic2any) return fail("HEIC decoder unavailable");
+      clearTimeout(timer);
+      resolve(window.heic2any);
     };
+    s.onerror = () => fail("HEIC decoder could not be downloaded");
     document.head.appendChild(s);
   });
   return loading;

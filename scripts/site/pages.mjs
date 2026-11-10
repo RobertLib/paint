@@ -54,7 +54,7 @@ export const PAGES = [
     slug: { en: "image-converter", cs: "prevod-obrazku" },
     related: ["png-to-jpg", "webp-to-jpg", "heic-to-jpg"],
     brief:
-      "Opens: PNG, JPEG, WebP, GIF (first frame), SVG, BMP, AVIF (if the browser decodes it), HEIC/HEIF, PSD. Exports: PNG, JPEG, WebP, layered PSD. Editor opens the Export dialog where the format is picked; JPEG has no transparency (filled with white).",
+      "Opens: PNG, JPEG, WebP, GIF (first frame), SVG, BMP, AVIF (if the browser decodes it), HEIC/HEIF, PSD (8/16/32-bit with layers), .paint projects. Exports: PNG, JPEG, WebP, layered PSD. Editor opens the Export dialog where the format is picked; JPEG has no transparency (filled with white).",
   },
   {
     id: "png-to-jpg",
@@ -153,7 +153,7 @@ export const PAGES = [
     slug: { en: "color-picker-from-image", cs: "zjistit-barvu-z-obrazku" },
     related: ["image-converter", "photo-filters", "draw-on-image"],
     brief:
-      "Editor opens with the Eyedropper. Click (or drag) anywhere on the image; the task bar shows the HEX and RGB value with a Copy button, and the Color panel shows it too. Sample from all layers or only the active layer. Picked colours are kept in the Recent row. Zoom in (scroll, pinch) to hit single pixels.",
+      "Editor opens with the Eyedropper. Click (or drag) anywhere on the image; the task bar shows the HEX and RGB values with a Copy HEX button (only HEX is copied; on phones the task-bar text is hidden), and the Color panel shows the colour too. Sample from all layers or only the active layer. Picked colours are kept in the Recent row. Zoom in (scroll, pinch) to hit single pixels.",
   },
   {
     id: "draw-on-image",
@@ -181,7 +181,7 @@ export const PAGES = [
     slug: { en: "open-psd-online", cs: "otevrit-psd" },
     related: ["image-converter", "resize-image", "crop-image"],
     brief:
-      "Opens Photoshop .psd files (8-bit RGB or grayscale) with their pixel layers, names, opacity, visibility, blend modes and layer masks; groups are flattened into a plain layer list. Text, shape and smart-object layers come in as their rendered pixels; adjustment layers and layer effects are not applied. If layer data can't be read (e.g. ZIP-compressed or 16/32-bit), the flattened composite is opened instead. Can export to PNG/JPEG/WebP or save back to a layered PSD. Not supported: PSB, CMYK, Lab.",
+      "Opens Photoshop .psd files, 8-, 16- and 32-bit RGB or grayscale, WITH their pixel layers, names, opacity, visibility, blend modes and layer masks — including Photoshop's separate 16/32-bit layer blocks (Lr16/Lr32) and ZIP / ZIP-with-prediction compressed channels; 16- and 32-bit (linear HDR) are converted to 8 bits per channel. Clipping masks are baked into the clipped layers' pixels; fill opacity is folded into the layer opacity. Groups are flattened into a plain layer list. Text, shape and smart-object layers come in as their rendered pixels; adjustment layers and layer effects are not applied. The flattened composite is the fallback when layer data can't be read. Can export to PNG/JPEG/WebP or save back to a layered PSD. Not supported: PSB, CMYK, Lab, Indexed, Bitmap, Duotone.",
   },
   {
     id: "retouch-photo",

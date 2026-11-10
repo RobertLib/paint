@@ -46,10 +46,14 @@ image.
 
 **Files** — opens PNG, JPEG, WebP, GIF, SVG, BMP, AVIF, **HEIC** (natively in
 Safari; elsewhere a decoder is fetched once from jsDelivr, pinned by version and
-integrity hash) and **PSD** (8/16-bit RGB or grayscale with layers, masks,
-blend modes; groups flattened). Exports PNG, JPEG, WebP with quality, scale and
-a live size estimate, and **layered PSD**. `.paint` project files keep layers,
-masks and editable text.
+integrity hash) and **PSD** — 8-, 16- and 32-bit RGB or grayscale with layers,
+masks and blend modes, including Photoshop's 16/32-bit layer blocks and
+ZIP-compressed channels (converted to 8 bits per channel); clipping masks are baked
+into the clipped layers and fill opacity is folded into opacity; groups are
+flattened, text/shape/smart-object layers come in as pixels, adjustment layers
+and layer effects are not applied; PSB, CMYK, Lab, indexed, bitmap and duotone are not supported.
+Exports PNG, JPEG, WebP with quality, scale and a live size estimate, and
+**layered PSD**. `.paint` project files keep layers, masks and editable text.
 
 **Everything else** — undo/redo history, **autosave** to the browser's own
 storage with restore on the next visit, zoom to 3200% with pan and pinch,
@@ -97,11 +101,28 @@ node scripts/build-site.mjs
 | `scripts/site/config.mjs` | base URL, languages, analytics, IndexNow key |
 | `scripts/site/pages.mjs` | page ids, slugs per language, task, icon, related pages |
 | `scripts/site/content/en.mjs`, `cs.mjs` | all copy (titles, descriptions, steps, sections, FAQ) |
+| `scripts/site/lastmod.json` | per-URL content hash and `<lastmod>` date (generated — commit it) |
 
 The generator also writes `sitemap.xml` (with `hreflang` alternates), the
 IndexNow key file and keeps the `modulepreload` list and analytics snippet of
-`editor/index.html` up to date. Adding a language means a new content file, a
-dictionary in `js/lang/` and an entry in `config.mjs`.
+`editor/index.html` up to date.
+
+A page's `<lastmod>` only moves when its title, description or main content
+changes: `lastmod.json` remembers a hash per URL, so rebuilding without copy
+changes leaves `sitemap.xml` untouched.
+
+Adding a language takes:
+
+1. `scripts/site/content/<lang>.mjs` with all the copy (start from `en.mjs`),
+   and slugs for it in every page of `pages.mjs`;
+2. the language in `scripts/site/config.mjs` — `languages`, `locales` and
+   `languageNames` (the header switcher, footer links and `hreflang` are
+   derived from these);
+3. the editor: a dictionary in `js/lang/<lang>.js`, imported in `js/i18n.js`
+   and added to its `DICTS` and `LANGS` (and to the browser-language match in
+   `detect()`), plus the landing-page path for that language in `SITE_HOME`
+   in `js/menus.js` (the "All tools and guides" link);
+4. `./<lang>/` in the precache list of `sw.js`.
 
 ### Search engines and analytics
 
@@ -111,15 +132,22 @@ dictionary in `js/lang/` and an entry in `config.mjs`.
   anonymous events (`event/open-png`, `event/export-jpg`, `event/editor-crop`…);
   no file names or image data are ever sent.
 - **IndexNow** (Bing, Seznam, Yandex…) — after a deploy run
-  `node scripts/indexnow.mjs` (`--dry-run` to preview).
+  `node scripts/indexnow.mjs`. It sends only the pages whose content changed
+  since the last submission (`--all` sends every URL, `--dry-run` previews)
+  and records what it sent in `scripts/site/lastmod.json` — commit that.
 - **Webmaster tools** — the sitemap is `https://robertlib.github.io/paint/sitemap.xml`;
-  submit it in Google Search Console, Bing Webmaster Tools and Seznam Webmaster.
+  submit it by hand in Google Search Console, Bing Webmaster Tools and Seznam
+  Webmaster. As a GitHub Pages *project* site the address has no root of its
+  own, so crawlers never see `robots.txt` (it is served at `/paint/robots.txt`,
+  and robots files only count at `/robots.txt`) and can't discover the sitemap
+  from it — manual submission is the only way until the site has its own domain.
 
 ### Moving to a custom domain
 
 1. Point the domain at GitHub Pages and add a `CNAME` file with the domain.
 2. Change `base` in `scripts/site/config.mjs` and run `node scripts/build-site.mjs`.
-3. Update the `Sitemap:` line in `robots.txt`.
+3. Update the `Sitemap:` line in `robots.txt` — on its own domain the file is
+   finally served from the root, where crawlers read it.
 
 GitHub Pages redirects the old `github.io` address to the custom domain.
 
@@ -129,8 +157,10 @@ ES modules, no framework, no bundler.
 
 | File | Responsibility |
 | --- | --- |
+| `js/main.js` | entry point: boots the editor, opens a handed-over file, task or autosave, registers the service worker |
 | `js/i18n.js`, `js/lang/cs.js` | UI language detection and the Czech dictionary |
 | `js/state.js` | app state and a small event bus; preferences persistence |
+| `js/color.js` | colour conversions (RGB/HSV/HEX) and parsing |
 | `js/doc.js` | document model: layers, masks, text layers, selections, compositing, geometry |
 | `js/history.js` | undo/redo commands with a memory budget |
 | `js/viewport.js` | zoom/pan and document ↔ screen coordinates |
@@ -145,7 +175,9 @@ ES modules, no framework, no bundler.
 | `js/autosave.js`, `js/store.js` | IndexedDB autosave and the landing-page hand-over |
 | `js/psd.js` | PSD reader and writer |
 | `js/heic.js` | on-demand HEIC decoder |
+| `js/track.js` | cookie-free GoatCounter event counting (no file names or image data) |
 | `js/site.js` | landing-page script (drop zone → editor) |
+| `sw.js` | service worker: network-first with an offline cache |
 
 Strokes are painted into a document-sized floating buffer that is composited
 above the active layer and flattened on pointer-up, so semi-transparent brushes

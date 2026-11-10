@@ -7,14 +7,17 @@ import { cssColor } from "./color.js";
 import {
   Doc,
   Layer,
+  MAX_DIM,
   copyCanvas,
   ctx2d,
   drawText,
+  fitScale,
   grayToMask,
   loadImage,
   makeCanvas,
   makeMask,
   maskToGray,
+  maxCanvasPixels,
   paintMasked,
 } from "./doc.js";
 import {
@@ -26,32 +29,44 @@ import {
 } from "./filters.js";
 import {
   beginPixelEdit,
+  cancelSessions,
+  dropSessions,
   editDoc,
   editPixels,
   editSelection,
   history,
+  pushCommand,
+  registerSession,
+  settleSessions,
 } from "./history.js";
-import { t } from "./i18n.js";
+import { t, tn } from "./i18n.js";
 import { overlay, requestRender } from "./render.js";
 import { emit, markDirty, state } from "./state.js";
 import { track } from "./track.js";
 import { view } from "./viewport.js";
 
-export const MAX_DIM = 8000;
+export { MAX_DIM };
+
+/** Finish live previews and transforms (for callers outside this module). */
+export const settle = () => settleSessions();
 
 const toast = (msg, kind = "info") => emit("toast", { msg, kind });
 
 /* ============================== documents ================================= */
 
-export function setDocument(doc, { fit = true, reason = "open" } = {}) {
-  endAdjustSession();
+/**
+ * Make `doc` the open document. `restored` marks a document brought back from
+ * the autosave (a landing-page task must not be applied to it again).
+ */
+export function setDocument(doc, { fit = true, reason = "open", restored = false } = {}) {
+  dropSessions();
   overlay.crop = null;
   overlay.marquee = null;
   overlay.transform = null;
   state.doc = doc;
   history.reset();
   markDirty(false);
-  emit("doc", { reason, doc });
+  emit("doc", { reason, doc, restored });
   emit("layers", doc);
   emit("selection", doc);
   if (fit) view.fit();
@@ -61,7 +76,8 @@ export function setDocument(doc, { fit = true, reason = "open" } = {}) {
 export function newDocument({ width, height, background = "#ffffff" }) {
   if (!confirmDiscard()) return false;
   const bg = background === "custom" ? cssColor(state.primary) : background;
-  const doc = Doc.blank(clampDim(width), clampDim(height), bg);
+  const { w, h } = clampSize(width, height);
+  const doc = Doc.blank(w, h, bg);
   setDocument(doc);
   toast(t("New {w} × {h} document", { w: doc.width, h: doc.height }), "ok");
   track("new-document");
@@ -75,7 +91,20 @@ export function confirmDiscard() {
   );
 }
 
-const clampDim = (v) => Math.max(1, Math.min(MAX_DIM, Math.round(v || 1)));
+/**
+ * A size this device can hold: at most MAX_DIM on a side and within the
+ * canvas area limit, scaled down proportionally so the shape is kept.
+ */
+export function clampSize(width, height) {
+  const w0 = Math.max(1, Math.round(Number(width) || 1));
+  const h0 = Math.max(1, Math.round(Number(height) || 1));
+  const k = fitScale(w0, h0);
+  return {
+    w: Math.max(1, Math.floor(w0 * k)),
+    h: Math.max(1, Math.floor(h0 * k)),
+    scaled: k < 1,
+  };
+}
 
 /* ================================ import ================================= */
 
@@ -97,12 +126,24 @@ export function isOpenable(file) {
   );
 }
 
+/** iPhone photos are sometimes renamed to .jpg: recognise HEIC by content. */
+async function looksLikeHeic(file) {
+  try {
+    const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+    const tag = String.fromCharCode(...head.slice(4, 12));
+    // (not "mif1" alone: AVIF files carry that brand too)
+    return /^ftyp(heic|heix|hevc|hevx|heim|heis)/.test(tag);
+  } catch {
+    return false;
+  }
+}
+
 async function decodeFile(file) {
   const url = URL.createObjectURL(file);
   try {
     return await loadImage(url);
   } catch (err) {
-    if (!isHeic(file)) throw err;
+    if (!isHeic(file) && !(await looksLikeHeic(file))) throw err;
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -141,7 +182,9 @@ export async function openImageFile(file, { asLayer = false } = {}) {
       setDocument(doc);
       toast(t("Opened {w} × {h} image", { w: doc.width, h: doc.height }), "ok");
     }
-    track(`open-${isHeic(file) ? "heic" : extOf(file) || "image"}`);
+    // only known formats are counted: a file name never leaves the device
+    const kind = isHeic(file) ? "heic" : IMAGE_EXT.has(extOf(file)) ? extOf(file) : "image";
+    track(`open-${kind}`);
     return true;
   } catch (err) {
     console.error(err);
@@ -155,25 +198,51 @@ export async function openImageFile(file, { asLayer = false } = {}) {
   }
 }
 
+/** Reader errors with a translation; anything else gets a generic message. */
+const PSD_ERRORS = new Set([
+  "Not a Photoshop file",
+  "PSB (large document) files are not supported",
+  "Unknown PSD version",
+  "CMYK PSD files are not supported",
+  "Only RGB and grayscale PSD files are supported",
+  "Only 8-, 16- and 32-bit PSD files are supported",
+  "This PSD is too large to open in a browser",
+  "This PSD uses compression that cannot be read here",
+  "This PSD file is damaged",
+]);
+
+const layerCount = (n) =>
+  tn(n, "Opened PSD with {n} layer", "Opened PSD with {n} layers", { n });
+
 async function openPsdFile(file) {
   if (!confirmDiscard()) return false;
   emit("busy", t("Reading PSD…"));
   try {
     const { readPSD } = await import("./psd.js");
-    const doc = await readPSD(await file.arrayBuffer(), { maxDim: MAX_DIM });
+    const doc = await readPSD(await file.arrayBuffer(), {
+      maxDim: MAX_DIM,
+      maxPixels: maxCanvasPixels(),
+    });
     doc.name = file.name.replace(/\.[^.]+$/, "") || t("Untitled");
     setDocument(doc);
     toast(
       doc.psdFlattened
         ? t("Opened the flattened PSD image — its layer data could not be read")
-        : t("Opened PSD with {n} layers", { n: doc.layers.length }),
+        : layerCount(doc.layers.length),
       doc.psdFlattened ? "info" : "ok"
     );
+    if (doc.psdScaled) {
+      toast(t("The PSD was too large for this device — scaled down to {w} × {h}", { w: doc.width, h: doc.height }), "info");
+    }
+    if (doc.psdSkipped > 0) {
+      toast(t("Adjustment layers can't be edited here and were left out ({n})", { n: doc.psdSkipped }), "info");
+    }
     track("open-psd");
     return true;
   } catch (err) {
     console.error(err);
-    toast(t("Could not read that PSD file: {msg}", { msg: t(err.message) }), "err");
+    const msg = PSD_ERRORS.has(err?.message) ? t(err.message) : t("The file could not be read");
+    toast(t("Could not read that PSD file: {msg}", { msg }), "err");
     return false;
   } finally {
     emit("busy", null);
@@ -183,20 +252,33 @@ async function openPsdFile(file) {
 function docFromImage(img, name) {
   let w = img.naturalWidth || img.width;
   let h = img.naturalHeight || img.height;
-  const scale = Math.min(1, MAX_DIM / Math.max(w, h));
-  if (scale < 1) {
-    w = Math.round(w * scale);
-    h = Math.round(h * scale);
-    const resized = makeCanvas(w, h);
-    ctx2d(resized).drawImage(img, 0, 0, w, h);
-    const doc = new Doc(w, h);
-    doc.layers.push(new Layer(w, h, { name, image: resized }));
-    doc.name = name;
-    toast(t("Image was very large — scaled down to 8000px"), "info");
-    return doc;
+  // an SVG without width/height has no intrinsic size in some browsers
+  if (!w || !h) {
+    w = 1200;
+    h = 900;
   }
-  const doc = Doc.fromImage(img, name);
+  const scale = fitScale(w, h);
+  const iw = w;
+  const ih = h;
+  w = Math.max(1, Math.floor(w * scale));
+  h = Math.max(1, Math.floor(h * scale));
+  const doc = new Doc(w, h);
+  const layer = new Layer(w, h, { name });
+  layer.ctx.drawImage(img, 0, 0, w, h);
+  layer.touch();
+  doc.layers.push(layer);
   doc.name = name;
+  if (scale < 1) {
+    toast(
+      t("The image was too large for this device — scaled down from {iw} × {ih} to {w} × {h}", {
+        iw,
+        ih,
+        w,
+        h,
+      }),
+      "info"
+    );
+  }
   return doc;
 }
 
@@ -222,10 +304,18 @@ export function placeImage(img, name = t("Image")) {
   toast(t("Placed “{name}” as a new layer", { name }), "ok");
 }
 
+async function imageFromBlob(blob) {
+  const url = URL.createObjectURL(blob);
+  try {
+    return await loadImage(url);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export async function pasteImage(source) {
   try {
-    const img =
-      source instanceof Blob ? await loadImage(URL.createObjectURL(source)) : source;
+    const img = source instanceof Blob ? await imageFromBlob(source) : source;
     if (!state.doc) {
       setDocument(docFromImage(img, t("Pasted")));
       toast(t("Pasted as a new document"), "ok");
@@ -263,9 +353,18 @@ export async function pasteFromClipboard() {
 export async function copyToClipboard() {
   const doc = state.doc;
   if (!doc) return;
+  if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+    toast(t("Copying is not available in this browser"), "err");
+    return;
+  }
+  settleSessions();
+  const canvas = selectionCanvas() || doc.renderFlat();
+  // hand the clipboard a promise: Safari only accepts a write that starts
+  // inside the click, before any await
+  const blob = new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode"))), "image/png")
+  );
   try {
-    const canvas = selectionCanvas() || doc.renderFlat();
-    const blob = await new Promise((r) => canvas.toBlob(r, "image/png"));
     await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
     toast(t("Copied to clipboard"), "ok");
   } catch {
@@ -273,8 +372,11 @@ export async function copyToClipboard() {
   }
 }
 
-/** Flattened pixels inside the selection, cropped to its bounds. */
-function selectionCanvas() {
+/**
+ * Pixels inside the selection, cropped to its bounds — of the whole picture
+ * by default, or only of the active layer (as it shows, mask applied).
+ */
+function selectionCanvas({ layerOnly = false } = {}) {
   const doc = state.doc;
   const sel = doc?.selection;
   if (!sel) return null;
@@ -282,7 +384,7 @@ function selectionCanvas() {
   if (!b) return null;
   const out = makeCanvas(b.w, b.h);
   const c = ctx2d(out);
-  c.drawImage(doc.composite(), -b.x, -b.y);
+  c.drawImage(layerOnly ? doc.active.maskedPixels() : doc.composite(), -b.x, -b.y);
   c.globalCompositeOperation = "destination-in";
   c.drawImage(sel.canvas, -b.x, -b.y);
   return out;
@@ -292,15 +394,36 @@ function selectionCanvas() {
 
 const EXT = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", psd: "psd" };
 
+/**
+ * The export size for a scale, kept within what this device can encode (the
+ * scale slider goes to 400 %, which a big photo cannot reach).
+ */
+export function exportSize(scale = 1) {
+  const doc = state.doc;
+  if (!doc) return { w: 0, h: 0, scale };
+  let w = Math.max(1, Math.round(doc.width * scale));
+  let h = Math.max(1, Math.round(doc.height * scale));
+  const area = w * h;
+  const k = Math.min(
+    1,
+    16384 / Math.max(w, h),
+    area > 4096 * 4096 ? Math.sqrt(maxCanvasPixels() / area) : 1
+  );
+  if (k < 1) {
+    w = Math.max(1, Math.floor(w * k));
+    h = Math.max(1, Math.floor(h * k));
+  }
+  return { w, h, limited: k < 1 };
+}
+
 export function exportCanvas({ scale = 1, format = "image/png" } = {}) {
   const doc = state.doc;
   if (!doc) return null;
   const flat = doc.renderFlat({
     background: format === "image/jpeg" ? "#ffffff" : null,
   });
-  if (scale === 1) return flat;
-  const w = Math.max(1, Math.round(doc.width * scale));
-  const h = Math.max(1, Math.round(doc.height * scale));
+  const { w, h } = exportSize(scale);
+  if (w === doc.width && h === doc.height) return flat;
   const out = makeCanvas(w, h);
   const c = ctx2d(out);
   c.imageSmoothingQuality = "high";
@@ -321,6 +444,12 @@ export async function exportBlob({ format = "image/png", quality = 0.92, scale =
   return new Promise((r) => canvas.toBlob(r, format, quality));
 }
 
+/** Browsers without a WebP (or other) encoder silently hand back a PNG. */
+export const encodedAs = (blob, format) =>
+  format === "psd" || !blob?.type || blob.type === format;
+
+let exporting = false;
+
 export async function exportImage({
   format = "image/png",
   quality = 0.92,
@@ -328,7 +457,10 @@ export async function exportImage({
   name = "paint-studio",
 } = {}) {
   const doc = state.doc;
-  if (!doc) return;
+  if (!doc || exporting) return false;
+  // an open text box or a live preview is part of what the user sees
+  settleSessions();
+  exporting = true;
   if (format === "psd") emit("busy", t("Writing PSD…"));
   let blob = null;
   try {
@@ -336,27 +468,52 @@ export async function exportImage({
   } catch (err) {
     console.error(err);
   } finally {
+    exporting = false;
     if (format === "psd") emit("busy", null);
   }
   if (!blob) {
     toast(t("Export failed — try PNG"), "err");
-    return;
+    return false;
+  }
+  if (!encodedAs(blob, format)) {
+    toast(t("This browser can't encode {fmt} — choose PNG or JPEG", { fmt: (EXT[format] || "").toUpperCase() }), "err");
+    return false;
   }
   const ext = EXT[format] || "png";
   download(blob, `${sanitize(name)}.${ext}`);
-  markDirty(false);
-  const w = format === "psd" ? doc.width : Math.max(1, Math.round(doc.width * scale));
-  const h = format === "psd" ? doc.height : Math.max(1, Math.round(doc.height * scale));
-  toast(t("Exported {w} × {h} {fmt}", { w, h, fmt: ext.toUpperCase() }), "ok");
+  // a layered PSD keeps the work; a flat PNG/JPEG/WebP does not
+  if (format === "psd") markDirty(false);
+  const size = format === "psd" ? { w: doc.width, h: doc.height } : exportSize(scale);
+  toast(t("Exported {w} × {h} {fmt}", { w: size.w, h: size.h, fmt: ext.toUpperCase() }), "ok");
   track(`export-${ext}`);
   emit("exported", { format });
+  return true;
+}
+
+/**
+ * The .paint file is built from parts — one data URL per layer — so a big
+ * document never needs a single string larger than the browser allows.
+ */
+function projectBlob(doc) {
+  const { layers, ...meta } = doc.toJSON();
+  const head = JSON.stringify(meta);
+  const parts = [`${head.slice(0, -1)}${head.length > 2 ? "," : ""}"layers":[`];
+  layers.forEach((layer, i) => parts.push(`${i ? "," : ""}${JSON.stringify(layer)}`));
+  parts.push("]}");
+  return new Blob(parts, { type: "application/json" });
 }
 
 export function saveProject() {
   const doc = state.doc;
   if (!doc) return;
-  const json = JSON.stringify(doc.toJSON());
-  download(new Blob([json], { type: "application/json" }), `${sanitize(doc.name)}.paint`);
+  settleSessions();
+  try {
+    download(projectBlob(doc), `${sanitize(doc.name)}.paint`);
+  } catch (err) {
+    console.error(err);
+    toast(t("The project could not be saved — the document may be too large"), "err");
+    return;
+  }
   markDirty(false);
   toast(t("Project saved"), "ok");
   track("save-project");
@@ -365,16 +522,22 @@ export function saveProject() {
 export async function openProjectFile(file) {
   if (!file) return false;
   if (!confirmDiscard()) return false;
+  emit("busy", t("Opening project…"));
   try {
     const doc = await Doc.fromJSON(JSON.parse(await file.text()));
     setDocument(doc);
     toast(t("Opened project “{name}”", { name: doc.name }), "ok");
+    if (doc.scaledFrom) {
+      toast(t("The project was too large for this device — scaled down to {w} × {h}", { w: doc.width, h: doc.height }), "info");
+    }
     track("open-project");
     return true;
   } catch (err) {
     console.error(err);
     toast(t("That is not a valid .paint project"), "err");
     return false;
+  } finally {
+    emit("busy", null);
   }
 }
 
@@ -413,7 +576,7 @@ export function duplicateLayer() {
 
 export function deleteLayer(index = state.doc?.activeIndex) {
   const doc = state.doc;
-  if (!doc) return;
+  if (!doc || !doc.layers[index]) return;
   if (doc.layers.length <= 1) {
     toast(t("A document needs at least one layer"), "err");
     return;
@@ -428,6 +591,10 @@ export function mergeDown() {
   if (!doc) return;
   if (doc.activeIndex <= 0) {
     toast(t("Nothing below this layer to merge into"), "err");
+    return;
+  }
+  if (doc.layers[doc.activeIndex - 1].locked) {
+    toast(t("The layer below is locked"), "err");
     return;
   }
   editDoc(t("Merge down"), () => doc.mergeDown());
@@ -462,14 +629,18 @@ export function raiseLayer(delta) {
 export function setActiveLayer(index, { mask } = {}) {
   const doc = state.doc;
   if (!doc) return;
-  const layer = doc.layers[index];
+  let layer = doc.layers[index];
   if (!layer) return;
   const wantMask = mask === undefined ? layer.editMask : !!mask && !!layer.mask;
   if (index === doc.activeIndex && wantMask === layer.editMask) return;
-  endAdjustSession();
-  emit("before-target-change");
+  // a preview or a transform belongs to the old target: keep its result
+  const id = layer.id;
+  settleSessions();
+  index = doc.indexOfLayer(id);
+  layer = doc.layers[index];
+  if (!layer) return;
   doc.setActive(index);
-  layer.editMask = wantMask;
+  layer.editMask = wantMask && !!layer.mask;
   doc.invalidate();
   emit("layers", doc);
   emit("target", doc.target);
@@ -496,7 +667,7 @@ export function setLayerProp(index, prop, value, label = t("Layer settings")) {
     requestRender();
   };
 
-  history.push({
+  pushCommand({
     label,
     bytes: 0,
     undo: () => apply(before),
@@ -526,7 +697,6 @@ export function addMask(mode = state.doc?.selection ? "selection" : "reveal") {
     toast(t("This layer already has a mask"), "info");
     return;
   }
-  endAdjustSession();
   editDoc(t("Add layer mask"), () => {
     let mask;
     if (mode === "selection" && doc.selection) {
@@ -553,7 +723,6 @@ export function deleteMask() {
   const doc = state.doc;
   const layer = doc?.active;
   if (!layer?.mask) return;
-  endAdjustSession();
   editDoc(t("Delete layer mask"), () => {
     layer.setMask(null);
     layer.touch();
@@ -567,7 +736,10 @@ export function applyLayerMask() {
   const doc = state.doc;
   const layer = doc?.active;
   if (!layer?.mask) return;
-  endAdjustSession();
+  if (layer.locked) {
+    toast(t("This layer is locked"), "err");
+    return;
+  }
   editDoc(t("Apply layer mask"), () => doc.applyMask(layer));
   emit("layers", doc);
   emit("target", doc.target);
@@ -578,6 +750,10 @@ export function invertMask() {
   const doc = state.doc;
   const layer = doc?.active;
   if (!layer?.mask) return;
+  if (layer.locked) {
+    toast(t("This layer is locked"), "err");
+    return;
+  }
   const target = layer.maskTarget;
   editPixels(
     t("Invert mask"),
@@ -696,9 +872,16 @@ export function invertSelection() {
 }
 
 export function clearSelectionPixels() {
+  // a transform in progress moves the selection: settle it before reading
+  settleSessions();
   const doc = state.doc;
   const target = doc?.target;
   if (!doc || !target) return;
+  // without a selection this would wipe the whole layer on a stray keypress
+  if (!doc.selection) {
+    toast(t("Make a selection first"), "info");
+    return;
+  }
   if (target.locked) {
     toast(t("This layer is locked"), "err");
     return;
@@ -717,29 +900,42 @@ export function clearSelectionPixels() {
       c.restore();
       target.touch();
     },
-    target
+    target,
+    doc.selection?.coverBounds || null
   );
   emit("layers", doc);
   requestRender();
 }
 
 export function fillSelection(which = "primary") {
+  settleSessions();
   const doc = state.doc;
   const target = doc?.target;
-  if (!doc || !target || target.locked) return;
+  if (!doc || !target) return;
+  if (target.locked) {
+    toast(t("This layer is locked"), "err");
+    return;
+  }
   const paint = makeCanvas(doc.width, doc.height);
   const pc = ctx2d(paint);
   pc.fillStyle = cssColor(state[which]);
   pc.fillRect(0, 0, doc.width, doc.height);
-  editPixels(t("Fill"), () => paintMasked(target, paint, doc.selection, {}), target);
+  editPixels(
+    t("Fill"),
+    () => paintMasked(target, paint, doc.selection, {}),
+    target,
+    doc.selection?.coverBounds || null
+  );
   emit("layers", doc);
   requestRender();
 }
 
 export function duplicateSelectionToLayer() {
+  settleSessions();
   const doc = state.doc;
   if (!doc) return;
-  const cut = selectionCanvas();
+  // like "Layer via Copy": the active layer's pixels, not the whole picture
+  const cut = selectionCanvas({ layerOnly: true });
   if (!cut) {
     toast(t("Make a selection first"), "err");
     return;
@@ -769,6 +965,7 @@ export function cropTo(rect) {
 }
 
 export function cropToSelection() {
+  settleSessions();
   const doc = state.doc;
   const b = doc?.selection?.bounds;
   if (!b) {
@@ -779,6 +976,7 @@ export function cropToSelection() {
 }
 
 export function trimTransparent() {
+  settleSessions();
   const doc = state.doc;
   if (!doc) return;
   const flat = doc.composite();
@@ -811,7 +1009,10 @@ export function trimTransparent() {
 export function resizeImage(width, height) {
   const doc = state.doc;
   if (!doc) return;
-  editDoc(t("Image size"), () => doc.scaleImage(clampDim(width), clampDim(height)));
+  const { w, h, scaled } = clampSize(width, height);
+  if (w === doc.width && h === doc.height) return;
+  if (scaled) toast(t("That is larger than this device supports — using {w} × {h}", { w, h }), "info");
+  editDoc(t("Image size"), () => doc.scaleImage(w, h));
   emit("layers", doc);
   emit("doc", { reason: "geometry" });
   view.fit();
@@ -823,7 +1024,10 @@ export function resizeImage(width, height) {
 export function resizeCanvas(width, height, anchor = "center") {
   const doc = state.doc;
   if (!doc) return;
-  editDoc(t("Canvas size"), () => doc.resizeCanvas(clampDim(width), clampDim(height), anchor));
+  const { w, h, scaled } = clampSize(width, height);
+  if (w === doc.width && h === doc.height) return;
+  if (scaled) toast(t("That is larger than this device supports — using {w} × {h}", { w, h }), "info");
+  editDoc(t("Canvas size"), () => doc.resizeCanvas(w, h, anchor));
   emit("layers", doc);
   emit("doc", { reason: "geometry" });
   view.fit();
@@ -855,28 +1059,61 @@ export function flip(axis) {
 
 /* ============================== adjustments ============================== */
 
+/**
+ * The Adjust panel previews on the active layer. The session keeps the
+ * original pixels so every slider move renders from them, and it is a live
+ * session (see history.js): before anything else is recorded the preview is
+ * applied as its own undo step, so it can never be lost or doubled.
+ */
 let adjustSession = null;
 let adjustFrame = 0;
 let pendingValues = null;
 
 export const adjustValues = { ...ADJUST_DEFAULTS };
 
+function resetAdjustValues() {
+  Object.assign(adjustValues, ADJUST_DEFAULTS);
+  emit("adjust", adjustValues);
+}
+
+function cancelAdjustFrame() {
+  if (adjustFrame) cancelAnimationFrame(adjustFrame);
+  adjustFrame = 0;
+}
+
 function ensureAdjustSession() {
+  // other live work (a text box, a transform) is finished before the target
+  // is read — finishing it can change which layer is active
+  if (!adjustSession) settleSessions();
   const doc = state.doc;
   const target = doc?.target;
-  if (!target || target.locked) return null;
+  if (!target) return null;
+  if (target.locked) {
+    toast(t("This layer is locked"), "err");
+    return null;
+  }
   if (target.isMask) {
     toast(t("Adjustments change layer pixels — click the layer thumbnail first"), "info");
     return null;
   }
 
   if (adjustSession) {
-    const same =
-      adjustSession.layerId === target.id && adjustSession.version === target.version;
-    if (same) return adjustSession;
-    // the layer changed underneath us (a stroke, a filter): abandon the old
-    // session without rolling back, so that work is never thrown away
-    adjustSession = null;
+    if (adjustSession.layerId === target.id && adjustSession.version === target.version) {
+      return adjustSession;
+    }
+    if (adjustSession.layerId !== target.id) {
+      // another layer is the target now: the preview on the old one is kept
+      // as its own step, and this layer starts fresh
+      const keep = { ...adjustValues };
+      finishAdjustments({ quiet: true });
+      Object.assign(adjustValues, keep);
+      emit("adjust", adjustValues);
+    } else {
+      // the pixels changed without going through history (should not
+      // happen): start over from what is there now, never a stale original
+      adjustSession.edit.dispose();
+      adjustSession = null;
+    }
   }
 
   const edit = beginPixelEdit(target);
@@ -885,7 +1122,6 @@ function ensureAdjustSession() {
     edit,
     orig: edit.before,
     version: target.version,
-    region: doc.selection?.bounds || null,
   };
   return adjustSession;
 }
@@ -894,7 +1130,9 @@ function renderAdjust(session, values) {
   const doc = state.doc;
   const layer = doc.layers.find((l) => l.id === session.layerId);
   if (!layer) return;
-  const processed = applyAdjustments(session.orig, values, session.region);
+  // the selection may have changed since the session began: use it as it is
+  const region = doc.selection?.coverBounds || null;
+  const processed = applyAdjustments(session.orig, values, region);
   const c = layer.ctx;
   c.save();
   c.setTransform(1, 0, 0, 1, 0, 0);
@@ -906,77 +1144,107 @@ function renderAdjust(session, values) {
   doc.invalidate();
 }
 
-/** Called on every slider input; the heavy pass runs once per frame. */
+/**
+ * Called on every slider input; the heavy pass runs once per frame. Returns
+ * false when the target can't be adjusted (locked, a mask, no document).
+ */
 export function previewAdjustments(values) {
   Object.assign(adjustValues, values);
   const doc = state.doc;
-  if (!doc) return;
+  if (!doc) return false;
   const session = ensureAdjustSession();
   if (!session) {
-    Object.assign(adjustValues, ADJUST_DEFAULTS);
-    emit("adjust", adjustValues);
-    return;
+    resetAdjustValues();
+    return false;
   }
   pendingValues = { ...adjustValues };
-  if (adjustFrame) return;
+  if (adjustFrame) return true;
   adjustFrame = requestAnimationFrame(() => {
     adjustFrame = 0;
+    if (adjustSession !== session) return;
     renderAdjust(session, pendingValues);
     requestRender();
   });
+  return true;
 }
 
-export function commitAdjustments() {
+/** Bake the preview in as one undo step. Quiet when called by settle(). */
+function finishAdjustments({ quiet = false } = {}) {
   const session = adjustSession;
-  if (!session) {
-    toast(t("Move a slider first"), "info");
-    return;
-  }
+  if (!session) return false;
   if (!hasAdjustments(adjustValues)) {
-    resetAdjustments();
-    return;
+    rollbackAdjustments();
+    return false;
   }
   // make sure the last slider position is baked in before committing
   if (adjustFrame) {
-    cancelAnimationFrame(adjustFrame);
-    adjustFrame = 0;
+    cancelAdjustFrame();
     renderAdjust(session, adjustValues);
   }
-  session.edit.commit(t("Adjustments"));
   adjustSession = null;
-  Object.assign(adjustValues, ADJUST_DEFAULTS);
+  session.edit.commit(t("Adjustments"), state.doc?.selection?.coverBounds || null);
+  resetAdjustValues();
   emit("layers", state.doc);
-  emit("adjust", adjustValues);
   requestRender();
-  toast(t("Adjustments applied"), "ok");
+  if (!quiet) toast(t("Adjustments applied"), "ok");
   track("adjust");
+  return true;
+}
+
+function rollbackAdjustments() {
+  cancelAdjustFrame();
+  const session = adjustSession;
+  adjustSession = null;
+  if (session) session.edit.rollback();
+  resetAdjustValues();
+  requestRender();
+}
+
+export function commitAdjustments() {
+  if (!adjustSession) {
+    toast(t("Move a slider first"), "info");
+    return;
+  }
+  finishAdjustments();
 }
 
 export function resetAdjustments() {
-  Object.assign(adjustValues, ADJUST_DEFAULTS);
-  if (adjustSession) {
-    adjustSession.edit.rollback();
-    adjustSession = null;
-  }
-  emit("adjust", adjustValues);
-  requestRender();
+  rollbackAdjustments();
 }
 
-/** Drop the session without touching pixels (they are already committed). */
-export function endAdjustSession() {
-  if (adjustSession) {
-    adjustSession.edit.rollback();
+registerSession({
+  settle: () => {
+    if (adjustSession) finishAdjustments({ quiet: true });
+  },
+  cancel: () => {
+    if (!adjustSession) return false;
+    const visible = hasAdjustments(adjustValues);
+    rollbackAdjustments();
+    return visible;
+  },
+  drop: () => {
+    cancelAdjustFrame();
+    adjustSession?.edit.dispose();
     adjustSession = null;
-    Object.assign(adjustValues, ADJUST_DEFAULTS);
-    emit("adjust", adjustValues);
-  }
-  if (adjustFrame) {
-    cancelAnimationFrame(adjustFrame);
-    adjustFrame = 0;
-  }
-}
+    resetAdjustValues();
+  },
+  busy: () => !!adjustSession,
+});
 
 /* ============================ preview sessions ============================ */
+
+let previewSession = null;
+
+registerSession({
+  settle: () => previewSession?.commit(),
+  cancel: () => {
+    if (!previewSession) return false;
+    previewSession.cancel();
+    return true;
+  },
+  drop: () => previewSession?.drop(),
+  busy: () => !!previewSession,
+});
 
 /**
  * Live preview for dialog-driven edits (Levels, Curves). `update(produce)`
@@ -992,17 +1260,18 @@ export function beginPreview(label) {
     toast(t("This layer is locked"), "err");
     return null;
   }
-  endAdjustSession();
+  previewSession?.cancel();
   const edit = beginPixelEdit(target);
   const isMask = !!target.isMask;
   const orig = isMask ? maskToGray(edit.before) : edit.before;
-  const region = doc.selection?.bounds || null;
+  const region = doc.selection?.coverBounds || null;
   let frame = 0;
   let pending = null;
   let changed = false;
+  let open = true;
 
   const render = () => {
-    if (!pending) return;
+    if (!pending || !open) return;
     let processed = pending(orig, region);
     if (isMask) processed = grayToMask(processed);
     const c = target.ctx;
@@ -1017,39 +1286,55 @@ export function beginPreview(label) {
     requestRender();
   };
 
-  return {
+  const close = () => {
+    open = false;
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    if (previewSession === session) previewSession = null;
+  };
+
+  const session = {
     orig,
     region,
     update(produce) {
       pending = produce;
-      if (frame) return;
+      if (frame || !open) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
         render();
       });
     },
     commit() {
+      if (!open) return;
       if (frame) {
         cancelAnimationFrame(frame);
         frame = 0;
         render();
       }
+      close();
       if (!changed) {
         edit.rollback();
         return;
       }
-      edit.commit(label);
+      edit.commit(label, doc.selection?.coverBounds || null);
       emit("layers", doc);
       requestRender();
       toast(t("{label} applied", { label }), "ok");
     },
     cancel() {
-      if (frame) cancelAnimationFrame(frame);
-      frame = 0;
+      if (!open) return;
+      close();
       edit.rollback();
       requestRender();
     },
+    drop() {
+      if (!open) return;
+      close();
+      edit.dispose();
+    },
   };
+  previewSession = session;
+  return session;
 }
 
 /* ================================ filters ================================ */
@@ -1071,38 +1356,55 @@ export async function heavy(label, fn) {
   }
 }
 
+let filtering = false;
+
 /** Apply a filter to the paint target (inside the selection when there is one). */
 export async function applyFilter(id, params = {}) {
+  if (filtering) return false;
+  // an open text box or transform becomes final first — it may change the target
+  settleSessions();
   const doc = state.doc;
   const target = doc?.target;
-  if (!doc || !target) return;
+  if (!doc || !target) return false;
   if (target.locked) {
     toast(t("This layer is locked"), "err");
-    return;
+    return false;
   }
-  endAdjustSession();
   const effect = EFFECTS.find((e) => e.id === id);
-  if (!effect) return;
+  if (!effect) return false;
 
-  await heavy(t("Applying {name}…", { name: effect.name }), () => {
-    const isMask = !!target.isMask;
-    const src = isMask ? maskToGray(target.canvas) : copyCanvas(target.canvas);
-    let out = applyEffect(id, src, {
-      primary: state.primary,
-      secondary: state.secondary,
-      ...params,
+  filtering = true;
+  let done = false;
+  try {
+    done = await heavy(t("Applying {name}…", { name: effect.name }), () => {
+      // the document or target may have changed while the busy overlay showed
+      if (state.doc !== doc || doc.target !== target) return false;
+      const isMask = !!target.isMask;
+      // effects may work in place: never hand them the layer itself
+      const src = isMask ? maskToGray(target.canvas) : copyCanvas(target.canvas);
+      let out = applyEffect(id, src, {
+        primary: state.primary,
+        secondary: state.secondary,
+        ...params,
+      });
+      if (isMask) out = grayToMask(out);
+      editPixels(
+        effect.name,
+        () => paintMasked(target, out, doc.selection, { replace: true }),
+        target,
+        doc.selection?.coverBounds || null
+      );
+      return true;
     });
-    if (isMask) out = grayToMask(out);
-    editPixels(
-      effect.name,
-      () => paintMasked(target, out, doc.selection, { replace: true }),
-      target
-    );
-  });
+  } finally {
+    filtering = false;
+  }
+  if (!done) return false;
   emit("layers", doc);
   requestRender();
   toast(t("{name} applied", { name: effect.name }), "ok");
   track(`filter-${id}`);
+  return true;
 }
 
 /** Small preview of an effect for the filter gallery. */
@@ -1130,21 +1432,40 @@ export function filterPreview(id, w, h) {
     primary: state.primary,
     secondary: state.secondary,
     preview: true,
+    // radii are in document pixels: shrink them with the thumbnail
+    scale: Math.min(1, scale),
   });
 }
 
 /* ================================= history ================================ */
 
+/** Undo of a crop or resize changes the frame: fit the new size on screen. */
+function refitIfResized(run) {
+  const doc = state.doc;
+  const before = doc ? `${doc.width}x${doc.height}` : "";
+  const ok = run();
+  if (doc && `${doc.width}x${doc.height}` !== before) {
+    emit("doc", { reason: "geometry" });
+    view.fit();
+  }
+  return ok;
+}
+
 export function undo() {
-  endAdjustSession();
-  emit("before-history");
-  if (!history.undo()) toast(t("Nothing to undo"), "info");
+  // a stroke in progress finishes first; its undo comes after
+  if (state.dragging) return;
+  // a live preview is the most recent change: undo cancels just that
+  if (cancelSessions()) {
+    requestRender();
+    return;
+  }
+  if (!refitIfResized(() => history.undo())) toast(t("Nothing to undo"), "info");
   requestRender();
 }
 
 export function redo() {
-  endAdjustSession();
-  emit("before-history");
-  if (!history.redo()) toast(t("Nothing to redo"), "info");
+  if (state.dragging) return;
+  cancelSessions();
+  if (!refitIfResized(() => history.redo())) toast(t("Nothing to redo"), "info");
   requestRender();
 }

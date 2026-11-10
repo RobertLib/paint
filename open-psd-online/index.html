@@ -18,9 +18,11 @@
     <meta property="og:image" content="https://robertlib.github.io/paint/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Paint Studio — image editor in your browser. Layers, retouching, filters." />
     <meta property="og:locale" content="en_US" />
     <meta property="og:locale:alternate" content="cs_CZ" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image:alt" content="Paint Studio — image editor in your browser. Layers, retouching, filters." />
 
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <link rel="icon" type="image/x-icon" href="../favicon.ico" />
@@ -30,7 +32,6 @@
     <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
 
     <script>
-      // the editor's theme choice applies here too; otherwise follow the system
       try {
         var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
         document.documentElement.dataset.theme =
@@ -43,7 +44,7 @@
     <link rel="stylesheet" href="../css/site.css" />
     <link rel="modulepreload" href="../js/site.js" />
     <link rel="modulepreload" href="../js/store.js" />
-    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/"},{"@type":"ListItem","position":2,"name":"Open PSD files online","item":"https://robertlib.github.io/paint/open-psd-online/"}]},{"@type":"WebApplication","name":"Open PSD — Paint Studio","url":"https://robertlib.github.io/paint/open-psd-online/","description":"Open PSD files online without Photoshop. View and edit layers with names, opacity, blend modes and masks, then save as PNG, JPG or PSD. Free, no upload.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (modern web browser)","inLanguage":"en","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@id":"https://robertlib.github.io/paint/#website"}}]}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://robertlib.github.io/paint/#website","name":"Paint Studio","url":"https://robertlib.github.io/paint/","inLanguage":"en"},{"@type":"WebApplication","@id":"https://robertlib.github.io/paint/#app","name":"Paint Studio","url":"https://robertlib.github.io/paint/","description":"Edit photos and paint online for free. Layers, brushes, filters, PSD and HEIC support — all in your browser, with no upload, no sign-up and no watermark.","applicationCategory":"MultimediaApplication","applicationSubCategory":"Image editor","operatingSystem":"Any (modern web browser)","browserRequirements":"Requires JavaScript and HTML5 canvas","inLanguage":["en","cs"],"isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"image":"https://robertlib.github.io/paint/og-image.png","screenshot":"https://robertlib.github.io/paint/docs/screenshot.png","license":"https://opensource.org/licenses/MIT","codeRepository":"https://github.com/RobertLib/paint","author":{"@type":"Person","name":"RobertLib","url":"https://github.com/RobertLib"}},{"@type":"WebPage","@id":"https://robertlib.github.io/paint/open-psd-online/#webpage","url":"https://robertlib.github.io/paint/open-psd-online/","name":"Open PSD File Online – View & Edit Layers | Paint Studio","description":"Open PSD files online without Photoshop. View and edit layers with names, opacity, blend modes and masks, then save as PNG, JPG or PSD. Free, no upload.","inLanguage":"en","isPartOf":{"@id":"https://robertlib.github.io/paint/#website"},"about":{"@id":"https://robertlib.github.io/paint/#app"},"primaryImageOfPage":{"@type":"ImageObject","url":"https://robertlib.github.io/paint/og-image.png","width":1200,"height":630},"breadcrumb":{"@id":"https://robertlib.github.io/paint/open-psd-online/#breadcrumb"}},{"@type":"BreadcrumbList","@id":"https://robertlib.github.io/paint/open-psd-online/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/"},{"@type":"ListItem","position":2,"name":"Open PSD","item":"https://robertlib.github.io/paint/open-psd-online/"}]}]}</script>
     
   </head>
   <body class="site">
@@ -51,32 +52,33 @@
     
     <header class="site-head">
       <a class="site-brand" href="../">
-        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+        <span class="brand-mark" aria-hidden="true"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg></span>
         <span translate="no">Paint<em>Studio</em></span>
       </a>
-      <nav class="site-nav" aria-label="All tools">
+      <nav class="site-nav" aria-label="Main">
         <a href="../#tools">All tools</a>
         <span class="langs" role="group" aria-label="Language"><span class="lang is-current" aria-current="true">EN</span><a class="lang" href="../cs/otevrit-psd/" hreflang="cs" lang="cs">CS</a></span>
-        <a class="btn btn-primary" href="../editor/?lang=en&task=psd"><svg class="icon"><use href="#i-brush" /></svg><span>Open editor</span></a>
+        <a class="btn btn-primary" href="../editor/?lang=en&task=psd"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg><span>Open editor</span></a>
       </nav>
     </header>
     <main>
       <section class="hero">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Paint Studio</a><span aria-hidden="true">›</span><span>Open PSD</span></nav>
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Paint Studio</a><span aria-hidden="true">›</span><span aria-current="page">Open PSD</span></nav>
         <h1>Open PSD files online</h1>
         <p class="lead">View and edit Photoshop files without Photoshop. Drop a .psd and its layers appear in the Layers panel, ready to edit, export as an image or save back as PSD.</p>
         
       <div class="drop" data-drop>
-        <svg class="icon drop-icon"><use href="#i-image" /></svg>
+        <svg class="icon drop-icon" aria-hidden="true" focusable="false"><use href="#i-image" /></svg>
         <strong class="drop-title">Drop an image here</strong>
-        <label class="btn btn-primary btn-lg"><svg class="icon"><use href="#i-folder" /></svg><span>Choose image</span>
-          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+        <label class="btn btn-primary btn-lg"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-folder" /></svg><span>Choose image</span>
+          <input type="file" accept="image/*,.heic,.heif,.psd,.paint" class="sr-only" data-file /></label>
         <p class="drop-hint">or paste with Ctrl+V · PNG, JPG, WebP, HEIC, PSD…</p>
         
-        <p class="drop-busy" data-busy hidden>Opening the editor…</p>
+        <p class="drop-busy" data-busy role="status" aria-live="polite" hidden>Opening the editor…</p>
+        <p class="drop-error" data-error role="alert" hidden></p>
       </div>
-      <script type="application/json" id="dropConfig">{"editor":"../editor/","task":"psd","lang":"en"}</script>
-        <ul class="trust"><li><svg class="icon"><use href="#i-check" /></svg><span>Nothing is uploaded</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No sign-up</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No watermark</span></li></ul>
+      <script type="application/json" id="dropConfig">{"editor":"../editor/","task":"psd","lang":"en","notOpenable":"This file can’t be opened here. Choose an image (PNG, JPG, WebP, HEIC…), a PSD file or a .paint project."}</script>
+        <ul class="trust"><li><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check" /></svg><span>Nothing is uploaded</span></li><li><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check" /></svg><span>No sign-up</span></li><li><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check" /></svg><span>No watermark</span></li></ul>
       </section>
 
       <section class="block steps">
@@ -86,9 +88,9 @@
 
       <section class="block prose">
         <h2>What is imported from a PSD</h2>
-        <p>Paint Studio reads 8-bit RGB and grayscale PSD files with their pixel layers, layer names, opacity, visibility, blend modes and layer masks. Layer groups are flattened into a plain list, so every layer is still there, just without the folder structure. Text, shape and smart-object layers come in as their rendered pixels: they look right, but the text can’t be retyped and vectors can’t be edited. Adjustment layers and layer effects such as drop shadows or strokes are not applied, so a design that relies on them may look different.</p>
-        <h2>When layers can’t be read</h2>
-        <p>Some PSD files store their layers in ways Paint Studio can’t decode, for example ZIP-compressed layer data or 16- and 32-bit color depth. In that case the editor opens the flattened composite image instead, so you can still view, crop, convert or retouch the picture — just as a single layer. PSB (the large document format), CMYK and Lab files are not supported; convert them to 8-bit RGB in the original program first if you need to open them here.</p>
+        <p>Paint Studio reads 8-, 16- and 32-bit RGB and grayscale PSD files with their pixel layers, layer names, opacity, visibility, blend modes and layer masks, including the separate 16/32-bit layer data Photoshop writes and ZIP-compressed channels; deeper documents are converted to 8 bits per channel as they open. Clipping masks are baked into the pixels of the clipped layers and fill opacity is folded into each layer’s opacity, so those layers look as they did in Photoshop. Layer groups are flattened into a plain list, so every layer is still there, just without the folder structure. Text, shape and smart-object layers come in as their rendered pixels: they look right, but the text can’t be retyped and vectors can’t be edited. Adjustment layers and layer effects such as drop shadows or strokes are not applied, so a design that relies on them may look different.</p>
+        <h2>16- and 32-bit files, and unsupported modes</h2>
+        <p>16- and 32-bit (HDR) files open with their layers, converted to 8 bits per channel — 32-bit images from linear light to ordinary sRGB. If a file’s layer data can’t be read, the editor opens its flattened composite instead, so you can still view, crop, convert or retouch the picture as a single layer. PSB (the large document format) and files in CMYK, Lab, Indexed Color, Bitmap or Duotone mode are not supported; convert them to RGB in the original program first (Image › Mode in Photoshop) and save a PSD to open it here with its layers.</p>
         <h2>Exporting and saving back to PSD</h2>
         <p>To share a design with someone who doesn’t have Photoshop, export it as PNG for graphics and screenshots or as JPEG for photos. To hand a file back to a designer, save a layered PSD, which keeps your layers separate. Groups stay flattened and text remains pixels, though, so this round trip suits small fixes better than complex templates. A .paint project keeps everything editable for later sessions in Paint Studio.</p>
       </section>
@@ -98,23 +100,23 @@
         <h3>Can I open a PSD file without Photoshop?</h3>
         <p>Yes. Drop the file on this page and it opens in your browser with its layers. Nothing is installed and the file isn’t uploaded, which matters for client work under NDA. It works on Windows, macOS, Linux and Chromebooks.</p>
         <h3>Why does my PSD look different from Photoshop?</h3>
-        <p>Most likely the file uses adjustment layers or layer effects such as shadows, glows or strokes, which are not applied. Text and smart objects are shown as their saved pixels. If the layer data can’t be read, you see the flattened composite as a single layer instead.</p>
+        <p>Most likely the file uses adjustment layers or layer effects such as shadows, glows or strokes, which are not applied. Text and smart objects are shown as their saved pixels. A file whose layer data can’t be read opens as the flattened composite in a single layer instead.</p>
         <h3>Can I edit the text in a PSD?</h3>
         <p>Not as text. Text layers come in as rendered pixels, so you can move, hide or paint over them, but not retype the words. To change wording, hide the layer and add new text with the Text tool, choosing the closest of the six available fonts.</p>
         <h3>Does it open PSB or CMYK files?</h3>
-        <p>No. PSB, CMYK and Lab files are not supported, and 16- or 32-bit files open only as the flattened composite. Save a copy as an 8-bit RGB PSD in the original application to open it here with its layers.</p>
+        <p>No. PSB files and PSDs in CMYK, Lab, Indexed Color, Bitmap or Duotone mode are not supported. Save a copy in RGB (or grayscale) with 8, 16 or 32 bits per channel in the original application to open it here with its layers.</p>
       </section>
 
       <section class="block">
         <h2>Related tools</h2>
         <ul class="tool-grid"><li><a class="tool-card" href="../image-converter/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-swap" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-swap" /></svg></span>
           <span class="tool-text"><strong>Image converter</strong><span>Convert between PNG, JPG, WebP and PSD</span></span>
         </a></li><li><a class="tool-card" href="../resize-image/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-frame" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-frame" /></svg></span>
           <span class="tool-text"><strong>Resize image</strong><span>Change width and height in pixels</span></span>
         </a></li><li><a class="tool-card" href="../crop-image/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-crop" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-crop" /></svg></span>
           <span class="tool-text"><strong>Crop image</strong><span>Cut out the part you want, with ratio presets</span></span>
         </a></li></ul>
       </section>
@@ -123,14 +125,14 @@
       <div class="foot-inner">
         <div class="foot-about">
           <a class="site-brand" href="../">
-            <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+            <span class="brand-mark" aria-hidden="true"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg></span>
             <span translate="no">Paint<em>Studio</em></span>
           </a>
           <p>Paint Studio is a free, open-source image editor under the MIT license. It runs entirely in your browser, so your images never leave your device.</p>
           <p><a href="https://github.com/RobertLib/paint" rel="noopener">Source code on GitHub</a> · <a href="../open-psd-online/" hreflang="en" lang="en">English</a> · <a href="../cs/otevrit-psd/" hreflang="cs" lang="cs">Čeština</a></p>
         </div>
-        <nav aria-label="All tools">
-          <h2>All tools</h2>
+        <nav aria-labelledby="foot-tools">
+          <h2 id="foot-tools">All tools</h2>
           <ul class="foot-links"><li><a href="../crop-image/">Crop image</a></li><li><a href="../resize-image/">Resize image</a></li><li><a href="../rotate-image/">Rotate image</a></li><li><a href="../compress-image/">Compress image</a></li><li><a href="../image-converter/">Image converter</a></li><li><a href="../png-to-jpg/">PNG to JPG</a></li><li><a href="../webp-to-jpg/">WebP to JPG</a></li><li><a href="../heic-to-jpg/">HEIC to JPG</a></li><li><a href="../blur-image/">Blur image</a></li><li><a href="../add-text-to-photo/">Add text</a></li><li><a href="../black-and-white-photo/">Black and white</a></li><li><a href="../invert-colors/">Invert colors</a></li><li><a href="../photo-filters/">Photo filters</a></li><li><a href="../brighten-photo/">Brighten photo</a></li><li><a href="../make-background-transparent/">Transparent background</a></li><li><a href="../color-picker-from-image/">Color picker</a></li><li><a href="../draw-on-image/">Draw on image</a></li><li><a href="../paint-online/">Paint online</a></li><li><a href="../open-psd-online/">Open PSD</a></li><li><a href="../retouch-photo/">Retouch photo</a></li></ul>
         </nav>
       </div>

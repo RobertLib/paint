@@ -46,6 +46,10 @@ function drawHistogram(canvas, hist, color) {
   ctx.globalAlpha = 1;
 }
 
+/** Histogram of what the session edits: inside the selection only, if any. */
+const sessionHistogram = (session) =>
+  histogram(session.orig, session.region, state.doc?.selection?.canvas || null);
+
 /** Wire a dialog to a preview session: Apply commits, anything else cancels. */
 function sessionDialog(dialog, label, onOpen) {
   let session = null;
@@ -155,7 +159,7 @@ function autoLevelsValues(hist) {
 function initLevels() {
   const dialog = $("#levelsDialog");
   levels.ctl = sessionDialog(dialog, t("Levels"), (session, { auto } = {}) => {
-    levels.hist = histogram(session.orig, session.region);
+    levels.hist = sessionHistogram(session);
     levels.values = Object.fromEntries(CHANNELS.map((c) => [c, LEVEL_DEFAULT()]));
     levels.channel = "rgb";
     if (auto) levels.values = autoLevelsValues(levels.hist);
@@ -219,7 +223,7 @@ export function openLevels({ auto = false, apply = false } = {}) {
     const session = A.beginPreview(t("Auto levels"));
     if (!session) return;
     const luts = (() => {
-      levels.values = autoLevelsValues(histogram(session.orig, session.region));
+      levels.values = autoLevelsValues(sessionHistogram(session));
       return levelsLuts();
     })();
     session.update((orig, region) => applyLUTs(orig, luts, region));
@@ -320,7 +324,7 @@ function curvePos(e) {
 function initCurves() {
   const dialog = $("#curvesDialog");
   curves.ctl = sessionDialog(dialog, t("Curves"), (session) => {
-    curves.hist = histogram(session.orig, session.region);
+    curves.hist = sessionHistogram(session);
     curves.points = Object.fromEntries(CHANNELS.map((c) => [c, DEFAULT_POINTS()]));
     curves.channel = "rgb";
     updateCurves();
@@ -379,9 +383,12 @@ function initCurves() {
     };
     updateCurves();
   });
-  canvas.addEventListener("pointerup", () => {
-    curves.drag = null;
-  });
+  // pointerup, pointercancel and a lost capture all end the drag
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+    canvas.addEventListener(type, () => {
+      curves.drag = null;
+    });
+  }
   canvas.addEventListener("dblclick", (e) => {
     const pts = curves.points[curves.channel];
     const p = curvePos(e);

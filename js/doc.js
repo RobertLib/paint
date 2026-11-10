@@ -29,12 +29,31 @@ export const BLEND_MODES = [
   ["saturation", t("Saturation")],
   ["color", t("Color")],
   ["luminosity", t("Luminosity")],
+  ["lighter", t("Linear dodge (add)")],
 ];
 
 let uid = 0;
 const nextId = () => `l${++uid}-${(Math.random() * 1e6) | 0}`;
 
+/**
+ * One clock for every pixel version in the app. A (layer id, version) pair
+ * therefore names exactly one bitmap content, which lets the undo history
+ * share frozen copies instead of duplicating them.
+ */
+let clock = 0;
+export const nextVersion = () => ++clock;
+
+/** Largest edge any document may have. */
+export const MAX_DIM = 8000;
+
 /* ------------------------------ canvas utils ----------------------------- */
+
+export class CanvasTooLargeError extends Error {
+  constructor() {
+    super("The image is too large for this device");
+    this.name = "CanvasTooLargeError";
+  }
+}
 
 export function makeCanvas(w, h) {
   const c = document.createElement("canvas");
@@ -45,8 +64,65 @@ export function makeCanvas(w, h) {
 
 export function ctx2d(canvas, opts) {
   const ctx = canvas.getContext("2d", opts);
+  // browsers hand out no context (or a dead one) past their canvas limits
+  if (!ctx) throw new CanvasTooLargeError();
   ctx.imageSmoothingQuality = "high";
   return ctx;
+}
+
+let _maxPixels = 0;
+
+/**
+ * The largest canvas area this device can really draw into. Desktop browsers
+ * cope with 8000 × 8000; iOS Safari stops at about 16.7 megapixels and fails
+ * silently beyond that, so the limit is probed once by drawing a pixel into
+ * the far corner and reading it back.
+ */
+export function maxCanvasPixels() {
+  if (_maxPixels) return _maxPixels;
+  const candidates = [MAX_DIM * MAX_DIM, 5793 * 5793, 4096 * 4096, 2896 * 2896];
+  for (const area of candidates) {
+    const side = Math.floor(Math.sqrt(area));
+    const c = document.createElement("canvas");
+    try {
+      c.width = side;
+      c.height = side;
+      const ctx = c.getContext("2d");
+      if (!ctx) continue;
+      ctx.fillStyle = "#ff0000";
+      ctx.fillRect(side - 1, side - 1, 1, 1);
+      if (ctx.getImageData(side - 1, side - 1, 1, 1).data[0] === 255) {
+        _maxPixels = side * side;
+        break;
+      }
+    } catch {
+      /* too large — try the next size */
+    } finally {
+      c.width = c.height = 0;
+    }
+  }
+  if (!_maxPixels) _maxPixels = 2896 * 2896;
+  return _maxPixels;
+}
+
+/**
+ * Scale factor (≤ 1) that brings a w × h image within the edge and area
+ * limits of this device.
+ */
+export function fitScale(w, h) {
+  const edge = MAX_DIM / Math.max(w, h, 1);
+  // every browser handles 16.7 MP, so only bigger images need the probe
+  const pixels = Math.max(1, w * h);
+  const area = pixels <= 4096 * 4096 ? 1 : Math.sqrt(maxCanvasPixels() / pixels);
+  return Math.min(1, edge, area);
+}
+
+/** Free a canvas's backing store now rather than whenever GC gets to it. */
+export function releaseCanvas(c) {
+  if (c && typeof c.width === "number") {
+    c.width = 0;
+    c.height = 0;
+  }
 }
 
 export function copyCanvas(src) {
@@ -76,6 +152,72 @@ export function alphaBounds(canvas, threshold = 0) {
     }
   }
   return maxX < 0 ? null : { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+
+let _supportsFilter = null;
+const supportsCanvasFilter = () =>
+  (_supportsFilter ??= typeof makeCanvas(1, 1).getContext("2d").filter === "string");
+
+/**
+ * Gaussian blur of a white-with-alpha canvas (selections, masks) where the
+ * pixels beyond the canvas edge repeat the edge, so nothing fades out at the
+ * document border. Uses the canvas filter when available, otherwise three
+ * box-blur passes on the alpha channel.
+ */
+export function blurAlpha(src, radius) {
+  const w = src.width;
+  const h = src.height;
+  const out = makeCanvas(w, h);
+  const oc = ctx2d(out);
+  if (supportsCanvasFilter()) {
+    const p = Math.ceil(radius * 3);
+    const padded = makeCanvas(w + p * 2, h + p * 2);
+    const pc = ctx2d(padded);
+    pc.imageSmoothingEnabled = false;
+    pc.drawImage(src, p, p);
+    // stretch the outermost rows/columns (and corners) into the padding
+    pc.drawImage(src, 0, 0, w, 1, p, 0, w, p);
+    pc.drawImage(src, 0, h - 1, w, 1, p, p + h, w, p);
+    pc.drawImage(src, 0, 0, 1, h, 0, p, p, h);
+    pc.drawImage(src, w - 1, 0, 1, h, p + w, p, p, h);
+    pc.drawImage(src, 0, 0, 1, 1, 0, 0, p, p);
+    pc.drawImage(src, w - 1, 0, 1, 1, p + w, 0, p, p);
+    pc.drawImage(src, 0, h - 1, 1, 1, 0, p + h, p, p);
+    pc.drawImage(src, w - 1, h - 1, 1, 1, p + w, p + h, p, p);
+    oc.filter = `blur(${radius}px)`;
+    oc.drawImage(padded, -p, -p);
+    oc.filter = "none";
+    return out;
+  }
+  const img = src.getContext("2d").getImageData(0, 0, w, h);
+  const d = img.data;
+  let a = new Float32Array(w * h);
+  for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3];
+  // three box passes of radius r have σ² = r(r + 1): pick r for σ = radius
+  const r = Math.max(1, Math.round((Math.sqrt(1 + 4 * radius * radius) - 1) / 2));
+  const tmp = new Float32Array(w * h);
+  const pass = (from, to, len, count, stride, step) => {
+    for (let line = 0; line < count; line++) {
+      const base = line * stride;
+      let sum = 0;
+      const at = (k) => from[base + Math.min(len - 1, Math.max(0, k)) * step];
+      for (let k = -r; k <= r; k++) sum += at(k);
+      for (let k = 0; k < len; k++) {
+        to[base + k * step] = sum / (r * 2 + 1);
+        sum += at(k + r + 1) - at(k - r);
+      }
+    }
+  };
+  for (let i = 0; i < 3; i++) {
+    pass(a, tmp, w, h, w, 1);
+    pass(tmp, a, h, w, 1, w);
+  }
+  for (let i = 0; i < a.length; i++) {
+    d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = 255;
+    d[i * 4 + 3] = a[i];
+  }
+  oc.putImageData(img, 0, 0);
+  return out;
 }
 
 /* ---------------------------------- masks --------------------------------- */
@@ -221,7 +363,7 @@ export function drawText(ctx, text) {
   ctx.restore();
 }
 
-const cloneText = (text) => (text ? { ...text, color: { ...text.color } } : null);
+export const cloneText = (text) => (text ? { ...text, color: { ...text.color } } : null);
 
 /* --------------------------------- Layer --------------------------------- */
 
@@ -262,11 +404,10 @@ class MaskTarget {
     /* masks never carry text */
   }
   touch() {
-    this.layer.touch();
+    this.layer.touchMask();
   }
   adopt(canvas) {
     this.layer.setMask(canvas);
-    this.layer.touch();
   }
 }
 
@@ -288,8 +429,11 @@ export class Layer {
     this.editMask = false;
     /** text parameters while the layer is still editable text, else null */
     this.text = null;
-    /** bumped on every pixel change — drives cache invalidation + thumbnails */
-    this.version = 0;
+    /** bumped on every change — drives cache invalidation + thumbnails */
+    this.version = nextVersion();
+    /** identity of the current pixel / mask content (see nextVersion) */
+    this.pixelVersion = this.version;
+    this.maskVersion = this.version;
     this._maskTarget = null;
 
     if (fill) {
@@ -318,10 +462,41 @@ export class Layer {
     this.mask = canvas || null;
     this.maskCtx = canvas ? ctx2d(canvas) : null;
     if (!canvas) this.editMask = false;
+    this.touchMask();
   }
 
+  /**
+   * Something on this layer changed. Pixels and mask both count as new: code
+   * that edits the mask through the layer calls this too, and an extra copy
+   * in the history is cheaper than a stale one.
+   */
   touch() {
-    this.version++;
+    this.version = nextVersion();
+    this.pixelVersion = this.version;
+    this.maskVersion = this.version;
+  }
+
+  /** Only the mask changed (edits through the mask paint target). */
+  touchMask() {
+    this.version = nextVersion();
+    this.maskVersion = this.version;
+  }
+
+  /** Swap in pixels whose content version is already known (undo/redo). */
+  restorePixels(canvas, pixelVersion) {
+    this.canvas = canvas;
+    this.ctx = ctx2d(canvas);
+    this.version = nextVersion();
+    this.pixelVersion = pixelVersion;
+  }
+
+  /** Swap in a mask whose content version is already known (undo/redo). */
+  restoreMask(canvas, maskVersion) {
+    this.mask = canvas || null;
+    this.maskCtx = canvas ? ctx2d(canvas) : null;
+    if (!canvas) this.editMask = false;
+    this.version = nextVersion();
+    this.maskVersion = maskVersion;
   }
 
   /** Re-render the pixels from the text parameters. */
@@ -356,6 +531,7 @@ export class Layer {
     l.maskEnabled = this.maskEnabled;
     l.editMask = this.editMask;
     l.text = cloneText(this.text);
+    l.touch();
     return l;
   }
 
@@ -375,14 +551,21 @@ export class Layer {
 
 /* ------------------------------- Selection ------------------------------- */
 
+let selUid = 0;
+
 /**
  * A selection is an 8-bit alpha mask at document size. Geometric selections
  * also remember their shape so marching ants can be drawn as crisp vectors.
+ *
+ * Once a selection has been handed to the document it is never drawn into
+ * again — every operation returns a new one — so the undo history can keep
+ * references instead of copies.
  */
 export class Selection {
   constructor(w, h) {
+    this.uid = ++selUid;
     this.canvas = makeCanvas(w, h);
-    this.ctx = ctx2d(this.canvas);
+    this.ctx = ctx2d(this.canvas, { willReadFrequently: true });
     this.shape = null; // {type:'rect'|'ellipse', x,y,w,h}
     this._bounds = null;
     this._boundsReady = false;
@@ -393,7 +576,16 @@ export class Selection {
     const s = new Selection(w, h);
     s.ctx.fillStyle = "#fff";
     s.ctx.fillRect(r.x, r.y, r.w, r.h);
-    s.shape = { type: "rect", ...r };
+    // ants follow the shape, so keep it inside the canvas like the pixels
+    const x = Math.max(0, r.x);
+    const y = Math.max(0, r.y);
+    s.shape = {
+      type: "rect",
+      x,
+      y,
+      w: Math.max(0, Math.min(w, r.x + r.w) - x),
+      h: Math.max(0, Math.min(h, r.y + r.h) - y),
+    };
     return s;
   }
 
@@ -437,6 +629,10 @@ export class Selection {
     const s = new Selection(this.canvas.width, this.canvas.height);
     s.ctx.drawImage(this.canvas, 0, 0);
     s.shape = this.shape ? { ...this.shape } : null;
+    // the copy has the same pixels, so the (immutable) caches still hold
+    s._bounds = this._bounds;
+    s._boundsReady = this._boundsReady;
+    s._segments = this._segments;
     return s;
   }
 
@@ -467,15 +663,16 @@ export class Selection {
   feather(radius) {
     if (radius <= 0) return this;
     const out = new Selection(this.canvas.width, this.canvas.height);
-    out.ctx.filter = `blur(${radius}px)`;
-    out.ctx.drawImage(this.canvas, 0, 0);
-    out.ctx.filter = "none";
+    // the document edge is not a selection edge: a select-all stays solid
+    out.ctx.drawImage(blurAlpha(this.canvas, radius), 0, 0);
     return out;
   }
 
   invalidate() {
     this._bounds = null;
     this._boundsReady = false;
+    this._cover = null;
+    this._coverReady = false;
     this._segments = null;
     this._path2d = null;
   }
@@ -493,6 +690,17 @@ export class Selection {
   }
 
   /**
+   * Bounds of every pixel the selection touches at all (alpha > 0) — what an
+   * edit through it can change, faint feathered tails included.
+   */
+  get coverBounds() {
+    if (this._coverReady) return this._cover;
+    this._cover = alphaBounds(this.canvas, 0);
+    this._coverReady = true;
+    return this._cover;
+  }
+
+  /**
    * Boundary segments in document space for marching ants, computed once and
    * cached. Only used for non-geometric (lasso / wand) selections.
    */
@@ -503,22 +711,45 @@ export class Selection {
     if (!b) return (this._segments = segs);
 
     const { data } = this.ctx.getImageData(b.x, b.y, b.w, b.h);
-    const at = (x, y) =>
-      x < 0 || y < 0 || x >= b.w || y >= b.h
-        ? 0
-        : data[(y * b.w + x) * 4 + 3] > 127
-        ? 1
-        : 0;
+    // the outline sits where a pixel is at least half selected — but a
+    // faint (heavily feathered) selection must still show where it is
+    let peak = 0;
+    for (let i = 3; i < data.length; i += 4) if (data[i] > peak) peak = data[i];
+    const threshold = Math.min(127, Math.max(3, peak >> 1));
+    const W = b.w;
+    const H = b.h;
+    const inside = new Uint8Array(W * H);
+    for (let i = 0; i < inside.length; i++) inside[i] = data[i * 4 + 3] > threshold ? 1 : 0;
+    const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? 0 : inside[y * W + x]);
 
-    for (let y = 0; y < b.h; y++) {
-      for (let x = 0; x < b.w; x++) {
-        if (!at(x, y)) continue;
-        const px = b.x + x;
-        const py = b.y + y;
-        if (!at(x, y - 1)) segs.push(px, py, px + 1, py);
-        if (!at(x, y + 1)) segs.push(px, py + 1, px + 1, py + 1);
-        if (!at(x - 1, y)) segs.push(px, py, px, py + 1);
-        if (!at(x + 1, y)) segs.push(px + 1, py, px + 1, py + 1);
+    // collect edges as long runs: every run is one sub-path, so fewer and
+    // longer runs make the dashes march instead of blinking
+    for (let y = 0; y <= H; y++) {
+      let runStart = -1;
+      let runKind = 0;
+      for (let x = 0; x <= W; x++) {
+        const up = at(x, y - 1);
+        const down = at(x, y);
+        const kind = x < W && up !== down ? (down ? 1 : 2) : 0;
+        if (kind !== runKind) {
+          if (runKind) segs.push(b.x + runStart, b.y + y, b.x + x, b.y + y);
+          runStart = x;
+          runKind = kind;
+        }
+      }
+    }
+    for (let x = 0; x <= W; x++) {
+      let runStart = -1;
+      let runKind = 0;
+      for (let y = 0; y <= H; y++) {
+        const left = at(x - 1, y);
+        const right = at(x, y);
+        const kind = y < H && left !== right ? (right ? 1 : 2) : 0;
+        if (kind !== runKind) {
+          if (runKind) segs.push(b.x + x, b.y + runStart, b.x + x, b.y + y);
+          runStart = y;
+          runKind = kind;
+        }
       }
     }
     return (this._segments = segs);
@@ -542,6 +773,11 @@ export class Doc {
     /** transient paint buffer shown above the active layer while a tool drags */
     this.floating = null;
     this.name = t("Untitled");
+    /**
+     * A layer the text tool is editing: its pixels are hidden while the live
+     * editor shows the same text. Purely a view state — never saved.
+     */
+    this.hiddenLayerId = null;
 
     this._belowKey = null;
     this._compositeKey = null;
@@ -551,17 +787,16 @@ export class Doc {
 
   /** (Re)create the document-sized scratch buffers used while compositing. */
   _allocBuffers() {
+    for (const name of ["_composite", "_tmp", "_below", "_maskTmp", "_maskPrev", "_selTmp"]) {
+      if (this[name]) releaseCanvas(this[name]);
+      this[name] = null;
+    }
     this._composite = makeCanvas(this.width, this.height);
     this._compositeCtx = ctx2d(this._composite);
-    this._tmp = makeCanvas(this.width, this.height);
-    this._tmpCtx = ctx2d(this._tmp);
-    this._below = makeCanvas(this.width, this.height);
-    this._belowCtx = ctx2d(this._below);
-    this._maskTmp = null;
-    this._maskPrev = null;
     this.invalidate();
   }
 
+  /** A document-sized scratch canvas, created the first time it is needed. */
   _scratch(name) {
     if (!this[name]) this[name] = makeCanvas(this.width, this.height);
     return this[name];
@@ -627,8 +862,13 @@ export class Doc {
 
   removeLayer(i) {
     if (this.layers.length <= 1) return null;
+    if (!Number.isInteger(i) || i < 0 || i >= this.layers.length) return null;
+    const active = this.active;
     const [gone] = this.layers.splice(i, 1);
-    this.activeIndex = Math.max(0, Math.min(this.layers.length - 1, i - 1));
+    // deleting another layer keeps the one being worked on active
+    const keep = gone === active ? -1 : this.layers.indexOf(active);
+    this.activeIndex =
+      keep >= 0 ? keep : Math.max(0, Math.min(this.layers.length - 1, i - 1));
     return gone;
   }
 
@@ -669,6 +909,16 @@ export class Doc {
     this.applyMask(bottom);
     bottom.text = null;
     const c = bottom.ctx;
+    if (bottom.opacity < 1) {
+      // bake the lower layer's opacity in first, so the upper layer is not
+      // faded by it afterwards and the merge looks like it did before
+      c.save();
+      c.globalCompositeOperation = "destination-in";
+      c.fillStyle = `rgba(0,0,0,${bottom.opacity})`;
+      c.fillRect(0, 0, bottom.width, bottom.height);
+      c.restore();
+      bottom.opacity = 1;
+    }
     c.save();
     c.globalAlpha = top.visible ? top.opacity : 0;
     c.globalCompositeOperation = top.blend;
@@ -712,16 +962,18 @@ export class Doc {
   }
 
   _key() {
-    let k = `${this.activeIndex}#${this._floatVersion}`;
+    let k = `${this.activeIndex}#${this._floatVersion}#${this.hiddenLayerId}`;
     if (this.floating) {
       k += `#${this.floating.mode}#${this.floating.opacity}#${this.floating.blend}`;
+      // the stroke preview is clipped to the selection
+      if (this.selection) k += `#s${this.selection.uid}`;
     }
     for (const l of this.layers) k += layerKey(l);
     return k;
   }
 
   _drawLayer(ctx, layer, source = layer.canvas, mask = null) {
-    if (!layer.visible || layer.opacity === 0) return;
+    if (!layer.visible || layer.opacity === 0 || layer.id === this.hiddenLayerId) return;
     let src = source;
     const m = mask || (layer.mask && layer.maskEnabled ? layer.mask : null);
     if (m) {
@@ -747,19 +999,32 @@ export class Doc {
   _activeSource() {
     const layer = this.active;
     if (!this.floating || !layer || this.target?.isMask) return layer?.canvas;
-    const { canvas: fc, mode, opacity, blend } = this.floating;
-    const c = this._tmpCtx;
+    let { canvas: fc } = this.floating;
+    const { mode, opacity, blend } = this.floating;
+    if (this.selection) {
+      // preview what pointer-up will commit: paint only inside the selection
+      const sc = this._scratch("_selTmp").getContext("2d");
+      sc.setTransform(1, 0, 0, 1, 0, 0);
+      sc.globalAlpha = 1;
+      sc.globalCompositeOperation = "copy";
+      sc.drawImage(fc, 0, 0);
+      sc.globalCompositeOperation = "destination-in";
+      sc.drawImage(this.selection.canvas, 0, 0);
+      sc.globalCompositeOperation = "source-over";
+      fc = this._selTmp;
+    }
+    const tmp = this._scratch("_tmp");
+    const c = tmp.getContext("2d");
     c.setTransform(1, 0, 0, 1, 0, 0);
-    c.globalCompositeOperation = "source-over";
     c.globalAlpha = 1;
-    c.clearRect(0, 0, this.width, this.height);
+    c.globalCompositeOperation = "copy";
     c.drawImage(layer.canvas, 0, 0);
     c.globalAlpha = opacity;
     c.globalCompositeOperation = mode === "erase" ? "destination-out" : blend;
     c.drawImage(fc, 0, 0);
     c.globalCompositeOperation = "source-over";
     c.globalAlpha = 1;
-    return this._tmp;
+    return tmp;
   }
 
   /**
@@ -805,8 +1070,8 @@ export class Doc {
     const ai = this.activeIndex;
     let belowKey = `${ai}`;
     for (let i = 0; i < ai; i++) belowKey += layerKey(this.layers[i]);
-    if (belowKey !== this._belowKey) {
-      const bc = this._belowCtx;
+    if (ai > 0 && belowKey !== this._belowKey) {
+      const bc = this._scratch("_below").getContext("2d");
       bc.setTransform(1, 0, 0, 1, 0, 0);
       bc.globalCompositeOperation = "source-over";
       bc.globalAlpha = 1;
@@ -876,7 +1141,7 @@ export class Doc {
    * Redraw every layer (and mask) into a new frame. `textFn` maps text
    * parameters into the new frame; without it text layers become pixels.
    */
-  _resizeAll(w, h, drawFn, textFn = null) {
+  _resizeAll(w, h, drawFn, textFn = null, { keepSelection = true } = {}) {
     for (const layer of this.layers) {
       const next = makeCanvas(w, h);
       const c = ctx2d(next);
@@ -887,9 +1152,15 @@ export class Doc {
         layer.text = textFn ? textFn(cloneText(layer.text)) : null;
       }
     }
+    // the selection follows the pixels it selects
+    let sel = null;
+    if (keepSelection && this.selection) {
+      sel = new Selection(w, h);
+      drawFn(sel.ctx, this.selection.canvas);
+    }
     this.width = Math.max(1, Math.round(w));
     this.height = Math.max(1, Math.round(h));
-    this.setSelection(null);
+    this.setSelection(sel);
     this.clearFloating();
     this._allocBuffers();
     // keep text crisp instead of resampled
@@ -936,7 +1207,8 @@ export class Doc {
       w,
       h,
       (c, src) => c.drawImage(src, -x, -y),
-      (tx) => ({ ...tx, x: tx.x - x, y: tx.y - y })
+      (tx) => ({ ...tx, x: tx.x - x, y: tx.y - y }),
+      { keepSelection: false }
     );
   }
 
@@ -982,58 +1254,12 @@ export class Doc {
     });
   }
 
-  /* ------------------------------ snapshots ------------------------------ */
-
-  /** Deep copy of everything undo needs to bring the document back. */
-  snapshot() {
-    return {
-      width: this.width,
-      height: this.height,
-      name: this.name,
-      activeIndex: this.activeIndex,
-      selection: this.selection ? this.selection.clone() : null,
-      layers: this.layers.map((l) => ({
-        id: l.id,
-        name: l.name,
-        visible: l.visible,
-        opacity: l.opacity,
-        blend: l.blend,
-        locked: l.locked,
-        canvas: copyCanvas(l.canvas),
-        mask: l.mask ? copyCanvas(l.mask) : null,
-        maskEnabled: l.maskEnabled,
-        editMask: l.editMask,
-        text: cloneText(l.text),
-      })),
-      bytes:
-        this.layers.reduce((n, l) => n + (l.mask ? 2 : 1), 0) * this.width * this.height * 4,
-    };
-  }
-
-  restoreSnapshot(snap) {
-    const resized = snap.width !== this.width || snap.height !== this.height;
-    this.width = snap.width;
-    this.height = snap.height;
-    this.name = snap.name;
-    this.layers = snap.layers.map((s) => {
-      const layer = new Layer(1, 1, { name: s.name });
-      layer.id = s.id;
-      layer.adopt(copyCanvas(s.canvas));
-      layer.visible = s.visible;
-      layer.opacity = s.opacity;
-      layer.blend = s.blend;
-      layer.locked = s.locked;
-      layer.setMask(s.mask ? copyCanvas(s.mask) : null);
-      layer.maskEnabled = s.maskEnabled ?? true;
-      layer.editMask = !!(s.editMask && s.mask);
-      layer.text = cloneText(s.text);
-      return layer;
-    });
-    this.activeIndex = Math.min(snap.activeIndex, this.layers.length - 1);
-    this.selection = snap.selection ? snap.selection.clone() : null;
-    this.clearFloating();
-    if (resized) this._allocBuffers();
-    else this.invalidate();
+  /** The document changed size (undo of a crop, resize…): new scratch buffers. */
+  setSize(w, h) {
+    if (w === this.width && h === this.height) return;
+    this.width = w;
+    this.height = h;
+    this._allocBuffers();
   }
 
   /* ---------------------------- serialization ---------------------------- */
@@ -1073,24 +1299,52 @@ export class Doc {
     };
   }
 
-  /** Same content as toJSON with PNG Blobs instead of data URLs (IndexedDB). */
-  async toStorable() {
-    const blob = (c) => new Promise((r) => c.toBlob(r, "image/png"));
-    const layers = [];
-    for (const l of this.layers) {
-      layers.push({
-        ...this._layerMeta(l),
-        data: await blob(l.canvas),
-        mask: l.mask ? await blob(l.mask) : null,
-      });
-    }
-    return { ...this._meta(), layers };
+  /**
+   * Same content as toJSON with PNG Blobs instead of data URLs (IndexedDB).
+   * Everything is captured in one go — toBlob() copies the bitmap the moment
+   * it is called — so edits made while the PNGs encode can't mix two states.
+   */
+  toStorable() {
+    // PNG encoding is the slow part: reuse the encoding of unchanged bitmaps
+    const cache = (this._pngCache ||= new Map());
+    const used = new Set();
+    const blob = (key, c) => {
+      used.add(key);
+      let p = cache.get(key);
+      if (!p) {
+        p = new Promise((r) => c.toBlob(r, "image/png"));
+        cache.set(key, p);
+      }
+      return p;
+    };
+    const meta = this._meta();
+    const pending = this.layers.map((l) => ({
+      meta: this._layerMeta(l),
+      data: blob(`p${l.id}@${l.pixelVersion}`, l.canvas),
+      mask: l.mask ? blob(`m${l.id}@${l.maskVersion}`, l.mask) : null,
+    }));
+    for (const key of cache.keys()) if (!used.has(key)) cache.delete(key);
+    return (async () => {
+      const layers = [];
+      for (const p of pending) {
+        const data = await p.data;
+        if (!data) throw new Error("Could not encode a layer");
+        layers.push({ ...p.meta, data, mask: p.mask ? await p.mask : null });
+      }
+      return { ...meta, layers };
+    })();
   }
 
   static async fromJSON(json) {
     if (!json || json.format !== "paint-studio") {
       throw new Error("Not a Paint Studio project file");
     }
+    const width = Number(json.width);
+    const height = Number(json.height);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) {
+      throw new Error("Not a Paint Studio project file");
+    }
+    // only embedded images: a project must never make the browser fetch URLs
     const load = async (src) => {
       if (!src) return null;
       if (src instanceof Blob) {
@@ -1101,29 +1355,47 @@ export class Doc {
           URL.revokeObjectURL(url);
         }
       }
+      if (typeof src !== "string" || !/^data:image\/[\w.+-]+;base64,/i.test(src)) return null;
       return loadImage(src);
     };
-    const doc = new Doc(json.width, json.height);
-    doc.name = json.name || t("Untitled");
-    for (const spec of json.layers || []) {
+    const k = fitScale(width, height);
+    const doc = new Doc(Math.round(width * k), Math.round(height * k));
+    const draw = (layerCanvas, image) => {
+      const c = ctx2d(layerCanvas);
+      c.drawImage(image, 0, 0, image.naturalWidth * k, image.naturalHeight * k);
+    };
+    doc.name = typeof json.name === "string" && json.name ? json.name : t("Untitled");
+    for (const spec of Array.isArray(json.layers) ? json.layers : []) {
+      if (!spec || typeof spec !== "object") continue;
       const image = await load(spec.data);
-      const layer = new Layer(doc.width, doc.height, { name: spec.name, image });
+      const layer = new Layer(doc.width, doc.height, {
+        name: typeof spec.name === "string" ? spec.name : t("Layer"),
+      });
+      if (image) draw(layer.canvas, image);
       layer.visible = spec.visible !== false;
-      layer.opacity = spec.opacity ?? 1;
-      layer.blend = spec.blend || "source-over";
+      const opacity = Number(spec.opacity);
+      layer.opacity = Number.isFinite(opacity) ? Math.min(1, Math.max(0, opacity)) : 1;
+      layer.blend = BLEND_MODES.some(([v]) => v === spec.blend) ? spec.blend : "source-over";
       layer.locked = !!spec.locked;
       const mask = await load(spec.mask);
       if (mask) {
         const m = makeCanvas(doc.width, doc.height);
-        ctx2d(m).drawImage(mask, 0, 0);
+        draw(m, mask);
         layer.setMask(m);
       }
       layer.maskEnabled = spec.maskEnabled !== false;
-      layer.text = cloneText(spec.text);
+      const tx = spec.text;
+      layer.text =
+        k === 1 && tx && typeof tx.value === "string" && tx.color && Number.isFinite(tx.size)
+          ? cloneText(tx)
+          : null;
+      layer.touch();
       doc.layers.push(layer);
     }
     if (!doc.layers.length) doc.layers.push(new Layer(doc.width, doc.height));
-    doc.setActive(json.activeIndex ?? doc.layers.length - 1);
+    const active = Number(json.activeIndex);
+    doc.setActive(Number.isInteger(active) ? active : doc.layers.length - 1);
+    if (k < 1) doc.scaledFrom = { width, height };
     return doc;
   }
 }
@@ -1172,10 +1444,10 @@ export function paintMasked(
   layer,
   src,
   selection,
-  { replace = false, opacity = 1, blend = "source-over", erase = false } = {}
+  { replace = false, opacity = 1, blend = "source-over", erase = false, rect = null } = {}
 ) {
   if (layer.isMask && !replace) {
-    paintMaskRegion(layer.canvas, layer.canvas, src, { x: 0, y: 0, w: layer.width, h: layer.height }, {
+    paintMaskRegion(layer.canvas, layer.canvas, src, rect || { x: 0, y: 0, w: layer.width, h: layer.height }, {
       opacity,
       erase,
       selection,
@@ -1197,15 +1469,22 @@ export function paintMasked(
   }
 
   c.save();
+  c.setTransform(1, 0, 0, 1, 0, 0);
   if (replace && selection) {
+    // out = old·(1−s) + new·s: erase by the selection, then *add* the masked
+    // result. A plain source-over would leave soft selection edges partly
+    // transparent (s + (1−s)² < 1).
     c.globalCompositeOperation = "destination-out";
     c.drawImage(selection.canvas, 0, 0);
-  } else if (replace) {
-    c.clearRect(0, 0, layer.width, layer.height);
+    c.globalAlpha = opacity;
+    c.globalCompositeOperation = "lighter";
+    c.drawImage(source, 0, 0);
+  } else {
+    if (replace) c.clearRect(0, 0, layer.width, layer.height);
+    c.globalAlpha = opacity;
+    c.globalCompositeOperation = erase ? "destination-out" : blend;
+    c.drawImage(source, 0, 0);
   }
-  c.globalAlpha = opacity;
-  c.globalCompositeOperation = erase ? "destination-out" : blend;
-  c.drawImage(source, 0, 0);
   c.restore();
   layer.touch();
 }

@@ -4,23 +4,26 @@
    ========================================================================== */
 
 export const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
-export const clamp255 = (v) => (v < 0 ? 0 : v > 255 ? 255 : v | 0);
+/** Clamp to 0..255 and round to the nearest integer (NaN becomes 0). */
+export const clamp255 = (v) => (v < 0 ? 0 : v > 255 ? 255 : (v + 0.5) | 0);
 
 export function rgb(r, g, b, a = 1) {
   return { r, g, b, a };
 }
 
+const HEX = /^(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
 export function hexToRgb(hex) {
   let h = String(hex).trim().replace(/^#/, "");
+  // parseInt would accept a valid prefix ("12zz56" → 0x12), so validate first
+  if (!HEX.test(h)) return null;
   if (h.length === 3 || h.length === 4) {
     h = h
       .split("")
       .map((c) => c + c)
       .join("");
   }
-  if (h.length !== 6 && h.length !== 8) return null;
   const n = Number.parseInt(h, 16);
-  if (Number.isNaN(n)) return null;
   if (h.length === 6) {
     return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255, a: 1 };
   }
@@ -32,7 +35,7 @@ export function hexToRgb(hex) {
   };
 }
 
-const hex2 = (v) => clamp255(Math.round(v)).toString(16).padStart(2, "0");
+const hex2 = (v) => clamp255(v).toString(16).padStart(2, "0");
 
 export function rgbToHex(c, withAlpha = false) {
   const base = `#${hex2(c.r)}${hex2(c.g)}${hex2(c.b)}`;
@@ -43,7 +46,7 @@ export function rgbToHex(c, withAlpha = false) {
 export function cssColor(c) {
   const a = c.a ?? 1;
   if (a >= 1) return rgbToHex(c);
-  return `rgba(${c.r | 0}, ${c.g | 0}, ${c.b | 0}, ${Number(a.toFixed(3))})`;
+  return `rgba(${clamp255(c.r)}, ${clamp255(c.g)}, ${clamp255(c.b)}, ${Number(a.toFixed(3))})`;
 }
 
 /** Parse hex / rgb() / rgba() / a few keywords. Returns null when unparseable. */
@@ -57,10 +60,18 @@ export function parseColor(input) {
   if (s.startsWith("#")) return hexToRgb(s);
   const m = s.match(/^rgba?\(([^)]+)\)$/);
   if (m) {
-    const p = m[1].split(/[,/\s]+/).filter(Boolean).map(Number);
-    if (p.length >= 3 && p.every((v) => !Number.isNaN(v))) {
-      return { r: p[0], g: p[1], b: p[2], a: p[3] === undefined ? 1 : p[3] };
-    }
+    const parts = m[1].split(/[,/\s]+/).filter(Boolean);
+    if (parts.length < 3 || parts.length > 4) return null;
+    // components clamp to 0..255 and alpha to 0..1; percentages are accepted
+    const p = parts.map((part, i) => {
+      const pct = part.endsWith("%");
+      const v = Number(pct ? part.slice(0, -1) : part);
+      if (!Number.isFinite(v)) return NaN;
+      if (i < 3) return clamp(pct ? v * 2.55 : v, 0, 255);
+      return clamp(pct ? v / 100 : v, 0, 1);
+    });
+    if (p.some((v) => Number.isNaN(v))) return null;
+    return { r: p[0], g: p[1], b: p[2], a: p[3] ?? 1 };
   }
   return hexToRgb(s);
 }

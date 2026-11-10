@@ -12,17 +12,40 @@ const STORE = "kv";
 
 let dbPromise = null;
 
+/** Open (once) — with a timeout: some Safari versions never answer open(). */
 function open() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve) => {
+    let settled = false;
+    const done = (db) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      // a failed or hung open is retried on the next call
+      if (!db) dbPromise = null;
+      resolve(db);
+    };
+    const timer = setTimeout(() => done(null), 4000);
     try {
       const req = indexedDB.open(DB, 1);
       req.onupgradeneeded = () => req.result.createObjectStore(STORE);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(null);
-      req.onblocked = () => resolve(null);
+      req.onsuccess = () => {
+        const db = req.result;
+        // another tab upgrading the database, or Safari dropping the
+        // connection: forget this handle and open a fresh one next time
+        db.onversionchange = () => {
+          db.close();
+          dbPromise = null;
+        };
+        db.onclose = () => {
+          dbPromise = null;
+        };
+        done(db);
+      };
+      req.onerror = () => done(null);
+      req.onblocked = () => done(null);
     } catch {
-      resolve(null);
+      done(null);
     }
   });
   return dbPromise;
@@ -40,6 +63,8 @@ function run(mode, fn) {
           tx.onerror = () => resolve(null);
           tx.onabort = () => resolve(null);
         } catch {
+          // "connection is closing" and friends: reopen on the next call
+          dbPromise = null;
           resolve(null);
         }
       })

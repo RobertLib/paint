@@ -6,6 +6,7 @@
      /index.html, /cs/index.html          home pages
      /<slug>/index.html, /cs/<slug>/…     one page per task (pages.mjs)
      /404.html, /sitemap.xml
+     scripts/site/lastmod.json            per-page <lastmod> (see lastmod.mjs)
    and refreshes the analytics + modulepreload blocks of /editor/index.html.
 
    The output is committed, so the site still deploys without a build step —
@@ -13,10 +14,12 @@
    No dependencies: Node 18+ only.
    ========================================================================== */
 
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SITE } from "./site/config.mjs";
+import { readLastmod, writeLastmod } from "./site/lastmod.mjs";
 import { PAGES, PAGE_BY_ID } from "./site/pages.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -32,6 +35,13 @@ const TODAY = new Date().toISOString().slice(0, 10);
 
 const esc = (s) =>
   String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+/** JSON that is safe inside a <script> element: no "</script>" or "<!--" can form. */
+const json = (value) =>
+  JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 
 /** Copy may carry a few inline tags; everything else is escaped. */
 const rich = (s) =>
@@ -60,7 +70,26 @@ function sprite(ids) {
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true"><defs>${out.join("")}</defs></svg>`;
 }
-const icon = (id, cls = "icon") => `<svg class="${cls}"><use href="#${id}" /></svg>`;
+const icon = (id, cls = "icon") =>
+  `<svg class="${cls}" aria-hidden="true" focusable="false"><use href="#${id}" /></svg>`;
+
+/** Files the pickers offer; the editor's open path handles all of them. */
+const ACCEPT = "image/*,.heic,.heif,.psd,.paint";
+
+/* the editor's theme choice applies here too; otherwise follow the system.
+   Runs before the stylesheets so the page never flashes the wrong theme. */
+const THEME_SCRIPT = `<script>
+      try {
+        var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
+        document.documentElement.dataset.theme =
+          (t && t.theme) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      } catch (e) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    </script>`;
+
+const THEME_COLOR = `<meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />`;
 
 function analytics() {
   if (!SITE.goatcounter) return "";
@@ -69,7 +98,7 @@ function analytics() {
 
 /* -------------------------------- template -------------------------------- */
 
-function head({ lang, path, page, title, description, jsonld }) {
+function head({ lang, path, page, title, description, jsonld, ui }) {
   const alternates = SITE.languages
     .map((l) => `<link rel="alternate" hreflang="${l}" href="${absolute(pagePath(l, page))}" />`)
     .join("\n    ");
@@ -84,46 +113,38 @@ function head({ lang, path, page, title, description, jsonld }) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>${esc(title)}</title>
-    <meta name="description" content="${esc(description)}" />
+    <title>${esc(plain(title))}</title>
+    <meta name="description" content="${esc(plain(description))}" />
     <link rel="canonical" href="${absolute(path)}" />
     ${alternates}
     <link rel="alternate" hreflang="x-default" href="${absolute(pagePath(DEFAULT_LANG, page))}" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="${esc(SITE.name)}" />
-    <meta property="og:title" content="${esc(title)}" />
-    <meta property="og:description" content="${esc(description)}" />
+    <meta property="og:title" content="${esc(plain(title))}" />
+    <meta property="og:description" content="${esc(plain(description))}" />
     <meta property="og:url" content="${absolute(path)}" />
     <meta property="og:image" content="${SITE.base}og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="${esc(ui.ogImageAlt)}" />
     <meta property="og:locale" content="${locale}" />
     ${otherLocales}
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image:alt" content="${esc(ui.ogImageAlt)}" />
 
     <link rel="icon" type="image/svg+xml" href="${root}favicon.svg" />
     <link rel="icon" type="image/x-icon" href="${root}favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="${root}apple-touch-icon.png" />
     <link rel="manifest" href="${root}manifest.json" />
-    <meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+    ${THEME_COLOR}
 
-    <script>
-      // the editor's theme choice applies here too; otherwise follow the system
-      try {
-        var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
-        document.documentElement.dataset.theme =
-          (t && t.theme) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-      } catch (e) {
-        document.documentElement.dataset.theme = "dark";
-      }
-    </script>
+    ${THEME_SCRIPT}
     <link rel="stylesheet" href="${root}css/tokens.css" />
     <link rel="stylesheet" href="${root}css/site.css" />
     <link rel="modulepreload" href="${root}js/site.js" />
     <link rel="modulepreload" href="${root}js/store.js" />
-    <script type="application/ld+json">${JSON.stringify(jsonld)}</script>
+    <script type="application/ld+json">${json(jsonld)}</script>
     ${analytics()}
   </head>`;
 }
@@ -144,7 +165,7 @@ function header({ lang, path, page, ui }) {
         <span class="brand-mark" aria-hidden="true">${icon("i-brush")}</span>
         <span translate="no">Paint<em>Studio</em></span>
       </a>
-      <nav class="site-nav" aria-label="${esc(ui.navTools)}">
+      <nav class="site-nav" aria-label="${esc(ui.navMain)}">
         <a href="${root}${pagePath(lang)}#tools">${esc(ui.navTools)}</a>
         <span class="langs" role="group" aria-label="${esc(ui.languageLabel)}">${langLinks}</span>
         <a class="btn btn-primary" href="${editor}">${icon("i-brush")}<span>${esc(ui.navEditor)}</span></a>
@@ -157,27 +178,41 @@ function dropzone({ lang, path, page, ui }) {
   const task = page?.task || "";
   const blank = !page || page.needsFile === false;
   const blankHref = `${root}editor/?${new URLSearchParams({ lang, task: "paint" })}`;
+  // the input stays focusable (visually hidden, not [hidden]) so the picker
+  // works from the keyboard; the label shows the focus ring (site.css)
+  const picker = (cls, iconId) =>
+    `<label class="btn ${cls}">${icon(iconId)}<span>${esc(ui.dropButton)}</span>
+          <input type="file" accept="${ACCEPT}" class="sr-only" data-file /></label>`;
+  // shown by js/site.js when a dropped or picked file can't be opened
+  const error = `<p class="drop-error" data-error role="alert" hidden></p>`;
+  const config = (task) =>
+    `<script type="application/json" id="dropConfig">${json({
+      editor: `${root}editor/`,
+      task,
+      lang,
+      notOpenable: ui.dropUnsupported,
+    })}</script>`;
   if (page && page.needsFile === false) {
     return `
       <div class="drop drop-blank">
         <a class="btn btn-primary btn-lg" href="${blankHref}">${icon("i-brush")}<span>${esc(ui.blankButton)}</span></a>
         <p class="drop-hint">${esc(ui.dropHint)}</p>
-        <label class="btn btn-ghost">${icon("i-image")}<span>${esc(ui.dropButton)}</span>
-          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+        ${picker("btn-ghost", "i-image")}
+        ${error}
       </div>
-      <script type="application/json" id="dropConfig">${JSON.stringify({ editor: `${root}editor/`, task: "draw", lang })}</script>`;
+      ${config("draw")}`;
   }
   return `
       <div class="drop" data-drop>
         ${icon("i-image", "icon drop-icon")}
         <strong class="drop-title">${esc(ui.dropTitle)}</strong>
-        <label class="btn btn-primary btn-lg">${icon("i-folder")}<span>${esc(ui.dropButton)}</span>
-          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+        ${picker("btn-primary btn-lg", "i-folder")}
         <p class="drop-hint">${esc(ui.dropHint)}</p>
         ${blank ? `<a class="drop-blank-link" href="${blankHref}">${esc(ui.blankButton)}</a>` : ""}
-        <p class="drop-busy" data-busy hidden>${esc(ui.dropBusy)}</p>
+        <p class="drop-busy" data-busy role="status" aria-live="polite" hidden>${esc(ui.dropBusy)}</p>
+        ${error}
       </div>
-      <script type="application/json" id="dropConfig">${JSON.stringify({ editor: `${root}editor/`, task, lang })}</script>`;
+      ${config(task)}`;
 }
 
 function trust(ui) {
@@ -215,7 +250,7 @@ function footer({ lang, path, page, ui }) {
     (p) => `<li><a href="${root}${pagePath(lang, p)}">${esc(c.pages[p.id].card)}</a></li>`
   ).join("");
   const langLinks = SITE.languages
-    .map((l) => `<a href="${root}${pagePath(l, page)}" hreflang="${l}" lang="${l}">${l === "cs" ? "Čeština" : "English"}</a>`)
+    .map((l) => `<a href="${root}${pagePath(l, page)}" hreflang="${l}" lang="${l}">${esc(SITE.languageNames[l])}</a>`)
     .join(" · ");
   return `
     <footer class="site-foot">
@@ -228,8 +263,8 @@ function footer({ lang, path, page, ui }) {
           <p>${esc(ui.footerText)}</p>
           <p><a href="${SITE.github}" rel="noopener">${esc(ui.footerSource)}</a> · ${langLinks}</p>
         </div>
-        <nav aria-label="${esc(ui.allToolsTitle)}">
-          <h2>${esc(ui.allToolsTitle)}</h2>
+        <nav aria-labelledby="foot-tools">
+          <h2 id="foot-tools">${esc(ui.allToolsTitle)}</h2>
           <ul class="foot-links">${links}</ul>
         </nav>
       </div>
@@ -244,6 +279,60 @@ function footer({ lang, path, page, ui }) {
 
 const ICONS_ALWAYS = ["i-brush", "i-image", "i-folder", "i-check"];
 
+/* ------------------------------ structured data --------------------------- */
+/* One WebSite and one WebApplication per language, identified by the home page
+   URL of that language; every page repeats both nodes verbatim (so its graph is
+   self-contained) and describes itself as a WebPage about the app. */
+
+const ids = (lang) => {
+  const home = absolute(pagePath(lang));
+  return { home, website: `${home}#website`, app: `${home}#app` };
+};
+
+function websiteNode(lang) {
+  const { home, website } = ids(lang);
+  return { "@type": "WebSite", "@id": website, name: SITE.name, url: home, inLanguage: lang };
+}
+
+function appNode(lang) {
+  const { home, app } = ids(lang);
+  return {
+    "@type": "WebApplication",
+    "@id": app,
+    name: SITE.name,
+    url: home,
+    description: plain(CONTENT[lang].home.description),
+    applicationCategory: "MultimediaApplication",
+    applicationSubCategory: "Image editor",
+    operatingSystem: "Any (modern web browser)",
+    browserRequirements: "Requires JavaScript and HTML5 canvas",
+    inLanguage: SITE.languages,
+    isAccessibleForFree: true,
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    image: `${SITE.base}og-image.png`,
+    screenshot: `${SITE.base}docs/screenshot.png`,
+    license: "https://opensource.org/licenses/MIT",
+    codeRepository: SITE.github,
+    author: { "@type": "Person", name: SITE.author.name, url: SITE.author.url },
+  };
+}
+
+function webPageNode({ lang, path, title, description, breadcrumb }) {
+  const url = absolute(path);
+  return {
+    "@type": "WebPage",
+    "@id": `${url}#webpage`,
+    url,
+    name: plain(title),
+    description: plain(description),
+    inLanguage: lang,
+    isPartOf: { "@id": ids(lang).website },
+    about: { "@id": ids(lang).app },
+    primaryImageOfPage: { "@type": "ImageObject", url: `${SITE.base}og-image.png`, width: 1200, height: 630 },
+    ...(breadcrumb ? { breadcrumb: { "@id": breadcrumb } } : {}),
+  };
+}
+
 function homePage(lang) {
   const c = CONTENT[lang];
   const ui = c.ui;
@@ -251,31 +340,9 @@ function homePage(lang) {
   const jsonld = {
     "@context": "https://schema.org",
     "@graph": [
-      {
-        "@type": "WebSite",
-        "@id": `${SITE.base}#website`,
-        name: SITE.name,
-        url: absolute(path),
-        inLanguage: lang,
-      },
-      {
-        "@type": "WebApplication",
-        name: SITE.name,
-        url: absolute(path),
-        description: plain(c.home.description),
-        applicationCategory: "MultimediaApplication",
-        applicationSubCategory: "Image editor",
-        operatingSystem: "Any (modern web browser)",
-        browserRequirements: "Requires JavaScript and HTML5 canvas",
-        inLanguage: SITE.languages,
-        isAccessibleForFree: true,
-        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-        image: `${SITE.base}og-image.png`,
-        screenshot: `${SITE.base}og-image.png`,
-        license: "https://opensource.org/licenses/MIT",
-        codeRepository: SITE.github,
-        author: { "@type": "Person", name: SITE.author.name, url: SITE.author.url },
-      },
+      websiteNode(lang),
+      appNode(lang),
+      webPageNode({ lang, path, title: c.home.title, description: c.home.description }),
     ],
   };
   const body = `
@@ -301,7 +368,7 @@ function homePage(lang) {
       ${faq(c.home.faq, ui)}
     </main>`;
   return (
-    head({ lang, path, page: null, title: c.home.title, description: c.home.description, jsonld }) +
+    head({ lang, path, page: null, title: c.home.title, description: c.home.description, jsonld, ui }) +
     body +
     footer({ lang, path, page: null, ui })
   );
@@ -313,27 +380,20 @@ function toolPage(lang, page) {
   const p = c.pages[page.id];
   const path = pagePath(lang, page);
   const title = `${p.title} | ${SITE.name}`;
+  const breadcrumb = `${absolute(path)}#breadcrumb`;
   const jsonld = {
     "@context": "https://schema.org",
     "@graph": [
+      websiteNode(lang),
+      appNode(lang),
+      webPageNode({ lang, path, title, description: p.description, breadcrumb }),
       {
         "@type": "BreadcrumbList",
+        "@id": breadcrumb,
         itemListElement: [
           { "@type": "ListItem", position: 1, name: ui.homeLink, item: absolute(pagePath(lang)) },
-          { "@type": "ListItem", position: 2, name: plain(p.h1), item: absolute(path) },
+          { "@type": "ListItem", position: 2, name: plain(p.card), item: absolute(path) },
         ],
-      },
-      {
-        "@type": "WebApplication",
-        name: `${plain(p.card)} — ${SITE.name}`,
-        url: absolute(path),
-        description: plain(p.description),
-        applicationCategory: "MultimediaApplication",
-        operatingSystem: "Any (modern web browser)",
-        inLanguage: lang,
-        isAccessibleForFree: true,
-        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-        isPartOf: { "@id": `${SITE.base}#website` },
       },
     ],
   };
@@ -343,7 +403,7 @@ function toolPage(lang, page) {
     ${header({ lang, path, page, ui })}
     <main>
       <section class="hero">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="${rootFrom(path)}${pagePath(lang)}">${esc(ui.homeLink)}</a><span aria-hidden="true">›</span><span>${esc(p.card)}</span></nav>
+        <nav class="crumbs" aria-label="${esc(ui.breadcrumbLabel)}"><a href="${rootFrom(path)}${pagePath(lang)}">${esc(ui.homeLink)}</a><span aria-hidden="true">›</span><span aria-current="page">${esc(p.card)}</span></nav>
         <h1>${rich(p.h1)}</h1>
         <p class="lead">${rich(p.lead)}</p>
         ${dropzone({ lang, path, page, ui })}
@@ -366,7 +426,7 @@ function toolPage(lang, page) {
       </section>
     </main>`;
   return (
-    head({ lang, path, page, title, description: p.description, jsonld }) +
+    head({ lang, path, page, title, description: p.description, jsonld, ui }) +
     body +
     footer({ lang, path, page, ui })
   );
@@ -389,10 +449,12 @@ function notFoundPage() {
 <html lang="${lang}">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>404 · ${esc(SITE.name)}</title>
     <meta name="robots" content="noindex" />
     <link rel="icon" type="image/svg+xml" href="${SITE.base}favicon.svg" />
+    ${THEME_COLOR}
+    ${THEME_SCRIPT}
     <link rel="stylesheet" href="${SITE.base}css/tokens.css" />
     <link rel="stylesheet" href="${SITE.base}css/site.css" />
   </head>
@@ -403,17 +465,42 @@ function notFoundPage() {
 `;
 }
 
-function sitemap() {
+/* ------------------------------- lastmod ---------------------------------- */
+
+/** Fingerprint of what a reader (or a search engine) sees as the page's content. */
+function contentHash(html) {
+  const title = html.match(/<title>[\s\S]*?<\/title>/)?.[0] || "";
+  const description = html.match(/<meta name="description"[^>]*>/)?.[0] || "";
+  const main = html.match(/<main>[\s\S]*<\/main>/)?.[0] || html;
+  return createHash("sha256").update(`${title}\n${description}\n${main}`).digest("hex").slice(0, 16);
+}
+
+/** URL → {hash, date}: the date only moves when the page's content changes. */
+function updateLastmod(hashes) {
+  const old = readLastmod();
+  const next = {};
+  for (const [url, hash] of hashes) {
+    const prev = old[url];
+    next[url] =
+      prev && prev.hash === hash
+        ? prev
+        : { hash, date: TODAY, ...(prev?.submitted ? { submitted: prev.submitted } : {}) };
+  }
+  return next;
+}
+
+function sitemap(lastmod) {
   const entries = [];
   const add = (page) => {
     for (const l of SITE.languages) {
+      const loc = absolute(pagePath(l, page));
       const alts = SITE.languages
         .map((a) => `<xhtml:link rel="alternate" hreflang="${a}" href="${absolute(pagePath(a, page))}" />`)
         .concat(`<xhtml:link rel="alternate" hreflang="x-default" href="${absolute(pagePath(DEFAULT_LANG, page))}" />`)
         .join("\n    ");
       entries.push(`  <url>
-    <loc>${absolute(pagePath(l, page))}</loc>
-    <lastmod>${TODAY}</lastmod>
+    <loc>${loc}</loc>
+    <lastmod>${lastmod[loc]?.date || TODAY}</lastmod>
     ${alts}
   </url>`);
     }
@@ -459,18 +546,43 @@ function write(path, html) {
   return file;
 }
 
-let count = 0;
 for (const lang of SITE.languages) {
-  write(pagePath(lang), homePage(lang));
+  for (const key of ["ogImageAlt", "navMain", "breadcrumbLabel", "dropUnsupported"]) {
+    if (!CONTENT[lang].ui[key]) throw new Error(`Missing ${lang} ui.${key}`);
+  }
+  if (!SITE.languageNames?.[lang]) throw new Error(`Missing SITE.languageNames.${lang}`);
+}
+
+let count = 0;
+const hashes = new Map(); // absolute URL → content hash, in sitemap order
+const emit = (path, html) => {
+  write(path, html);
+  hashes.set(absolute(path), contentHash(html));
   count++;
+};
+for (const lang of SITE.languages) {
+  emit(pagePath(lang), homePage(lang));
   for (const page of PAGES) {
     if (!CONTENT[lang].pages[page.id]) throw new Error(`Missing ${lang} copy for ${page.id}`);
-    write(pagePath(lang, page), toolPage(lang, page));
-    count++;
+    emit(pagePath(lang, page), toolPage(lang, page));
   }
 }
+const lastmod = updateLastmod(hashes);
 writeFileSync(join(ROOT, "404.html"), notFoundPage());
-writeFileSync(join(ROOT, "sitemap.xml"), sitemap());
+writeFileSync(join(ROOT, "sitemap.xml"), sitemap(lastmod));
+// keep the file in sitemap order so diffs stay readable
+const ordered = Object.fromEntries(
+  [null, ...PAGES].flatMap((page) =>
+    SITE.languages.map((l) => {
+      const url = absolute(pagePath(l, page));
+      return [url, lastmod[url]];
+    })
+  )
+);
+writeLastmod(ordered);
 writeFileSync(join(ROOT, `${SITE.indexNowKey}.txt`), SITE.indexNowKey);
 patchEditor();
-console.log(`Wrote ${count} pages, 404.html, sitemap.xml and refreshed editor/index.html`);
+const changed = Object.values(ordered).filter((e) => e.date === TODAY).length;
+console.log(
+  `Wrote ${count} pages (${changed} dated ${TODAY}), 404.html, sitemap.xml, lastmod.json and refreshed editor/index.html`
+);

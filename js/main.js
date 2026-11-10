@@ -5,18 +5,18 @@
 import { translateDOM } from "./i18n.js";
 import * as A from "./actions.js";
 import {
-  clearAutosave,
+  SLOT_CURRENT,
   initAutosave,
+  listSessions,
   loadAutosave,
-  peekAutosave,
   relativeTime,
 } from "./autosave.js";
 import { t } from "./i18n.js";
-import { initMenus, showWelcome } from "./menus.js";
+import { initMenus, openNewDialog, showWelcome, showWelcomeDialog } from "./menus.js";
 import { initRender, requestRender } from "./render.js";
 import { emit, loadPrefs, on, registerDefaults, state } from "./state.js";
 import { HANDOFF_KEY, HANDOFF_TTL, idbDelete, idbGet } from "./store.js";
-import { isBlankTask, startTask } from "./tasks.js";
+import { isBlankTask, isTask, startTask } from "./tasks.js";
 import { initTone } from "./tone.js";
 import { TOOL_DEFAULTS, TOOLS, initInput, switchTool } from "./tools.js";
 import { track } from "./track.js";
@@ -79,76 +79,135 @@ async function takeHandoff() {
   return file instanceof File ? file : new File([file], name || "image", { type: type || file.type });
 }
 
-async function restore() {
+async function restore(slot = SLOT_CURRENT) {
+  if (state.doc && !A.confirmDiscard()) return false;
+  emit("busy", t("Restoring…"));
   try {
-    const doc = await loadAutosave();
-    if (!doc) return false;
-    A.setDocument(doc);
+    const doc = await loadAutosave(slot);
+    if (!doc) {
+      emit("toast", { msg: t("That session is no longer available"), kind: "err" });
+      return false;
+    }
+    A.setDocument(doc, { restored: true });
     emit("toast", { msg: t("Restored “{name}”", { name: doc.name }), kind: "ok" });
     track("restore");
     return true;
   } catch (err) {
+    // keep the stored session: a later attempt (more memory, another
+    // browser update) may well succeed — never delete the only copy
     console.error(err);
     emit("toast", { msg: t("The saved session could not be restored"), kind: "err" });
-    await clearAutosave();
     return false;
+  } finally {
+    emit("busy", null);
   }
 }
 
-on("restore-autosave", restore);
+on("restore-autosave", (slot) => restore(slot || SLOT_CURRENT));
 
-/** Offer the autosaved document on the welcome screen. */
-async function offerRestore() {
-  const saved = await peekAutosave();
-  const card = document.getElementById("restoreCard");
-  if (!saved || !card) return;
-  card.hidden = false;
-  card.querySelector("[data-restore-name]").textContent = saved.name || t("Untitled");
-  card.querySelector("[data-restore-meta]").textContent = t("{w} × {h} · {when}", {
-    w: saved.width,
-    h: saved.height,
-    when: relativeTime(saved.savedAt),
-  });
-  if (saved.thumb) {
-    const img = card.querySelector("img");
-    img.src = URL.createObjectURL(saved.thumb);
-    img.hidden = false;
-  }
+const thumbUrls = [];
+
+/** Cards for the stored sessions on the welcome screen. */
+async function renderSessions() {
+  const list = document.getElementById("restoreList");
+  const template = document.getElementById("restoreCard");
+  if (!list || !template) return [];
+  const sessions = await listSessions();
+  for (const url of thumbUrls.splice(0)) URL.revokeObjectURL(url);
+  list.replaceChildren(
+    ...sessions.map((saved, i) => {
+      const card = template.cloneNode(true);
+      card.removeAttribute("id");
+      card.hidden = false;
+      card.dataset.slot = saved.slot;
+      if (i > 0) card.querySelector("strong").textContent = t("An earlier session");
+      card.querySelector("[data-restore-name]").textContent = saved.name || t("Untitled");
+      card.querySelector("[data-restore-meta]").textContent = t("{w} × {h} · {when}", {
+        w: saved.width,
+        h: saved.height,
+        when: relativeTime(saved.savedAt),
+      });
+      if (saved.thumb) {
+        const img = card.querySelector("img");
+        const url = URL.createObjectURL(saved.thumb);
+        thumbUrls.push(url);
+        img.src = url;
+        img.hidden = false;
+      }
+      return card;
+    })
+  );
+  return sessions;
 }
+
+/** File › Restore previous session…: the welcome screen with the sessions. */
+on("show-sessions", async () => {
+  const sessions = await renderSessions();
+  if (!sessions.length) {
+    emit("toast", { msg: t("There is no other saved session"), kind: "info" });
+    return;
+  }
+  showWelcomeDialog();
+});
 
 async function boot() {
   let opened = false;
+  let restored = false;
   const file = await takeHandoff().catch(() => null);
   if (file) opened = await A.openImageFile(file);
-  if (!opened && params.get("restore") === "1") opened = await restore();
+  if (!opened && params.get("restore") === "1") opened = restored = await restore();
   if (!opened && task && isBlankTask(task)) {
     startTask(task);
     opened = !!state.doc;
   }
   if (!opened) {
+    await renderSessions();
     showWelcome();
-    offerRestore();
+  } else if (!restored) {
+    // the earlier work is kept in the second autosave slot — say where
+    const earlier = (await listSessions())[0];
+    if (earlier) {
+      emit("toast", {
+        msg: t("Your earlier work “{name}” is kept", { name: earlier.name || t("Untitled") }),
+        kind: "info",
+        action: { label: t("Show"), onClick: () => emit("show-sessions") },
+      });
+    }
   }
-  if (task) startTask(task);
+  if (task) startTask(task, { restored });
 
-  // a reload should not replay the hand-over or the restore
-  if (params.has("open") || params.has("restore")) {
+  // a reload should not replay the hand-over, the restore or the task
+  if (params.has("open") || params.has("restore") || params.has("task")) {
     params.delete("open");
     params.delete("restore");
+    params.delete("task");
     const qs = params.toString();
     history.replaceState(null, "", `${location.pathname}${qs ? `?${qs}` : ""}${location.hash}`);
   }
-  track(task ? `editor-${task}` : "editor");
+  track(task && isTask(task) ? `editor-${task}` : "editor");
 }
 
 boot();
 
-/* installed app: files opened from the OS ("Open with Paint Studio") */
+/* installed app: files opened from the OS ("Open with Paint Studio") and
+   app shortcuts while the window is already open (launch_handler) */
 if ("launchQueue" in window) {
-  window.launchQueue.setConsumer(async ({ files }) => {
-    for (const handle of files || []) {
-      const file = await handle.getFile();
-      await A.openImageFile(file, { asLayer: !!state.doc && files.length > 1 });
+  window.launchQueue.setConsumer(async ({ files, targetURL }) => {
+    const handles = files || [];
+    for (const handle of handles) {
+      try {
+        const file = await handle.getFile();
+        await A.openImageFile(file, { asLayer: !!state.doc && handles.length > 1 });
+      } catch (err) {
+        console.error(err);
+        emit("toast", { msg: t("Could not open that image"), kind: "err" });
+      }
+    }
+    if (!handles.length && targetURL) {
+      const next = new URL(targetURL).searchParams.get("task");
+      // "New canvas" with a document open asks for the size, as File › New
+      if (next === "paint" && state.doc) openNewDialog();
+      else if (next) startTask(next, { again: true });
     }
   });
 }

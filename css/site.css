@@ -5,7 +5,14 @@
 
 html {
   height: auto;
-  scroll-behavior: smooth;
+  /* in-page links (#tools) stop below the sticky header, not under it */
+  scroll-padding-top: calc(72px + env(safe-area-inset-top, 0px));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 body.site {
@@ -34,6 +41,20 @@ body.site::before {
   text-underline-offset: 3px;
 }
 
+/* visually hidden, still read by screen readers and still focusable */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 .site kbd,
 .site code {
   font-family: var(--mono);
@@ -47,10 +68,12 @@ body.site::before {
 /* --------------------------------- buttons -------------------------------- */
 
 .site .btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  max-width: 100%;
   height: 38px;
   padding: 0 16px;
   font-size: 14px;
@@ -81,16 +104,25 @@ body.site::before {
   height: 18px;
 }
 
+/* the file picker is a <label> around a visually hidden input: the ring shows
+   when the input inside has keyboard focus */
+.site label.btn:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .site .btn-primary {
   color: var(--accent-text);
-  background: linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 82%, #000));
+  background: linear-gradient(180deg, var(--accent-fill), color-mix(in oklab, var(--accent-fill) 82%, #000));
   border-color: transparent;
   box-shadow: 0 1px 10px var(--accent-glow), var(--sh-inset);
 }
 
+/* hover never gets lighter than --accent-fill, so the label keeps its contrast */
 .site .btn-primary:hover {
-  background: linear-gradient(180deg, color-mix(in oklab, var(--accent) 90%, #fff), var(--accent));
+  background: linear-gradient(180deg, var(--accent-fill), color-mix(in oklab, var(--accent-fill) 92%, #000));
   border-color: transparent;
+  box-shadow: 0 2px 16px var(--accent-glow), var(--sh-inset);
 }
 
 .site .btn-ghost {
@@ -98,9 +130,14 @@ body.site::before {
 }
 
 .site .btn-lg {
-  height: 48px;
-  padding: 0 24px;
+  height: auto;
+  min-height: 48px;
+  padding: 10px 24px;
   font-size: 15.5px;
+  line-height: 1.3;
+  text-align: center;
+  /* long labels (“Začít s prázdným plátnem”) wrap on narrow phones */
+  white-space: normal;
   border-radius: var(--r-lg);
 }
 
@@ -116,6 +153,7 @@ body.site::before {
   padding: calc(10px + env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) 10px
     max(20px, env(safe-area-inset-left, 0px));
   background: var(--glass);
+  -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--stroke);
 }
@@ -290,6 +328,13 @@ body.site::before {
   color: var(--accent);
 }
 
+.drop-error {
+  max-width: 46ch;
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--danger);
+}
+
 .drop-blank {
   border-style: solid;
 }
@@ -383,7 +428,7 @@ body.site::before {
   font-weight: 700;
   font-size: 14px;
   color: var(--accent-text);
-  background: var(--accent);
+  background: var(--accent-fill);
 }
 
 .features {
@@ -531,8 +576,15 @@ body.site::before {
     display: none;
   }
 
+  /* icon-only button: the label stays for screen readers */
   .site-nav .btn span {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .site-nav .btn {

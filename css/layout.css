@@ -2,9 +2,21 @@
    Paint Studio — application shell layout
    ========================================================================== */
 
+/* editor/index.html sets viewport-fit=cover, so the shell pads itself out of
+   the notch, the rounded corners and the home indicator (env(safe-area-*)) */
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+}
+
 .app {
   display: grid;
-  grid-template-rows: var(--h-top) var(--h-options) 1fr var(--h-status);
+  grid-template-rows:
+    calc(var(--h-top) + var(--safe-t)) var(--h-options) 1fr
+    calc(var(--h-status) + var(--safe-b));
+  height: 100vh; /* browsers without dynamic viewport units */
   height: 100dvh;
   min-height: 0;
   background: var(--bg-0);
@@ -24,7 +36,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 10px 0 12px;
+  padding: var(--safe-t) calc(10px + var(--safe-r)) 0 calc(12px + var(--safe-l));
   background: var(--bg-1);
   border-bottom: 1px solid var(--stroke);
   box-shadow: var(--sh-1);
@@ -148,7 +160,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 10px;
+  padding: 0 calc(10px + var(--safe-r)) 0 calc(10px + var(--safe-l));
   background: linear-gradient(var(--bg-1), var(--bg-1)) padding-box;
   border-bottom: 1px solid var(--stroke);
   overflow-x: auto;
@@ -182,13 +194,15 @@
 
 .workspace {
   display: grid;
-  grid-template-columns: var(--w-rail) minmax(0, 1fr) var(--w-side);
+  grid-template-columns:
+    calc(var(--w-rail) + var(--safe-l)) minmax(0, 1fr)
+    calc(var(--w-side) + var(--safe-r));
   min-height: 0;
   min-width: 0;
 }
 
 .workspace.side-collapsed {
-  grid-template-columns: var(--w-rail) minmax(0, 1fr) 0;
+  grid-template-columns: calc(var(--w-rail) + var(--safe-l)) minmax(0, 1fr) var(--safe-r);
 }
 
 .workspace.side-collapsed .sidebar {
@@ -201,7 +215,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px 6px;
+  padding: 8px 6px 8px calc(6px + var(--safe-l));
   background: var(--bg-1);
   border-right: 1px solid var(--stroke);
   overflow-y: auto;
@@ -275,6 +289,7 @@
   padding: 4px;
   border-radius: var(--r-full);
   background: var(--glass);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
   backdrop-filter: blur(14px) saturate(160%);
   border: 1px solid var(--stroke-2);
   box-shadow: var(--sh-2);
@@ -303,6 +318,7 @@
   place-items: center;
   z-index: 8;
   background: rgba(10, 11, 15, 0.6);
+  -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
   opacity: 0;
   pointer-events: none;
@@ -353,6 +369,7 @@
   flex-direction: column;
   min-height: 0;
   min-width: 0;
+  padding-right: var(--safe-r);
   background: var(--bg-1);
   border-left: 1px solid var(--stroke);
   z-index: 15;
@@ -473,7 +490,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 0 12px;
+  padding: 0 calc(12px + var(--safe-r)) var(--safe-b) calc(12px + var(--safe-l));
   font-size: 11px;
   color: var(--text-3);
   background: var(--bg-1);
@@ -529,15 +546,16 @@
 
 @media (max-width: 760px) {
   .workspace {
-    grid-template-columns: var(--w-rail) minmax(0, 1fr);
+    grid-template-columns: calc(var(--w-rail) + var(--safe-l)) minmax(0, 1fr);
   }
 
+  /* the panels slide in over the stage; their width includes the right inset */
   .sidebar {
     position: fixed;
-    top: calc(var(--h-top) + var(--h-options));
+    top: calc(var(--h-top) + var(--safe-t) + var(--h-options));
     right: 0;
-    bottom: var(--h-status);
-    width: min(320px, 88vw);
+    bottom: calc(var(--h-status) + var(--safe-b));
+    width: calc(min(320px, 88vw) + var(--safe-r));
     box-shadow: var(--sh-3);
     transform: translateX(101%);
     transition: transform var(--t-slow);
@@ -558,7 +576,7 @@
 
   /* keep undo/redo and Export reachable: the rest lives in the menus */
   .topbar {
-    padding: 0 6px 0 8px;
+    padding: var(--safe-t) calc(6px + var(--safe-r)) 0 calc(8px + var(--safe-l));
     gap: 4px;
   }
 

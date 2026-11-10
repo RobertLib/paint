@@ -7,10 +7,15 @@ export default {
   ui: {
     navEditor: "Otevřít editor",
     navTools: "Všechny nástroje",
+    navMain: "Hlavní",
+    breadcrumbLabel: "Drobečková navigace",
+    ogImageAlt: "Paint Studio – editor obrázků v prohlížeči. Vrstvy, retuš, filtry.",
     dropTitle: "Přetáhněte sem obrázek",
     dropButton: "Vybrat obrázek",
     dropHint: "nebo ho vložte ze schránky (Ctrl+V) · PNG, JPG, WebP, HEIC, PSD…",
     dropBusy: "Editor se otevírá…",
+    dropUnsupported:
+      "Tento soubor tu otevřít nejde. Vyberte obrázek (PNG, JPG, WebP, HEIC…), soubor PSD nebo projekt .paint.",
     blankButton: "Začít s prázdným plátnem",
     trust: ["Nic se nenahrává", "Bez registrace", "Bez vodoznaku"],
     stepsTitle: "Jak na to",
@@ -38,11 +43,11 @@ export default {
     features: [
       {
         h2: "Vrstvy, masky a režimy prolnutí",
-        p: "Skládejte obrázek z libovolného počtu vrstev jako v desktopovém editoru. V panelu Vrstvy je přejmenujete, zamknete, skryjete, nastavíte jim krytí a přetažením změníte jejich pořadí. Šestnáct režimů prolnutí pomáhá se stíny, světly i barevným tónováním. Maska vrstvy skryje část obrazu bez mazání: černou barvou skrýváte, bílou zase odkrýváte. Hotové vrstvy spojíte s vrstvou pod nimi, nebo celý dokument sloučíte do jedné.",
+        p: "Skládejte obrázek z libovolného počtu vrstev jako v desktopovém editoru. V panelu Vrstvy je přejmenujete, zamknete, skryjete, nastavíte jim krytí a přetažením změníte jejich pořadí. Šestnáct režimů prolnutí pomáhá se stíny, světly i barevným tónováním. Maska vrstvy skryje část obrazu bez mazání: černou barvou skrýváte, bílou zase odkrýváte. Hotovou vrstvu spojíte s vrstvou pod ní příkazem Sloučit dolů, celý dokument příkazem Sloučit do jedné vrstvy.",
       },
       {
         h2: "Výběry, které hlídají každý zásah",
-        p: "Obdélníkový výběr, Eliptický výběr, Laso a Kouzelná hůlka vymezí oblast, se kterou chcete pracovat. Výběr můžete vytvořit nový, přidat k němu, odečíst z něj nebo ponechat jen průnik, změkčit mu okraj a invertovat ho. Malování, výplň, mazání, korekce i filtry se pak zastaví přesně na jeho hranici. Zesvětlíte tak jen oblohu nebo rozmažete jediný obličej, aniž byste museli složitě stavět masku.",
+        p: "Obdélníkový výběr, Eliptický výběr, Laso a Kouzelná hůlka vymezí oblast, se kterou chcete pracovat. Výběr můžete vytvořit nový, přidat k němu, odečíst z něj nebo ponechat jen průnik, nastavit mu prolnutí okraje a invertovat ho. Malování, výplň, mazání, korekce i filtry se pak zastaví přesně na jeho hranici. Zesvětlíte tak jen oblohu nebo rozmažete jediný obličej, aniž byste museli složitě stavět masku.",
       },
       {
         h2: "Štětce, tvary a text",
@@ -54,11 +59,11 @@ export default {
       },
       {
         h2: "Korekce a filtry s živým náhledem",
-        p: "Panel Korekce nabízí 15 posuvníků: expozici, jas, kontrast, světla, stíny, gamu, sytost, živost, teplotu, tónování, posun odstínu, čistotu, změkčení, zrno a vinětaci. Každou změnu hned vidíte na fotce. Pro přesnou práci s tóny jsou tu Úrovně… s histogramem a Křivky… pro jednotlivé kanály. Panel Filtry obsahuje 21 filtrů, například Odstíny šedi, Sépie, Vintage, Duotón nebo Kresba tužkou, každý s náhledem přímo z vaší fotky.",
+        p: "Panel Korekce nabízí 15 posuvníků: expozici, jas, kontrast, světla, stíny, gamu, sytost, živost, teplotu, nádech, posun odstínu, zřetelnost, změkčení, zrno a vinětaci. Každou změnu hned vidíte na fotce. Pro přesnou práci s tóny jsou tu Úrovně… s histogramem a Křivky… pro jednotlivé kanály. Panel Filtry obsahuje 21 filtrů, například Odstíny šedi, Sépie, Vintage, Duotón nebo Kresba tužkou, každý s náhledem přímo z vaší fotky.",
       },
       {
         h2: "Ořez, velikost a otáčení",
-        p: "Nástroj Oříznutí nabízí poměry stran 1:1, 4:3, 16:9 a další spolu s mřížkou podle pravidla třetin. Velikost obrázku… mění rozlišení v pixelech, Velikost plátna… přidá nebo ubere místo kolem obrazu s volbou ukotvení. Obrázek otočíte o 90° nebo 180°, převrátíte vodorovně či svisle a nástrojem Transformace ho volně posunete, zvětšíte nebo natočíte o libovolný úhel. Oříznout průhledné okraje odstraní prázdné místo kolem objektu jedním kliknutím.",
+        p: "Nástroj Oříznutí nabízí poměry stran 1:1, 4:3, 16:9 a další spolu s mřížkou podle pravidla třetin. Velikost obrázku… mění rozlišení v pixelech, Velikost plátna… přidá nebo ubere místo kolem obrazu s volbou ukotvení. Obrázek otočíte o 90° nebo 180°, překlopíte vodorovně či svisle a nástrojem Transformace ho volně posunete, zvětšíte nebo natočíte o libovolný úhel. Příkaz Oříznout průhledné okraje odstraní prázdné místo kolem objektu jedním kliknutím.",
       },
       {
         h2: "Od fotek z iPhonu po soubory PSD",
@@ -76,7 +81,7 @@ export default {
       },
       {
         q: "Je Paint Studio opravdu zdarma?",
-        a: "Ano, úplně. Nepotřebujete účet, nemá zkušební dobu, nezobrazuje reklamy a na exportované obrázky nepřidává vodoznak. Žádná funkce není schovaná za placením. Projekt má otevřený zdrojový kód pod licencí MIT, takže si ho můžete prohlédnout na GitHubu, nebo si ho dokonce upravit podle sebe.",
+        a: "Ano, úplně. Nepotřebujete účet, editor nemá zkušební dobu, nezobrazuje reklamy a na exportované obrázky nepřidává vodoznak. Žádná funkce není schovaná za placením. Projekt má otevřený zdrojový kód pod licencí MIT, takže si ho můžete prohlédnout na GitHubu, nebo si ho dokonce upravit podle sebe.",
       },
       {
         q: "Funguje editor bez internetu?",
@@ -92,7 +97,7 @@ export default {
       },
       {
         q: "Co Paint Studio neumí?",
-        a: "Nemá funkce umělé inteligence, takže sám nevybere objekt ani nevygeneruje chybějící část obrazu. Nepracuje s CMYK, správou barev, formátem RAW ani 16bitovými barvami, neupravuje animované GIFy, není to vektorový editor a neotevře PSB. Obrázky upravujete jeden po druhém, hromadné zpracování nenabízí.",
+        a: "Nemá funkce umělé inteligence, takže sám nevybere objekt ani nevygeneruje chybějící část obrazu. Nepracuje s CMYK, správou barev ani formátem RAW, barvy upravuje v 8 bitech na kanál (16bitové a 32bitové PSD při otevření převede), neupravuje animované GIFy, není to vektorový editor a neotevře PSB. Obrázky upravujete jeden po druhém, hromadné zpracování nenabízí.",
       },
       {
         q: "Jaké má klávesové zkratky?",
@@ -124,7 +129,7 @@ export default {
       sections: [
         {
           h2: "Jaký poměr stran zvolit",
-          p: "Čtverec 1:1 se hodí na profilovou fotku a příspěvky na sociální sítě. Poměr 16:9 odpovídá obrazovce notebooku, televizi i náhledu videa, 9:16 je formát na výšku pro stories a krátká videa. Většina fotoaparátů fotí v poměru 3:2, většina telefonů ve 4:3 – v těchto poměrech tedy oříznete fotku, aniž by se změnil její tvar. 3:4 je totéž na výšku. Volný ořez použijte, když chcete jen odstranit rušivý okraj a na přesném rozměru nezáleží.",
+          p: "Čtverec 1:1 se hodí na profilovou fotku a příspěvky na sociální sítě. Poměr 16:9 odpovídá obrazovce notebooku, televizi i náhledu videa, 9:16 je formát na výšku pro stories a krátká videa. Většina fotoaparátů fotí v poměru 3:2, většina telefonů ve 4:3 – v těchto poměrech tedy oříznete fotku, aniž by se změnil její tvar. Poměr 3:4 je totéž na výšku. Volný ořez použijte, když chcete jen odstranit rušivý okraj a na přesném rozměru nezáleží.",
         },
         {
           h2: "Kompozice podle pravidla třetin",
@@ -142,7 +147,7 @@ export default {
         },
         {
           q: "Můžu oříznout obrázek podle výběru?",
-          a: "Ano. Označte oblast nástrojem Obdélníkový výběr nebo jiným výběrem a v nabídce Obrázek použijte oříznutí podle výběru. Plátno se zmenší přesně na ohraničení výběru. Hodí se to, když už výběr máte hotový z předchozí úpravy.",
+          a: "Ano. Označte oblast nástrojem Obdélníkový výběr nebo jiným výběrem a v nabídce Obrázek zvolte Oříznout podle výběru. Plátno se zmenší přesně na ohraničení výběru. Hodí se to, když už výběr máte hotový z předchozí úpravy.",
         },
         {
           q: "Oříznu fotku i na mobilu?",
@@ -191,7 +196,7 @@ export default {
         },
         {
           q: "Jak zachovat poměr stran?",
-          a: "V dialogu Velikost obrázku… nechte zaškrtnuté zachování poměru stran. Pak stačí změnit šířku a výška se upraví automaticky, takže se fotka neroztáhne ani nezdeformuje. Volbu vypněte jen tehdy, když chcete obrázek záměrně roztáhnout do jiného tvaru.",
+          a: "V dialogu Velikost obrázku… nechte zaškrtnutou volbu Zachovat poměr stran. Pak stačí změnit šířku a výška se upraví automaticky, takže se fotka neroztáhne ani nezdeformuje. Volbu vypněte jen tehdy, když chcete obrázek záměrně roztáhnout do jiného tvaru.",
         },
         {
           q: "Jak zmenšit fotku v MB pro e-mail?",
@@ -208,7 +213,7 @@ export default {
     "rotate-image": {
       title: "Otočit fotku nebo obrázek online",
       description:
-        "Otočte fotku o 90° doleva či doprava, zrcadlově ji převraťte nebo srovnejte křivý horizont volným otočením o libovolný úhel. Zdarma, rovnou v prohlížeči.",
+        "Otočte fotku o 90° doleva či doprava, zrcadlově ji překlopte nebo srovnejte křivý horizont volným otočením o libovolný úhel. Zdarma, rovnou v prohlížeči.",
       h1: "Otočit fotku online",
       lead:
         "Fotka uložená na bok, zrcadlově obrácené selfie nebo nakřivo vyfocený horizont – všechno opravíte pár kliknutími v liště, která se otevře hned s fotkou.",
@@ -216,13 +221,13 @@ export default {
       cardText: "O 90°, zrcadlově nebo o libovolný úhel",
       steps: [
         "Přetáhněte fotku sem, nebo ji vyberte z disku.",
-        "V liště zvolte otočení o 90°, převrácení nebo volné otočení.",
+        "V liště zvolte otočení doleva či doprava, překlopení nebo volné otočení.",
         "Volné otočení potvrďte klávesou <kbd>Enter</kbd> a obrázek exportujte.",
       ],
       sections: [
         {
           h2: "Otočení o 90° a zrcadlení",
-          p: "Tlačítka pro otočení o 90° doleva a doprava opraví fotku, kterou telefon uložil na bok. Vodorovné převrácení vytvoří zrcadlový obraz – hodí se pro selfie z přední kamery, kde je nápis na tričku obráceně, nebo když chcete, aby se postava na plakátu dívala opačným směrem. Svislé převrácení obrátí obraz vzhůru nohama, což využijete spíš u grafiky nebo při skládání odrazu na vodní hladině. Žádná z těchto operací neubírá kvalitu, pixely se jen přeskládají.",
+          p: "Tlačítka Doleva a Doprava otočí obrázek o 90° a opraví fotku, kterou telefon uložil na bok. Příkaz Překlopit vodorovně vytvoří zrcadlový obraz – hodí se pro selfie z přední kamery, kde je nápis na tričku obráceně, nebo když chcete, aby se postava na plakátu dívala opačným směrem. Překlopit svisle obrátí obraz vzhůru nohama, což využijete spíš u grafiky nebo při skládání odrazu na vodní hladině. Žádná z těchto operací neubírá kvalitu, pixely se jen přeskládají.",
         },
         {
           h2: "Jak srovnat křivý horizont",
@@ -232,15 +237,15 @@ export default {
       faq: [
         {
           q: "Jak otočit fotku o 180°?",
-          a: "Klikněte dvakrát na otočení o 90° ve stejném směru, nebo použijte otočení o 180° v nabídce Obrázek. Fotka se obrátí vzhůru nohama bez jakékoli ztráty kvality a výsledek hned uložíte přes tlačítko Exportovat.",
+          a: "Klikněte dvakrát na otočení o 90° ve stejném směru, nebo v nabídce Obrázek zvolte Otočit o 180°. Fotka se obrátí vzhůru nohama bez jakékoli ztráty kvality a výsledek hned uložíte přes tlačítko Exportovat.",
         },
         {
           q: "Jak zrcadlově otočit fotku?",
-          a: "Použijte vodorovné převrácení. Levá a pravá strana se prohodí, takže obrácený nápis na selfie bude zase čitelný. Pokud chcete obraz otočit vzhůru nohama jako odraz ve vodě, zvolte převrácení svislé.",
+          a: "Použijte příkaz Překlopit vodorovně. Levá a pravá strana se prohodí, takže obrácený nápis na selfie bude zase čitelný. Pokud chcete obraz obrátit vzhůru nohama jako odraz ve vodě, zvolte Překlopit svisle.",
         },
         {
           q: "Ztratí fotka otočením kvalitu?",
-          a: "Otočení o 90° a 180° i zrcadlení pixely jen přeskládá, kvalita zůstává stejná. Volné otočení o jiný úhel musí pixely přepočítat, takže obraz může nepatrně změknout. Kvalitu výsledného souboru pak ovlivní ještě nastavení exportu.",
+          a: "Otočení o 90° a 180° i překlopení pixely jen přeskládá, kvalita zůstává stejná. Volné otočení o jiný úhel musí pixely přepočítat, takže obraz může nepatrně změknout. Kvalitu výsledného souboru pak ovlivní ještě nastavení exportu.",
         },
         {
           q: "Proč se po volném otočení objeví v rozích šachovnice?",
@@ -324,7 +329,7 @@ export default {
         },
         {
           h2: "Převod bez odesílání souborů",
-          p: "Mnoho online převodníků soubor nahraje na svůj server, převede ho tam a pošle zpět. Tady se nic takového neděje: obrázek se dekóduje a znovu zakóduje ve vaší záložce prohlížeče. Nemusíte proto řešit, kdo získá přístup k vašim dokumentům, fotkám dětí nebo pracovním podkladům. Rychlost převodu nezávisí na připojení a po první návštěvě funguje i offline. Jedinou výjimkou je HEIC mimo Safari, kde si prohlížeč při prvním použití jednou stáhne dekodér.",
+          p: "Mnoho online převodníků soubor nahraje na svůj server, převede ho tam a pošle zpět. Tady se nic takového neděje: obrázek se dekóduje a znovu zakóduje ve vaší záložce prohlížeče. Nemusíte proto řešit, kdo získá přístup k vašim dokumentům, fotkám dětí nebo pracovním podkladům. Rychlost převodu proto nezávisí na připojení a po první návštěvě převodník funguje i offline. Jedinou výjimkou je HEIC mimo Safari, kde si prohlížeč při prvním použití jednou stáhne dekodér.",
         },
       ],
       faq: [
@@ -504,7 +509,7 @@ export default {
         },
         {
           h2: "Rozmazání, nebo pixelizace?",
-          p: "Rozmazání působí jemněji a na fotce méně ruší – hodí se pro kolemjdoucí v pozadí nebo detaily, které nemají odvádět pozornost. Pixelizace vytvoří typické čtverečky a na první pohled dává najevo, že bylo něco záměrně skryto, což se hodí u snímků obrazovky s osobními údaji nebo u fotek do inzerátu. Když okraj výběru změkčíte, rozmazaná oblast plynule přejde do okolí a nebude mít ostrou hranu. Bez výběru se rozmaže celý obrázek.",
+          p: "Rozmazání působí jemněji a na fotce méně ruší – hodí se pro kolemjdoucí v pozadí nebo detaily, které nemají odvádět pozornost. Pixelizace vytvoří typické čtverečky a na první pohled dává najevo, že bylo něco záměrně skryto, což se hodí u snímků obrazovky s osobními údaji nebo u fotek do inzerátu. Když výběru nastavíte prolnutí okraje, rozmazaná oblast plynule přejde do okolí a nebude mít ostrou hranu. Bez výběru se rozmaže celý obrázek.",
         },
         {
           h2: "Rozostřené pozadí a jemné rozmazání štětcem",
@@ -553,7 +558,7 @@ export default {
         },
         {
           h2: "Text zůstává upravitelný",
-          p: "Každý nápis vznikne jako samostatná textová vrstva v panelu Vrstvy. Překlep opravíte tak, že na text znovu kliknete nástrojem Text, a nástrojem Přesun ho posunete jinam. Upravitelný zůstává, dokud do jeho vrstvy nezačnete malovat nebo ji neotočíte či nepřevrátíte – pak se z něj stanou obyčejné pixely. Pokud chcete text natočit, udělejte to až úplně nakonec. Práci uloženou jako projekt <code>.paint</code> otevřete později i se všemi vrstvami.",
+          p: "Každý nápis vznikne jako samostatná textová vrstva v panelu Vrstvy. Překlep opravíte tak, že na text znovu kliknete nástrojem Text, a nástrojem Přesun ho posunete jinam. Upravitelný zůstává, dokud do jeho vrstvy nezačnete malovat nebo ji neotočíte či nepřeklopíte – pak se z něj stanou obyčejné pixely. Pokud chcete text natočit, udělejte to až úplně nakonec. Práci uloženou jako projekt <code>.paint</code> otevřete později i se všemi vrstvami.",
         },
         {
           h2: "Meme, popisky a vodoznak",
@@ -567,7 +572,7 @@ export default {
         },
         {
           q: "Můžu text později změnit?",
-          a: "Ano. Text je na vlastní textové vrstvě, stačí na něj znovu kliknout nástrojem Text a nápis upravit. Změnu potvrďte klávesami <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (na Macu <kbd>⌘</kbd>+<kbd>Enter</kbd>). Upravitelnost končí, jakmile do vrstvy malujete nebo ji otočíte či převrátíte.",
+          a: "Ano. Text je na vlastní textové vrstvě, stačí na něj znovu kliknout nástrojem Text a nápis upravit. Změnu potvrďte klávesami <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (na Macu <kbd>⌘</kbd>+<kbd>Enter</kbd>). Upravitelnost končí, jakmile do vrstvy malujete nebo ji otočíte či překlopíte.",
         },
         {
           q: "Jaká písma jsou k dispozici?",
@@ -606,7 +611,7 @@ export default {
         },
         {
           h2: "Barevný akcent: černobílá fotka s jednou barvou",
-          p: "Filtr se použije jen uvnitř výběru, pokud nějaký existuje. Toho využijete pro efekt barevného akcentu. Krokem zpět vraťte fotce barvy, označte objekt, který má zůstat barevný (třeba červený deštník nebo kytici), nástrojem Laso nebo Kouzelná hůlka, výběr invertujte a v panelu Filtry klikněte na Odstíny šedi. Všechno kolem zešedne a vybraný objekt si barvu ponechá. Změkčený okraj výběru zajistí, že přechod nebude příliš ostrý.",
+          p: "Filtr se použije jen uvnitř výběru, pokud nějaký existuje. Toho využijete pro efekt barevného akcentu. Krokem zpět vraťte fotce barvy, označte objekt, který má zůstat barevný (třeba červený deštník nebo kytici), nástrojem Laso nebo Kouzelná hůlka, výběr invertujte a v panelu Filtry klikněte na Odstíny šedi. Všechno kolem zešedne a vybraný objekt si barvu ponechá. Prolnutí okraje u nástroje výběru zajistí, že přechod nebude příliš ostrý.",
         },
       ],
       faq: [
@@ -651,7 +656,7 @@ export default {
         },
         {
           h2: "Inverze jen části obrázku",
-          p: "Filtr pracuje uvnitř výběru, pokud nějaký existuje. Automatickou inverzi po otevření tedy vraťte krokem zpět, označte oblast nástrojem Obdélníkový výběr nebo Laso a v panelu Filtry klikněte na filtr Inverze. Takto převedete třeba jen tmavý panel ve snímku obrazovky nebo jedno okno aplikace a zbytek necháte, jak je. Pro jemný přechod mezi invertovanou a původní částí změkčete okraj výběru ještě před použitím filtru.",
+          p: "Filtr pracuje uvnitř výběru, pokud nějaký existuje. Automatickou inverzi po otevření tedy vraťte krokem zpět, označte oblast nástrojem Obdélníkový výběr nebo Laso a v panelu Filtry klikněte na filtr Inverze. Takto převedete třeba jen tmavý panel ve snímku obrazovky nebo jedno okno aplikace a zbytek necháte, jak je. Pro jemný přechod mezi invertovanou a původní částí nastavte výběru prolnutí okraje ještě před použitím filtru.",
         },
       ],
       faq: [
@@ -688,15 +693,15 @@ export default {
       sections: [
         {
           h2: "Přehled všech 21 filtrů",
-          p: "<strong>Barvy a nálada:</strong> Živé barvy, Vybledlé, Teplé, Studené, Vintage a Duotón, který fotku přebarví do dvou tónů podle hlavní a vedlejší barvy v panelu Barva. <strong>Černobílé a tónované:</strong> Odstíny šedi, Noir a Sépie. <strong>Grafické efekty:</strong> Inverze, Posterizace, Práh, Solarizace, Reliéf, Detekce hran, Kresba tužkou a Pixelizace. <strong>Ostrost a světlo:</strong> Jemné rozostření, Doostření, Záře a Vinětace. Každý filtr je jeden krok historie, takže ho klávesami <kbd>Ctrl</kbd>+<kbd>Z</kbd> hned vrátíte.",
+          p: "<strong>Barvy a nálada:</strong> Živé barvy, Vybledlé, Teplé, Studené, Vintage a Duotón, který fotku přebarví do dvou tónů podle hlavní a vedlejší barvy v panelu Barva. <strong>Černobílé a tónované:</strong> Odstíny šedi, Noir a Sépie. <strong>Grafické efekty:</strong> Inverze, Posterizace, Práh, Solarizace, Reliéf, Detekce hran, Kresba tužkou a Pixelizace. <strong>Ostrost a světlo:</strong> Jemné rozostření, Zaostření, Záře a Vinětace. Každý filtr je jeden krok historie, takže ho klávesami <kbd>Ctrl</kbd>+<kbd>Z</kbd> hned vrátíte.",
         },
         {
           h2: "Kombinování filtrů",
-          p: "Filtry se sčítají: každý další se použije na výsledek předchozího. Zkuste například kombinaci filtrů Teplé a Vinětace pro útulný podvečerní portrét, filtr Vybledlé s posuvníkem zrna v panelu Korekce pro vzhled staré fotky z alba, nebo dvojici Posterizace a Detekce hran pro komiksový efekt. Na pořadí záleží – Doostření použité před filtrem Pixelizace dá jiný výsledek než naopak. Když se kombinace nepovede, vraťte se o několik kroků zpět, historie si pamatuje až 60 kroků.",
+          p: "Filtry se sčítají: každý další se použije na výsledek předchozího. Zkuste například kombinaci filtrů Teplé a Vinětace pro útulný podvečerní portrét, filtr Vybledlé s posuvníkem zrna v panelu Korekce pro vzhled staré fotky z alba, nebo dvojici Posterizace a Detekce hran pro komiksový efekt. Na pořadí záleží – filtr Zaostření použitý před filtrem Pixelizace dá jiný výsledek než naopak. Když se kombinace nepovede, vraťte se o několik kroků zpět, historie si pamatuje až 60 kroků.",
         },
         {
           h2: "Filtr jen na část fotky",
-          p: "Pokud existuje výběr, filtr se použije jen uvnitř něj. Rozmažte tak pozadí filtrem Jemné rozostření, zatímco postava zůstane ostrá, nebo pixelizujte jen displej telefonu na fotce. Výběr vytvoříte nástroji Obdélníkový výběr, Eliptický výběr, Laso nebo Kouzelná hůlka a výběr můžete i invertovat, když je snazší označit to, co se měnit nemá. Okraj výběru změkčete, aby filtr do okolí přecházel plynule a nevznikla viditelná hrana.",
+          p: "Pokud existuje výběr, filtr se použije jen uvnitř něj. Rozmažte tak pozadí filtrem Jemné rozostření, zatímco postava zůstane ostrá, nebo pixelizujte jen displej telefonu na fotce. Výběr vytvoříte nástroji Obdélníkový výběr, Eliptický výběr, Laso nebo Kouzelná hůlka a výběr můžete i invertovat, když je snazší označit to, co se měnit nemá. Nastavte výběru prolnutí okraje, aby filtr do okolí přecházel plynule a nevznikla viditelná hrana.",
         },
       ],
       faq: [
@@ -741,7 +746,7 @@ export default {
         },
         {
           h2: "Barvy, teplota a rychlé předvolby",
-          p: "Fotky pod žárovkou bývají žluté, ve stínu za zataženého dne zase modré. Posuvník teploty to vyrovná, zelený nebo purpurový nádech od zářivek dorovná posuvník tónování. Sytost posílí všechny barvy, živost hlavně ty méně syté, takže pleť nezoranžoví. V nabídce Korekce najdete i rychlé předvolby pro automatický kontrast, oteplení, ochlazení a výraznější barvy – dobrý výchozí bod, který pak doladíte posuvníky. Všechny změny vidíte živě ještě před potvrzením.",
+          p: "Fotky pod žárovkou bývají žluté, ve stínu za zataženého dne zase modré. Posuvník Teplota to vyrovná, zelený nebo purpurový nádech od zářivek dorovná posuvník Nádech. Sytost posílí všechny barvy, živost hlavně ty méně syté, takže pleť nezoranžoví. V nabídce Korekce najdete i rychlé předvolby Automatický kontrast, Oteplit, Ochladit a Výrazné barvy – dobrý výchozí bod, který pak doladíte posuvníky. Všechny změny vidíte živě ještě před potvrzením.",
         },
       ],
       faq: [
@@ -751,7 +756,7 @@ export default {
         },
         {
           q: "Jak zesvětlit jen část fotky?",
-          a: "Označte oblast některým nástrojem výběru, nejlépe se změkčeným okrajem, a korekce se použijí jen uvnitř. Pro jemné malování světla je tu nástroj Zesvětlit / ztmavit: přejíždějte jím po místě, které chcete rozjasnit, a zvolte, zda má působit na stíny, střední tóny, nebo světla.",
+          a: "Označte oblast některým nástrojem výběru, nejlépe s prolnutím okraje, a korekce se použijí jen uvnitř. Pro jemné malování světla je tu nástroj Zesvětlit / ztmavit: přejíždějte jím po místě, které chcete rozjasnit, a zvolte, zda má působit na stíny, střední tóny, nebo světla.",
         },
         {
           q: "Zachráním úplně černou nebo přepálenou fotku?",
@@ -813,21 +818,21 @@ export default {
     "color-picker-from-image": {
       title: "Zjistit barvu z obrázku – HEX a RGB",
       description:
-        "Zjistěte barvu z obrázku nebo fotky: klikněte kamkoli a uvidíte kód HEX i RGB, který jedním kliknutím zkopírujete. Hodí se pro web, prezentace i grafiku.",
+        "Zjistěte barvu z obrázku nebo fotky: klikněte kamkoli a uvidíte kód HEX i hodnoty RGB. Kód HEX zkopírujete jedním kliknutím. Hodí se pro web i grafiku.",
       h1: "Zjistit barvu z obrázku",
       lead:
-        "Klikněte nástrojem Kapátko kamkoli do obrázku a hned uvidíte kód barvy ve formátu HEX i RGB. Tlačítkem pro kopírování ho přenesete do CSS, prezentace nebo jiného programu.",
+        "Klikněte nástrojem Kapátko kamkoli do obrázku a hned uvidíte kód barvy ve formátu HEX i hodnoty RGB. Tlačítkem Kopírovat HEX přenesete kód do CSS, prezentace nebo jiného programu.",
       card: "Barva z obrázku",
       cardText: "Kód HEX a RGB z libovolného pixelu",
       steps: [
         "Přetáhněte obrázek nebo snímek obrazovky sem.",
         "Nástrojem Kapátko klikněte nebo táhněte po místě s hledanou barvou.",
-        "Kód HEX nebo RGB zkopírujte tlačítkem v liště.",
+        "Kód HEX zkopírujte tlačítkem Kopírovat HEX v liště.",
       ],
       sections: [
         {
           h2: "HEX, nebo RGB?",
-          p: "Lišta nástroje Kapátko ukáže vybranou barvu ve dvou zápisech. <strong>HEX</strong>, třeba <code>#1E88E5</code>, je šestimístný kód, který se používá v CSS, webových editorech, prezentacích i v manuálech firemní identity. <strong>RGB</strong>, například <code>30, 136, 229</code>, udává podíl červené, zelené a modré složky v rozsahu 0–255 a hodí se pro programy, které chtějí jednotlivé složky zvlášť. Oba zápisy popisují stejnou barvu, takže vyberte ten, který po vás program chce.",
+          p: "Lišta nástroje Kapátko ukáže vybranou barvu ve dvou zápisech. <strong>HEX</strong>, třeba <code>#1E88E5</code>, je šestimístný kód, který se používá v CSS, webových editorech, prezentacích i v manuálech firemní identity. <strong>RGB</strong>, například <code>30, 136, 229</code>, udává podíl červené, zelené a modré složky v rozsahu 0–255 a hodí se pro programy, které chtějí jednotlivé složky zvlášť. Oba zápisy popisují stejnou barvu. Tlačítko Kopírovat HEX vloží do schránky kód HEX, hodnoty RGB si z lišty opíšete.",
         },
         {
           h2: "Jak trefit přesný pixel",
@@ -835,13 +840,13 @@ export default {
         },
         {
           h2: "Všechny vrstvy, nebo jen aktivní, a paleta barev",
-          p: "Kapátko umí brát barvu z výsledného obrazu všech vrstev, nebo jen z aktivní vrstvy – volbu najdete v jeho liště. Vybraná barva se zobrazí i v panelu Barva, takže s ní můžete hned malovat, psát text nebo vyplňovat plochy. Nasáté barvy se ukládají do řady naposledy použitých barev, a tak si z jedné fotky snadno poskládáte celou paletu, třeba pro web, pozvánku nebo prezentaci v barvách fotky.",
+          p: "Kapátko umí brát barvu z výsledného obrazu všech vrstev, nebo jen z aktivní vrstvy – volbu najdete v jeho liště. Vybraná barva se zobrazí i v panelu Barva, takže s ní můžete hned malovat, psát text nebo vyplňovat plochy. Nasáté barvy se ukládají do řady Nedávné, a tak si z jedné fotky snadno poskládáte celou paletu, třeba pro web, pozvánku nebo prezentaci v barvách fotky.",
         },
       ],
       faq: [
         {
           q: "Jak zjistit kód barvy z obrázku?",
-          a: "Otevřete obrázek na této stránce a editor rovnou zapne Kapátko. Klikněte na místo s hledanou barvou a v liště se zobrazí kód HEX i RGB. Tlačítkem pro kopírování ho vložíte do schránky a odtud kamkoli dál.",
+          a: "Otevřete obrázek na této stránce a editor rovnou zapne Kapátko. Klikněte na místo s hledanou barvou a v liště se zobrazí kód HEX i hodnoty RGB. Tlačítkem Kopírovat HEX vložíte kód do schránky a odtud kamkoli dál.",
         },
         {
           q: "Můžu zjistit barvu z webové stránky?",
@@ -872,11 +877,11 @@ export default {
       sections: [
         {
           h2: "Šipky a rámečky pro návody a reklamace",
-          p: "Snímek obrazovky s červenou šipkou vysvětlí víc než odstavec textu. Nástroj Šipka nakreslí rovnou šipku tažením, Obdélník se zaoblenými rohy nebo Elipsa zarámují tlačítko v aplikaci, chybu v dokumentu nebo poškození na fotce zboží pro reklamaci. Tvary kreslíte obrysem, výplní, nebo obojím. Pro přímé spojnice a kóty slouží Čára, Mnohoúhelník a Hvězda doplní další tvary. Barvu všech nástrojů nastavíte v panelu Barva.",
+          p: "Snímek obrazovky s červenou šipkou vysvětlí víc než odstavec textu. Nástroj Šipka nakreslí rovnou šipku tažením, Obdélník se zaoblenými rohy nebo Elipsa zarámují tlačítko v aplikaci, chybu v dokumentu nebo poškození na fotce zboží pro reklamaci. Tvary kreslíte obrysem, výplní, nebo obojím. Na rovné spojnice a kóty použijte nástroj Čára, další tvary nabízejí Mnohoúhelník a Hvězda. Barvu všech nástrojů nastavíte v panelu Barva.",
         },
         {
           h2: "Zvýrazňovač a ruční poznámky",
-          p: "Štětec s nastavitelnou velikostí, tvrdostí a vyhlazením tahu se hodí na ručně psané poznámky, podpisy i zakroužkování místa na mapě nebo plánku bytu. Efekt zvýrazňovače vytvoříte tak, že na novou vrstvu malujete žlutou barvou a vrstvě nastavíte režim prolnutí násobení a nižší krytí – text pod ní zůstane čitelný. Tužka kreslí ostré pixelové čáry, Sprej měkké stopy. Na tabletu s perem reaguje štětec na přítlak.",
+          p: "Štětec s nastavitelnou velikostí, tvrdostí a vyhlazením tahu se hodí na ručně psané poznámky, podpisy i zakroužkování místa na mapě nebo plánku bytu. Efekt zvýrazňovače vytvoříte tak, že na novou vrstvu malujete žlutou barvou a vrstvě nastavíte režim prolnutí Násobit a nižší krytí – text pod ní zůstane čitelný. Tužka kreslí ostré pixelové čáry, Sprej měkké stopy. Na tabletu s perem reaguje štětec na přítlak.",
         },
         {
           h2: "Proč kreslit na samostatnou vrstvu",
@@ -966,11 +971,11 @@ export default {
       sections: [
         {
           h2: "Co se z PSD načte",
-          p: "Editor otevře 8bitové soubory PSD v režimu RGB nebo ve stupních šedi. Načte pixelové vrstvy včetně jejich názvů, krytí, viditelnosti, režimů prolnutí a masek vrstev. Skupiny se rozbalí do obyčejného seznamu vrstev. Textové vrstvy, tvary a inteligentní objekty se načtou tak, jak byly vykreslené, tedy jako pixely – text uvidíte, ale už ho nepřepíšete. Pokud vrstvy přečíst nejde, otevře se aspoň sloučený obraz celého dokumentu.",
+          p: "Editor otevře soubory PSD v režimu RGB nebo ve stupních šedi s 8, 16 i 32 bity na kanál, včetně 16bitových a 32bitových vrstev a kanálů komprimovaných metodou ZIP. Načte pixelové vrstvy s jejich názvy, krytím, viditelností, režimy prolnutí a maskami vrstev; 16bitový a 32bitový dokument při otevření převede na 8 bitů na kanál. Ořezové masky se promítnou přímo do pixelů ořezaných vrstev a krytí výplně se započítá do krytí vrstvy, takže vrstvy vypadají stejně jako ve Photoshopu. Skupiny se rozbalí do obyčejného seznamu vrstev. Textové vrstvy, tvary a inteligentní objekty se načtou tak, jak byly vykreslené, tedy jako pixely – text uvidíte, ale už ho nepřepíšete.",
         },
         {
           h2: "Co se nepřenese",
-          p: "Vrstvy úprav (například křivky nebo odstín a sytost z Photoshopu) a efekty vrstev, jako je stín, tah nebo vnější záře, se nepoužijí, takže výsledek může vypadat jinak než v původním programu. Soubory s vrstvami komprimovanými metodou ZIP nebo v 16 a 32bitové hloubce se otevřou jen jako sloučený obrázek. Formát PSB pro velké dokumenty a barevné režimy CMYK a Lab editor nepodporuje, tiskové PSD v CMYK proto nejdřív převeďte do RGB.",
+          p: "Vrstvy úprav (například křivky nebo odstín a sytost z Photoshopu) a efekty vrstev, jako je stín, tah nebo vnější záře, se nepoužijí, takže výsledek může vypadat jinak než v původním programu. 16bitové i 32bitové soubory (HDR) se otevřou s vrstvami převedenými na 8 bitů na kanál; když vrstvy z nějakého důvodu přečíst nejde, editor otevře aspoň sloučený obraz. Formát PSB pro velké dokumenty ani barevné režimy CMYK, Lab, Indexované barvy, Bitová mapa a Duplex editor nepodporuje, tiskové PSD v CMYK proto nejdřív převeďte do RGB.",
         },
         {
           h2: "Úprava a export do PNG nebo JPG",

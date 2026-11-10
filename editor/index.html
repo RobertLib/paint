@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Paint Studio — Editor</title>
+    <script>
+      // pick the saved (or system) theme before the first paint — no dark flash
+      (function () {
+        var theme = null;
+        try {
+          theme = (JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null") || {}).theme;
+        } catch (e) {}
+        if (theme !== "light" && theme !== "dark") {
+          theme = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        }
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
     <meta
       name="description"
       content="The Paint Studio editor: layers, masks, selections, brushes, retouching, filters and photo adjustments — running locally in your browser."
@@ -220,10 +233,10 @@
 
             <div class="color-body">
               <div class="color-chips">
-                <button class="chip chip-primary is-active" id="primaryChip" data-tip="Primary color">
+                <button class="chip chip-primary is-active" id="primaryChip" data-tip="Primary color" aria-label="Primary color" aria-pressed="true">
                   <span class="chip-fill"></span>
                 </button>
-                <button class="chip chip-secondary" id="secondaryChip" data-tip="Secondary color">
+                <button class="chip chip-secondary" id="secondaryChip" data-tip="Secondary color" aria-label="Secondary color" aria-pressed="false">
                   <span class="chip-fill"></span>
                 </button>
                 <div class="chip-actions">
@@ -263,19 +276,19 @@
           </section>
 
           <div class="tabs" role="tablist">
-            <button class="tab is-active" data-tab="layers" role="tab">
+            <button class="tab is-active" data-tab="layers" role="tab" aria-selected="true" aria-controls="panel-layers" id="tab-layers">
               <svg class="icon"><use href="#i-layers" /></svg><span>Layers</span>
             </button>
-            <button class="tab" data-tab="adjust" role="tab">
+            <button class="tab" data-tab="adjust" role="tab" aria-selected="false" aria-controls="panel-adjust" id="tab-adjust">
               <svg class="icon"><use href="#i-sliders" /></svg><span>Adjust</span>
             </button>
-            <button class="tab" data-tab="filters" role="tab">
+            <button class="tab" data-tab="filters" role="tab" aria-selected="false" aria-controls="panel-filters" id="tab-filters">
               <svg class="icon"><use href="#i-sparkles" /></svg><span>Filters</span>
             </button>
           </div>
 
           <div class="tab-panels">
-            <section class="tab-panel is-active" data-panel="layers">
+            <section class="tab-panel is-active" data-panel="layers" role="tabpanel" id="panel-layers" aria-labelledby="tab-layers">
               <div class="layer-props">
                 <div class="prop-row">
                   <label for="layerBlend">Blend</label>
@@ -300,7 +313,7 @@
               </div>
             </section>
 
-            <section class="tab-panel" data-panel="adjust">
+            <section class="tab-panel" data-panel="adjust" role="tabpanel" id="panel-adjust" aria-labelledby="tab-adjust">
               <div class="adjust-list" id="adjustList"></div>
               <div class="panel-actions">
                 <button class="btn btn-ghost" id="adjustResetBtn">Reset</button>
@@ -309,7 +322,7 @@
               <p class="panel-hint">Adjustments preview live on the active layer and apply inside the selection when one exists.</p>
             </section>
 
-            <section class="tab-panel" data-panel="filters">
+            <section class="tab-panel" data-panel="filters" role="tabpanel" id="panel-filters" aria-labelledby="tab-filters">
               <div class="filter-grid" id="filterGrid"></div>
               <p class="panel-hint">Filters apply to the active layer — or to the selected area only.</p>
             </section>
@@ -337,6 +350,7 @@
         <p>A complete image editor in your browser. Layers, selections, retouching and filters — nothing ever leaves your device.</p>
       </div>
 
+      <div class="restore-list" id="restoreList"></div>
       <button class="restore-card" id="restoreCard" data-start="restore" hidden>
         <img alt="" hidden />
         <span class="restore-text">
@@ -396,7 +410,7 @@
       </div>
       <footer class="dialog-foot">
         <button class="btn btn-ghost" data-close>Cancel</button>
-        <button class="btn btn-primary" id="newDocCreate">Create</button>
+        <button class="btn btn-primary" id="newDocCreate" autofocus>Create</button>
       </footer>
     </dialog>
 
@@ -421,7 +435,7 @@
       </div>
       <footer class="dialog-foot">
         <button class="btn btn-ghost" data-close>Cancel</button>
-        <button class="btn btn-primary" id="resizeApply">Apply</button>
+        <button class="btn btn-primary" id="resizeApply" autofocus>Apply</button>
       </footer>
     </dialog>
 
@@ -458,7 +472,7 @@
       </div>
       <footer class="dialog-foot">
         <button class="btn btn-ghost" data-close>Cancel</button>
-        <button class="btn btn-primary" id="exportGo">
+        <button class="btn btn-primary" id="exportGo" autofocus>
           <svg class="icon"><use href="#i-download" /></svg><span>Download</span>
         </button>
       </footer>
@@ -547,10 +561,11 @@
       </div>
     </dialog>
 
-    <div class="toasts" id="toasts" aria-live="polite"></div>
+    <!-- popovers sit in the top layer, so messages show above open dialogs too -->
+    <div class="toasts" id="toasts" aria-live="polite" popover="manual"></div>
     <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
     <div class="menu-popover" id="menuPopover" hidden></div>
-    <div class="busy" id="busy" hidden><span class="spinner"></span><span id="busyLabel">Working…</span></div>
+    <div class="busy" id="busy" hidden popover="manual" role="status" aria-live="polite"><span class="spinner"></span><span id="busyLabel">Working…</span></div>
 
     <input type="file" id="imageInput" accept="image/*,.heic,.heif,.psd,.paint" hidden />
     <input type="file" id="projectInput" accept=".paint,application/json" hidden />

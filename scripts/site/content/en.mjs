@@ -4,10 +4,15 @@ export default {
   ui: {
     navEditor: "Open editor",
     navTools: "All tools",
+    navMain: "Main",
+    breadcrumbLabel: "Breadcrumb",
+    ogImageAlt: "Paint Studio — image editor in your browser. Layers, retouching, filters.",
     dropTitle: "Drop an image here",
     dropButton: "Choose image",
     dropHint: "or paste with Ctrl+V · PNG, JPG, WebP, HEIC, PSD…",
     dropBusy: "Opening the editor…",
+    dropUnsupported:
+      "This file can’t be opened here. Choose an image (PNG, JPG, WebP, HEIC…), a PSD file or a .paint project.",
     blankButton: "Start with a blank canvas",
     trust: ["Nothing is uploaded", "No sign-up", "No watermark"],
     stepsTitle: "How it works",
@@ -85,7 +90,7 @@ export default {
       },
       {
         q: "Which file formats can I open and save?",
-        a: "You can open PNG, JPEG, WebP, GIF (first frame only), SVG, BMP, AVIF when your browser decodes it, HEIC/HEIF and 8-bit PSD files, plus .paint projects. You can export PNG, JPEG and WebP, a layered PSD, or a .paint project that keeps layers for later editing.",
+        a: "You can open PNG, JPEG, WebP, GIF (first frame only), SVG, BMP, AVIF when your browser decodes it, HEIC/HEIF, 8-, 16- and 32-bit RGB or grayscale PSD files with their layers, plus .paint projects. You can export PNG, JPEG and WebP, a layered PSD, or a .paint project that keeps layers for later editing.",
       },
       {
         q: "How large can an image be?",
@@ -176,7 +181,7 @@ export default {
         },
         {
           h2: "Resizing while you export",
-          p: "The Export dialog has its own Scale slider from 10 to 400 %. Use it when you want to keep the full-resolution document for further editing but download a smaller copy — 50 % for a quick share, for example. The dialog shows the expected file size before you click Download, so you can check whether the image now fits an upload limit. If the limit is about file size rather than pixels, lowering the JPEG or WebP quality helps as well.",
+          p: "The Export dialog has its own Scale slider from 10 to 400%. Use it when you want to keep the full-resolution document for further editing but download a smaller copy — 50% for a quick share, for example. The dialog shows the expected file size before you click Download, so you can check whether the image now fits an upload limit. If the limit is about file size rather than pixels, lowering the JPEG or WebP quality helps as well.",
         },
       ],
       faq: [
@@ -264,7 +269,7 @@ export default {
       sections: [
         {
           h2: "Quality, scale and format: what shrinks a file most",
-          p: "Three controls decide the file size. <strong>Scale</strong> reduces the pixel dimensions and has by far the biggest effect: at 50 % only a quarter of the pixels remain, and the file shrinks accordingly. <strong>Quality</strong> controls how much detail JPEG and WebP discard; going from 100 down to around 80 typically saves a lot of space with little visible change. <strong>Format</strong> matters too — WebP usually produces smaller files than JPEG at similar quality. Start with scale if the image is larger than it will ever be displayed, then fine-tune quality.",
+          p: "Three controls decide the file size. <strong>Scale</strong> reduces the pixel dimensions and has by far the biggest effect: at 50% only a quarter of the pixels remain, and the file shrinks accordingly. <strong>Quality</strong> controls how much detail JPEG and WebP discard; going from 100 down to around 80 typically saves a lot of space with little visible change. <strong>Format</strong> matters too — WebP usually produces smaller files than JPEG at similar quality. Start with scale if the image is larger than it will ever be displayed, then fine-tune quality.",
         },
         {
           h2: "Settings that work for common limits",
@@ -316,7 +321,7 @@ export default {
         },
         {
           h2: "Formats you can open",
-          p: "Paint Studio reads PNG, JPEG, WebP, BMP and SVG, the first frame of a GIF, AVIF if your browser can decode it, iPhone HEIC/HEIF photos and 8-bit Photoshop PSD files with their layers. Drag the file onto the page, use the file picker, or paste an image copied from another app with <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd>. SVG drawings are turned into pixels when they open, so the result is a regular bitmap; there is no SVG export or vector editing. Animated GIFs come in as a single still image.",
+          p: "Paint Studio reads PNG, JPEG, WebP, BMP and SVG, the first frame of a GIF, AVIF if your browser can decode it, iPhone HEIC/HEIF photos and 8-, 16- or 32-bit Photoshop PSD files with their layers. Drag the file onto the page, use the file picker, or paste an image copied from another app with <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd>. SVG drawings are turned into pixels when they open, so the result is a regular bitmap; there is no SVG export or vector editing. Animated GIFs come in as a single still image.",
         },
         {
           h2: "What changes during conversion",
@@ -552,7 +557,7 @@ export default {
         },
         {
           h2: "Memes and watermarks",
-          p: "For the classic meme style, pick Impact, set a large size, center the alignment and use white text near the top and bottom edges. For a watermark, type your name or website in a small size, place it in a corner and set the opacity to around 30–50 % so it is visible without covering the picture. Export as JPEG for photos you share, or as PNG if the image consists mostly of text and flat graphics.",
+          p: "For the classic meme style, pick Impact, set a large size, center the alignment and use white text near the top and bottom edges. For a watermark, type your name or website in a small size, place it in a corner and set the opacity to around 30–50% so it is visible without covering the picture. Export as JPEG for photos you share, or as PNG if the image consists mostly of text and flat graphics.",
         },
       ],
       faq: [
@@ -807,20 +812,20 @@ export default {
     "color-picker-from-image": {
       title: "Color Picker from Image – HEX & RGB",
       description:
-        "Pick a color from any image online and get its HEX and RGB code in one click. Zoom in to single pixels, copy the value and reuse it. Free, no upload.",
+        "Pick a color from any image online and get its HEX and RGB values in one click. Zoom in to single pixels, copy the HEX code and reuse it. Free, no upload.",
       h1: "Color picker from image",
-      lead: "Find the exact color of any pixel in a photo, logo or screenshot. Click it with the Eyedropper and copy its HEX or RGB code.",
+      lead: "Find the exact color of any pixel in a photo, logo or screenshot. Click it with the Eyedropper to read its HEX and RGB values, and copy the HEX code with one click.",
       card: "Color picker",
       cardText: "Get HEX and RGB codes from any pixel",
       steps: [
         "Drop an image or paste a screenshot — the Eyedropper is ready.",
         "Click or drag over the image to sample a color.",
-        "Read the HEX and RGB value in the task bar and click Copy.",
+        "Read the HEX and RGB values in the task bar and click Copy HEX.",
       ],
       sections: [
         {
           h2: "Getting the exact color",
-          p: "Click anywhere to sample a pixel, or press and drag to watch the value change as you move across the image. The task bar shows the color as a HEX code (such as #1E88E5) and as RGB, with a Copy button that puts the value on your clipboard; the Color panel shows it as well. To hit a single pixel — a thin line, a small icon, one letter — zoom in with the scroll wheel or a pinch gesture. At up to 3200 % every pixel becomes a large square.",
+          p: "Click anywhere to sample a pixel, or press and drag to watch the value change as you move across the image. The task bar shows the color as a HEX code (such as #1E88E5) and as RGB values, with a Copy HEX button that puts the HEX code on your clipboard; the Color panel shows the color as well. To hit a single pixel — a thin line, a small icon, one letter — zoom in with the scroll wheel or a pinch gesture. At up to 3200% every pixel becomes a large square.",
         },
         {
           h2: "Photos, logos and screenshots",
@@ -834,7 +839,7 @@ export default {
       faq: [
         {
           q: "How do I get the HEX code of a color in an image?",
-          a: "Open the image, click the color with the Eyedropper and read the HEX value in the task bar. Click Copy to put it on your clipboard, then paste it into your design tool, CSS file or document.",
+          a: "Open the image, click the color with the Eyedropper and read the HEX value in the task bar. Click Copy HEX to put it on your clipboard, then paste it into your design tool, CSS file or document.",
         },
         {
           q: "Can I pick a color from a screenshot?",
@@ -868,7 +873,7 @@ export default {
         },
         {
           h2: "A highlighter effect",
-          p: "To mark text the way a highlighter pen does, choose a bright yellow, set the Brush or a solid Rectangle to low opacity — around 40 % — and set the layer’s blend mode to Multiply in the Layers panel. Multiply only darkens, so black text stays fully readable through the color instead of being covered. Keeping the highlights on their own layer lets you change their opacity or delete them later without touching the screenshot underneath.",
+          p: "To mark text the way a highlighter pen does, choose a bright yellow, set the Brush or a solid Rectangle to low opacity — around 40% — and set the layer’s blend mode to Multiply in the Layers panel. Multiply only darkens, so black text stays fully readable through the color instead of being covered. Keeping the highlights on their own layer lets you change their opacity or delete them later without touching the screenshot underneath.",
         },
         {
           h2: "Freehand drawing on photos",
@@ -916,7 +921,7 @@ export default {
         },
         {
           h2: "Painting on a tablet, Chromebook or phone",
-          p: "Everything runs in the browser, so Paint Studio works on school Chromebooks, iPads, Android tablets and phones as well as on computers. Pinch to zoom on a touch screen, and go up to 3200 % for detail work. Apple Pencil and other styluses give pressure-sensitive strokes where the browser supports them. It is simple enough for kids to doodle with and complete enough for adults to sketch and paint. Your work is autosaved in the browser, so an accidentally closed tab isn’t a disaster.",
+          p: "Everything runs in the browser, so Paint Studio works on school Chromebooks, iPads, Android tablets and phones as well as on computers. Pinch to zoom on a touch screen, and go up to 3200% for detail work. Apple Pencil and other styluses give pressure-sensitive strokes where the browser supports them. It is simple enough for kids to doodle with and complete enough for adults to sketch and paint. Your work is autosaved in the browser, so an accidentally closed tab isn’t a disaster.",
         },
       ],
       faq: [
@@ -956,11 +961,11 @@ export default {
       sections: [
         {
           h2: "What is imported from a PSD",
-          p: "Paint Studio reads 8-bit RGB and grayscale PSD files with their pixel layers, layer names, opacity, visibility, blend modes and layer masks. Layer groups are flattened into a plain list, so every layer is still there, just without the folder structure. Text, shape and smart-object layers come in as their rendered pixels: they look right, but the text can’t be retyped and vectors can’t be edited. Adjustment layers and layer effects such as drop shadows or strokes are not applied, so a design that relies on them may look different.",
+          p: "Paint Studio reads 8-, 16- and 32-bit RGB and grayscale PSD files with their pixel layers, layer names, opacity, visibility, blend modes and layer masks, including the separate 16/32-bit layer data Photoshop writes and ZIP-compressed channels; deeper documents are converted to 8 bits per channel as they open. Clipping masks are baked into the pixels of the clipped layers and fill opacity is folded into each layer’s opacity, so those layers look as they did in Photoshop. Layer groups are flattened into a plain list, so every layer is still there, just without the folder structure. Text, shape and smart-object layers come in as their rendered pixels: they look right, but the text can’t be retyped and vectors can’t be edited. Adjustment layers and layer effects such as drop shadows or strokes are not applied, so a design that relies on them may look different.",
         },
         {
-          h2: "When layers can’t be read",
-          p: "Some PSD files store their layers in ways Paint Studio can’t decode, for example ZIP-compressed layer data or 16- and 32-bit color depth. In that case the editor opens the flattened composite image instead, so you can still view, crop, convert or retouch the picture — just as a single layer. PSB (the large document format), CMYK and Lab files are not supported; convert them to 8-bit RGB in the original program first if you need to open them here.",
+          h2: "16- and 32-bit files, and unsupported modes",
+          p: "16- and 32-bit (HDR) files open with their layers, converted to 8 bits per channel — 32-bit images from linear light to ordinary sRGB. If a file’s layer data can’t be read, the editor opens its flattened composite instead, so you can still view, crop, convert or retouch the picture as a single layer. PSB (the large document format) and files in CMYK, Lab, Indexed Color, Bitmap or Duotone mode are not supported; convert them to RGB in the original program first (Image › Mode in Photoshop) and save a PSD to open it here with its layers.",
         },
         {
           h2: "Exporting and saving back to PSD",
@@ -974,7 +979,7 @@ export default {
         },
         {
           q: "Why does my PSD look different from Photoshop?",
-          a: "Most likely the file uses adjustment layers or layer effects such as shadows, glows or strokes, which are not applied. Text and smart objects are shown as their saved pixels. If the layer data can’t be read, you see the flattened composite as a single layer instead.",
+          a: "Most likely the file uses adjustment layers or layer effects such as shadows, glows or strokes, which are not applied. Text and smart objects are shown as their saved pixels. A file whose layer data can’t be read opens as the flattened composite in a single layer instead.",
         },
         {
           q: "Can I edit the text in a PSD?",
@@ -982,7 +987,7 @@ export default {
         },
         {
           q: "Does it open PSB or CMYK files?",
-          a: "No. PSB, CMYK and Lab files are not supported, and 16- or 32-bit files open only as the flattened composite. Save a copy as an 8-bit RGB PSD in the original application to open it here with its layers.",
+          a: "No. PSB files and PSDs in CMYK, Lab, Indexed Color, Bitmap or Duotone mode are not supported. Save a copy in RGB (or grayscale) with 8, 16 or 32 bits per channel in the original application to open it here with its layers.",
         },
       ],
     },
@@ -1026,7 +1031,7 @@ export default {
         },
         {
           q: "How do I remove dust spots from a scanned photo?",
-          a: "Zoom in to around 100 % and work across the image section by section. Click or paint each spot with Spot healing, using a size just larger than the speck. For scratches, paint along them in short strokes.",
+          a: "Zoom in to around 100% and work across the image section by section. Click or paint each spot with Spot healing, using a size just larger than the speck. For scratches, paint along them in short strokes.",
         },
         {
           q: "Are my portraits uploaded for retouching?",

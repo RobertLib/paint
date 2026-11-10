@@ -130,7 +130,7 @@ export default {
   "Unlock layer": "Odemknout vrstvu",
   "Toggle visibility": "Přepnout viditelnost",
   "Toggle lock": "Přepnout zámek",
-  Reset: "Obnovit",
+  Reset: "Vynulovat",
   Apply: "Použít",
   "Apply {name}": "Použít {name}",
   "Adjustments preview live on the active layer and apply inside the selection when one exists.":
@@ -356,7 +356,11 @@ export default {
   "Writing PSD…": "Ukládám PSD…",
   "Opened the flattened PSD image — its layer data could not be read":
     "Otevřen sloučený obraz PSD – vrstvy se nepodařilo načíst",
-  "Opened PSD with {n} layers": "Otevřeno PSD s {n} vrstvami",
+  "Opened PSD with {n} layers": {
+    one: "Otevřeno PSD s 1 vrstvou",
+    few: "Otevřeno PSD se {n} vrstvami",
+    many: "Otevřeno PSD s {n} vrstvami",
+  },
   "Could not read that PSD file: {msg}": "Soubor PSD se nepodařilo načíst: {msg}",
   "Not a Photoshop file": "Nejde o soubor Photoshopu",
   "PSB (large document) files are not supported": "Soubory PSB (velké dokumenty) nejsou podporované",
@@ -536,4 +540,48 @@ export default {
   "Paint on the photo — a new layer keeps drawings separate":
     "Malujte do fotky – nová vrstva udrží kresbu zvlášť",
   "The PSD layers are in the Layers panel": "Vrstvy z PSD najdete v panelu Vrstvy",
+
+  /* --- review fixes --- */
+  "Gradient type": "Typ přechodu",
+  "The PSD was too large for this device — scaled down to {w} × {h}":
+    "PSD bylo pro toto zařízení příliš velké – zmenšeno na {w} × {h}",
+  "Adjustment layers can't be edited here and were left out ({n})":
+    "Vrstvy úprav zde nelze upravovat, a proto byly vynechány ({n})",
+  "The file could not be read": "Soubor se nepodařilo přečíst",
+  "The image was too large for this device — scaled down from {iw} × {ih} to {w} × {h}":
+    "Obrázek byl pro toto zařízení příliš velký – zmenšen z {iw} × {ih} na {w} × {h}",
+  "This browser can't encode {fmt} — choose PNG or JPEG":
+    "Tento prohlížeč neumí uložit {fmt} – zvolte PNG nebo JPEG",
+  "The project could not be saved — the document may be too large":
+    "Projekt se nepodařilo uložit – dokument je možná příliš velký",
+  "Opening project…": "Otevírám projekt…",
+  "The project was too large for this device — scaled down to {w} × {h}":
+    "Projekt byl pro toto zařízení příliš velký – zmenšen na {w} × {h}",
+  "The layer below is locked": "Vrstva pod ní je zamčená",
+  "That is larger than this device supports — using {w} × {h}":
+    "Takovou velikost toto zařízení nezvládne – použije se {w} × {h}",
+  "Restoring…": "Obnovuji…",
+  "That session is no longer available": "Tato relace už není k dispozici",
+  "An earlier session": "Starší relace",
+  "There is no other saved session": "Žádná jiná uložená relace není",
+  "Your earlier work “{name}” is kept": "Vaše předchozí práce „{name}“ zůstala uložená",
+  Show: "Zobrazit",
+  "Restore previous session…": "Obnovit předchozí relaci…",
+  "This document could not be kept for the reload (it may be too large). Switch the language anyway and lose it?":
+    "Dokument se pro znovunačtení nepodařilo uložit (možná je příliš velký). Přesto přepnout jazyk a dokument ztratit?",
+  "{w} × {h} px — this size can't be exported here": "{w} × {h} px – tuto velikost zde nelze exportovat",
+  "Close the dialog first, then drop the file again": "Nejdřív zavřete dialog a pak soubor přetáhněte znovu",
+  "Select what to hide first": "Nejdřív vyberte, co chcete skrýt",
+  "4:3": "4:3",
+  "3:4": "3:4",
+  "16:9": "16:9",
+  "9:16": "9:16",
+  "3:2": "3:2",
+  "This layer is hidden — show it to paint on it": "Vrstva je skrytá – pro kreslení ji nejdřív zobrazte",
+  "Saturation and brightness": "Sytost a jas",
+  "Layer name": "Název vrstvy",
+  "Paint Studio — Editor": "Paint Studio – editor",
+  "This PSD file is damaged": "Soubor PSD je poškozený",
+  "Only 8-, 16- and 32-bit PSD files are supported": "Podporované jsou jen 8bitové, 16bitové a 32bitové PSD",
+  "Linear dodge (add)": "Lineární zesvětlení (přidat)",
 };

@@ -5,7 +5,7 @@
 import * as A from "./actions.js";
 import { clamp } from "./color.js";
 import { history } from "./history.js";
-import { LANGS, lang, saveLang, t } from "./i18n.js";
+import { LANGS, lang, platformKeys, saveLang, t } from "./i18n.js";
 import { overlay, requestRender } from "./render.js";
 import { emit, on, opt, setOpt, setTheme, setTool, state, swapColors } from "./state.js";
 import { openCurves, openLevels } from "./tone.js";
@@ -28,6 +28,15 @@ const SIZE_PRESETS = [
 /** Landing pages live one level up; the Czech ones under /cs/. */
 export const SITE_HOME = lang === "cs" ? "../cs/" : "../";
 
+/**
+ * Browsers keep Ctrl/⌘+N and Ctrl/⌘+Shift+N for new windows — a page never
+ * sees them. An installed app window does, so the app offers both: ⌘N there,
+ * ⌥N (which always works) in a browser tab.
+ */
+const STANDALONE = window.matchMedia?.("(display-mode: standalone)").matches ?? false;
+const KEY_NEW = STANDALONE ? `${MOD}N` : "⌥N";
+const KEY_NEW_LAYER = STANDALONE ? `⇧${MOD}N` : "⇧⌥N";
+
 /* ================================== menus ================================= */
 
 function startTransform() {
@@ -40,9 +49,10 @@ const MENUS = [
   {
     name: t("File"),
     items: () => [
-      { label: t("New…"), keys: `${MOD}N`, icon: "i-file", run: openNewDialog },
+      { label: t("New…"), keys: KEY_NEW, icon: "i-file", run: openNewDialog },
       { label: t("Open image…"), keys: `${MOD}O`, icon: "i-image", run: () => $("#imageInput").click() },
       { label: t("Open project…"), icon: "i-folder", run: () => $("#projectInput").click() },
+      { label: t("Restore previous session…"), icon: "i-undo", run: () => emit("show-sessions") },
       { divider: true },
       { label: t("Save project"), keys: `${MOD}S`, icon: "i-save", run: A.saveProject, enabled: !!state.doc },
       { label: t("Export image…"), keys: `⇧${MOD}E`, icon: "i-download", run: openExportDialog, enabled: !!state.doc },
@@ -64,7 +74,7 @@ const MENUS = [
       { label: t("Invert selection"), keys: `⇧${MOD}I`, run: A.invertSelection, enabled: !!state.doc?.selection },
       { divider: true },
       { label: t("Fill with primary"), keys: "⌥⌫", icon: "i-bucket", run: () => A.fillSelection("primary"), enabled: !!state.doc },
-      { label: t("Delete selected pixels"), keys: "⌫", icon: "i-trash", run: A.clearSelectionPixels, enabled: !!state.doc },
+      { label: t("Delete selected pixels"), keys: "⌫", icon: "i-trash", run: A.clearSelectionPixels, enabled: !!state.doc?.selection },
       { label: t("Selection to new layer"), keys: `⇧${MOD}J`, icon: "i-layers", run: A.duplicateSelectionToLayer, enabled: !!state.doc?.selection },
     ],
   },
@@ -90,7 +100,7 @@ const MENUS = [
       const layer = state.doc?.active;
       const hasMask = !!layer?.mask;
       return [
-        { label: t("New layer"), keys: `⇧${MOD}N`, icon: "i-plus", run: A.addLayer, enabled: !!state.doc },
+        { label: t("New layer"), keys: KEY_NEW_LAYER, icon: "i-plus", run: A.addLayer, enabled: !!state.doc },
         { label: t("Duplicate layer"), keys: `${MOD}J`, icon: "i-copy", run: A.duplicateLayer, enabled: !!state.doc },
         { label: t("Delete layer"), icon: "i-trash", run: () => A.deleteLayer(), enabled: (state.doc?.layers.length || 0) > 1 },
         { divider: true },
@@ -101,7 +111,7 @@ const MENUS = [
         { label: t("Apply mask"), run: A.applyLayerMask, enabled: hasMask },
         { label: t("Delete mask"), run: A.deleteMask, enabled: hasMask },
         { divider: true },
-        { label: t("Merge down"), keys: `${MOD}E`, icon: "i-merge", run: A.mergeDown, enabled: (state.doc?.activeIndex || 0) > 0 },
+        { label: t("Merge down"), keys: `${MOD}E`, icon: "i-merge", run: A.mergeDown, enabled: (state.doc?.activeIndex || 0) > 0 && !state.doc?.layers[state.doc.activeIndex - 1]?.locked },
         { label: t("Flatten image"), icon: "i-layers", run: A.flattenImage, enabled: (state.doc?.layers.length || 0) > 1 },
         { divider: true },
         { label: t("Bring forward"), run: () => A.raiseLayer(1), enabled: !!state.doc },
@@ -141,7 +151,7 @@ const MENUS = [
       {
         label: t("Toggle panels"),
         icon: "i-panel",
-        run: () => $(".workspace").classList.toggle("side-collapsed"),
+        run: togglePanels,
       },
       { divider: true },
       ...LANGS.map(([code, name]) => ({
@@ -168,19 +178,32 @@ const MENUS = [
 /** Reload in another language; the autosave brings the document back. */
 async function switchLanguage(code) {
   if (code === lang) return;
+  let saved = true;
+  if (state.doc) {
+    const { flushAutosave } = await import("./autosave.js");
+    saved = await flushAutosave();
+    if (
+      !saved &&
+      !window.confirm(
+        t("This document could not be kept for the reload (it may be too large). Switch the language anyway and lose it?")
+      )
+    ) {
+      return;
+    }
+  }
   saveLang(code);
-  emit("flush-autosave");
-  const { flushAutosave } = await import("./autosave.js");
-  await flushAutosave();
   const url = new URL(location.href);
   url.searchParams.set("lang", code);
-  if (state.doc) url.searchParams.set("restore", "1");
+  if (state.doc && saved) url.searchParams.set("restore", "1");
+  else url.searchParams.delete("restore");
   url.searchParams.delete("task");
+  // the document is safe in the autosave: no "leave page?" prompt
+  state.dirty = false;
   location.href = url.toString();
 }
 
 function quickAdjust(values) {
-  A.previewAdjustments(values);
+  if (!A.previewAdjustments(values)) return;
   emit("adjust", A.adjustValues);
   openTab("adjust");
   A.commitAdjustments();
@@ -213,7 +236,7 @@ function buildMenubar() {
               item.enabled === false ? " disabled" : ""
             }>${item.icon ? icon(item.icon) : `<span class="icon"></span>`}
                <span>${item.label}</span>
-               ${item.keys ? `<span class="keys">${item.keys}</span>` : ""}
+               ${item.keys ? `<span class="keys">${platformKeys(item.keys)}</span>` : ""}
              </button>`
       )
       .join("");
@@ -252,7 +275,11 @@ function buildMenubar() {
     if (!e.target.closest("#menuPopover") && !e.target.closest("#menubar")) close();
   });
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") close();
+    // Escape closes the menu — and only the menu, not the selection under it
+    if (e.key === "Escape" && openIndex !== null) {
+      close();
+      e.stopImmediatePropagation();
+    }
   });
 
   // tasks can open a menu programmatically
@@ -264,15 +291,35 @@ function buildMenubar() {
 
 /* ================================= dialogs ================================ */
 
-export function wireDialog(dialog) {
+export function wireDialog(dialog, { canClose = () => true } = {}) {
   $$("[data-close]", dialog).forEach((btn) =>
     btn.addEventListener("click", () => dialog.close())
   );
+  // a click on the backdrop closes — but only one that started there too:
+  // releasing a slider or a text selection outside the box is not a click
+  // on the backdrop
+  let downOutside = false;
+  const outside = (e) => {
+    if (e.target !== dialog) return false;
+    const r = dialog.getBoundingClientRect();
+    return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+  };
+  dialog.addEventListener("pointerdown", (e) => {
+    downOutside = outside(e);
+  });
   dialog.addEventListener("click", (e) => {
-    // click on the backdrop area closes
-    if (e.target === dialog) dialog.close();
+    if (downOutside && outside(e) && canClose()) dialog.close();
+    downOutside = false;
   });
 }
+
+/**
+ * True while a modal dialog covers the document: any dialog — the welcome
+ * screen too once it is shown over a document (Restore previous session…).
+ */
+export const modalOpen = () =>
+  !!document.querySelector("dialog[open]:not(#welcomeDialog)") ||
+  (!!state.doc && !!document.getElementById("welcomeDialog")?.open);
 
 /* --- new document --- */
 
@@ -380,7 +427,7 @@ function initResizeDialog() {
   $("#resizeApply").addEventListener("click", () => {
     const width = Number(w.value);
     const height = Number(h.value);
-    if (!width || !height) return;
+    if (!(width > 0) || !(height > 0)) return;
     if (width > A.MAX_DIM || height > A.MAX_DIM) {
       emit("toast", { msg: t("The largest supported size is 8000 × 8000 px"), kind: "info" });
     }
@@ -445,14 +492,21 @@ function initExportDialog() {
     refreshExportPreview();
   });
 
-  $("#exportGo").addEventListener("click", async () => {
-    await A.exportImage({
-      format: exportFormat,
-      quality: Number($("#exportQuality").value) / 100,
-      scale: Number($("#exportScale").value) / 100,
-      name: $("#exportName").value,
-    });
-    dialog.close();
+  $("#exportGo").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try {
+      const ok = await A.exportImage({
+        format: exportFormat,
+        quality: Number($("#exportQuality").value) / 100,
+        scale: Number($("#exportScale").value) / 100,
+        name: $("#exportName").value,
+      });
+      if (ok) dialog.close();
+    } finally {
+      btn.disabled = false;
+    }
   });
 }
 
@@ -461,12 +515,13 @@ const formatSize = (bytes) => {
   return kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`;
 };
 
+let estimateId = 0;
+
 function refreshExportPreview() {
   const doc = state.doc;
   if (!doc) return;
   const scale = exportFormat === "psd" ? 1 : Number($("#exportScale").value) / 100;
-  const w = Math.max(1, Math.round(doc.width * scale));
-  const h = Math.max(1, Math.round(doc.height * scale));
+  const { w, h } = exportFormat === "psd" ? { w: doc.width, h: doc.height } : A.exportSize(scale);
 
   const preview = $("#exportPreview");
   const box = 320;
@@ -484,18 +539,29 @@ function refreshExportPreview() {
   $("#exportInfo").textContent = t("{w} × {h} px — calculating size…", { w, h });
   clearTimeout(sizeTimer);
   const format = exportFormat;
+  // only the newest estimate may write the line (an old one can finish last)
+  const id = ++estimateId;
   sizeTimer = setTimeout(async () => {
-    const blob = await A.exportBlob({
-      format,
-      quality: Number($("#exportQuality").value) / 100,
-      scale,
-    });
-    if (format !== exportFormat) return;
-    $("#exportInfo").textContent = t("{w} × {h} px — about {size}", {
-      w,
-      h,
-      size: blob ? formatSize(blob.size) : "?",
-    });
+    let blob = null;
+    try {
+      blob = await A.exportBlob({
+        format,
+        quality: Number($("#exportQuality").value) / 100,
+        scale,
+      });
+    } catch (err) {
+      console.error(err);
+    }
+    if (id !== estimateId) return;
+    if (blob && !A.encodedAs(blob, format)) {
+      $("#exportInfo").textContent = t("This browser can't encode {fmt} — choose PNG or JPEG", {
+        fmt: format.replace("image/", "").toUpperCase(),
+      });
+      return;
+    }
+    $("#exportInfo").textContent = blob
+      ? t("{w} × {h} px — about {size}", { w, h, size: formatSize(blob.size) })
+      : t("{w} × {h} px — this size can't be exported here", { w, h });
   }, 260);
 }
 
@@ -505,7 +571,7 @@ const SHORTCUT_GROUPS = [
   {
     title: t("File"),
     rows: [
-      [t("New document"), `${MOD} N`],
+      [t("New document"), KEY_NEW],
       [t("Open image"), `${MOD} O`],
       [t("Save project"), `${MOD} S`],
       [t("Export image"), `⇧ ${MOD} E`],
@@ -527,7 +593,7 @@ const SHORTCUT_GROUPS = [
   {
     title: t("Layers"),
     rows: [
-      [t("New layer"), `⇧ ${MOD} N`],
+      [t("New layer"), KEY_NEW_LAYER],
       [t("Duplicate layer"), `${MOD} J`],
       [t("Merge down"), `${MOD} E`],
       [t("Levels / Curves"), `${MOD} L · ${MOD} M`],
@@ -573,7 +639,7 @@ function openShortcuts() {
         ${g.rows
           .map(
             ([label, keys]) =>
-              `<div class="shortcut-row"><span>${label}</span><kbd>${keys}</kbd></div>`
+              `<div class="shortcut-row"><span>${label}</span><kbd>${platformKeys(keys)}</kbd></div>`
           )
           .join("")}
       </div>`
@@ -586,11 +652,16 @@ function openShortcuts() {
 
 function initWelcome() {
   const dialog = $("#welcomeDialog");
-  wireDialog(dialog);
+  // there is nothing behind the welcome screen until a document exists
+  wireDialog(dialog, { canClose: () => !!state.doc });
 
   dialog.addEventListener("cancel", (e) => {
-    // there is nothing behind the welcome screen until a document exists
     if (!state.doc) e.preventDefault();
+  });
+  // browsers may close a modal on a repeated Esc regardless of
+  // preventDefault(); without a document it simply comes back
+  dialog.addEventListener("close", () => {
+    if (!state.doc) setTimeout(() => !state.doc && !dialog.open && dialog.showModal(), 0);
   });
 
   presetChips($("#welcomePresets"), (w, h) => {
@@ -606,7 +677,7 @@ function initWelcome() {
     else if (kind === "open") $("#imageInput").click();
     else if (kind === "project") $("#projectInput").click();
     else if (kind === "paste") A.pasteFromClipboard();
-    else if (kind === "restore") emit("restore-autosave");
+    else if (kind === "restore") emit("restore-autosave", card.dataset.slot);
   });
 
   $("#welcomeAbout").setAttribute("href", SITE_HOME);
@@ -620,6 +691,12 @@ function initWelcome() {
 export function showWelcome() {
   const dialog = $("#welcomeDialog");
   if (!state.doc && !dialog.open) dialog.showModal();
+}
+
+/** The welcome screen on request (to pick a stored session), document or not. */
+export function showWelcomeDialog() {
+  const dialog = $("#welcomeDialog");
+  if (!dialog.open) dialog.showModal();
 }
 
 /* ================================ file input ============================== */
@@ -660,9 +737,14 @@ function initDragDrop() {
     e.preventDefault();
     depth = 0;
     show(false);
+    // a dialog (Levels, Export…) is working on the current document
+    if (modalOpen()) {
+      emit("toast", { msg: t("Close the dialog first, then drop the file again"), kind: "info" });
+      return;
+    }
     const files = [...(e.dataTransfer?.files || [])];
     if (!files.length) return;
-    const project = files.find((f) => f.name.endsWith(".paint"));
+    const project = files.find((f) => f.name.toLowerCase().endsWith(".paint"));
     if (project) {
       await A.openProjectFile(project);
       return;
@@ -672,7 +754,12 @@ function initDragDrop() {
       await A.openImageFile(psd);
       return;
     }
-    for (const file of files.filter(A.isOpenable)) {
+    const images = files.filter(A.isOpenable);
+    if (!images.length) {
+      emit("toast", { msg: t("That file is not an image"), kind: "err" });
+      return;
+    }
+    for (const file of images) {
       await A.openImageFile(file, { asLayer: !!state.doc });
     }
   });
@@ -681,7 +768,7 @@ function initDragDrop() {
 
 function initPaste() {
   document.addEventListener("paste", async (e) => {
-    if (isTypingTarget(e.target)) return;
+    if (isTypingTarget(e.target) || modalOpen()) return;
     const items = [...(e.clipboardData?.items || [])];
     const image = items.find((i) => i.type.startsWith("image/"));
     if (!image) return;
@@ -693,6 +780,23 @@ function initPaste() {
 
 /* =============================== shortcuts ================================ */
 
+/**
+ * Keys by position where layouts disagree: on a Czech keyboard the digit row
+ * types +ěščřžýáíé and [ ] need AltGr, so e.key alone would break Ctrl+0,
+ * Ctrl+1 and the brush-size keys there.
+ */
+function physicalKey(e) {
+  const c = e.code || "";
+  if (/^Digit\d$/.test(c)) return c.slice(5);
+  if (/^Numpad\d$/.test(c)) return c.slice(6);
+  if (c === "Equal" || c === "NumpadAdd") return "+";
+  if (c === "Minus" || c === "NumpadSubtract") return "-";
+  if (c === "BracketLeft") return "[";
+  if (c === "BracketRight") return "]";
+  if (/^Key[A-Z]$/.test(c)) return c.slice(3).toLowerCase();
+  return null;
+}
+
 function initShortcuts() {
   const toolByKey = new Map(
     TOOL_LIST.filter((tool) => tool.shortcut).map((tool) => [tool.shortcut, tool.id])
@@ -700,18 +804,34 @@ function initShortcuts() {
 
   window.addEventListener("keydown", (e) => {
     if (isTypingTarget(e.target)) return;
-    if (document.querySelector("dialog[open]:not(#welcomeDialog)")) return;
-    const mod = e.metaKey || e.ctrlKey;
+    if (modalOpen()) return;
+    // AltGr arrives as Ctrl+Alt on Windows: it types characters, not commands
+    const altGraph = e.getModifierState?.("AltGraph");
+    const mod = (e.metaKey || e.ctrlKey) && !altGraph;
     const key = e.key.toLowerCase();
+    const phys = physicalKey(e);
+    // letters follow the layout (Z/Y swap on QWERTZ), everything else the key
+    const letter = key.length === 1 && /\p{L}/u.test(key) && /^[a-z]$/.test(key) ? key : phys;
+    // holding a command key must not fire it again and again
+    const once = () => !e.repeat;
 
     if (mod) {
       // ⌥⌘T on a Mac reports "†" as the key; match the physical key instead
       if (e.altKey && e.code === "KeyT") {
         e.preventDefault();
-        startTransform();
+        if (once()) startTransform();
         return;
       }
-      switch (key) {
+      // zoom by position: Ctrl+0 / Ctrl+1 / Ctrl+ +/− on any layout
+      if (phys === "0" || phys === "1" || phys === "+" || phys === "-" || key === "+" || key === "=" || key === "-") {
+        e.preventDefault();
+        if (phys === "0") view.fit();
+        else if (phys === "1") view.actualSize();
+        else if (phys === "+" || key === "+" || key === "=") view.zoomStep(1);
+        else view.zoomStep(-1);
+        return;
+      }
+      switch (letter) {
         case "z":
           e.preventDefault();
           e.shiftKey ? A.redo() : A.undo();
@@ -721,71 +841,72 @@ function initShortcuts() {
           A.redo();
           return;
         case "n":
+          // only reaches the page in an installed app window
           e.preventDefault();
-          e.shiftKey ? A.addLayer() : openNewDialog();
+          if (once()) e.shiftKey ? A.addLayer() : openNewDialog();
           return;
         case "o":
           e.preventDefault();
-          $("#imageInput").click();
+          if (once()) $("#imageInput").click();
           return;
         case "s":
           e.preventDefault();
-          A.saveProject();
+          if (once()) A.saveProject();
           return;
         case "e":
           e.preventDefault();
-          e.shiftKey ? openExportDialog() : A.mergeDown();
+          if (once()) e.shiftKey ? openExportDialog() : A.mergeDown();
           return;
         case "j":
           e.preventDefault();
-          e.shiftKey ? A.duplicateSelectionToLayer() : A.duplicateLayer();
+          if (once()) e.shiftKey ? A.duplicateSelectionToLayer() : A.duplicateLayer();
           return;
         case "a":
           e.preventDefault();
-          A.selectAll();
+          if (once()) A.selectAll();
           return;
         case "d":
           e.preventDefault();
-          A.deselect();
+          if (once()) A.deselect();
           return;
         case "i":
           if (e.shiftKey) {
             e.preventDefault();
-            A.invertSelection();
+            if (once()) A.invertSelection();
           }
           return;
         case "l":
           e.preventDefault();
-          openLevels();
+          if (once()) openLevels();
           return;
         case "m":
           e.preventDefault();
-          openCurves();
+          if (once()) openCurves();
           return;
         case "c":
           e.preventDefault();
-          A.copyToClipboard();
-          return;
-        case "0":
-          e.preventDefault();
-          view.fit();
-          return;
-        case "1":
-          e.preventDefault();
-          view.actualSize();
-          return;
-        case "=":
-        case "+":
-          e.preventDefault();
-          view.zoomStep(1);
-          return;
-        case "-":
-          e.preventDefault();
-          view.zoomStep(-1);
+          if (once()) A.copyToClipboard();
           return;
         default:
           return;
       }
+    }
+
+    // a stroke in progress: Escape abandons it, everything else waits
+    if (state.dragging) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        emit("abort-gesture");
+        requestRender();
+      }
+      return;
+    }
+
+    // ⌥N / ⇧⌥N: New… and New layer in a browser tab (see KEY_NEW)
+    if (e.altKey && !altGraph && e.code === "KeyN") {
+      e.preventDefault();
+      if (once()) e.shiftKey ? A.addLayer() : openNewDialog();
+      return;
     }
 
     if (e.key === "Escape") {
@@ -814,39 +935,53 @@ function initShortcuts() {
 
     if (e.key === "Backspace" || e.key === "Delete") {
       e.preventDefault();
+      if (!once()) return;
       if (e.altKey) A.fillSelection("primary");
       else A.clearSelectionPixels();
       return;
     }
 
-    if (key === "[" || key === "]") {
+    const bracket = key === "[" || key === "]" ? key : phys === "[" || phys === "]" ? phys : null;
+    if (bracket) {
       const current = opt("size");
       if (typeof current !== "number") return;
+      // stay inside the tool's own range (pencil 1–64, text 6–400…)
+      const spec = TOOLS[state.tool]?.opts?.find((o) => o.key === "size");
       const step = Math.max(1, Math.round(current * 0.15));
-      setOpt("size", clamp(current + (key === "]" ? step : -step), 1, 400));
+      setOpt(
+        "size",
+        clamp(current + (bracket === "]" ? step : -step), spec?.min ?? 1, spec?.max ?? 400)
+      );
       emit("tool", { tool: state.tool });
       return;
     }
 
-    if (key === "x") {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+
+    if (letter === "x") {
       swapColors();
       return;
     }
-    if (key === "?" || (e.shiftKey && key === "/")) {
+    if (key === "?" || (e.shiftKey && (key === "/" || e.code === "Slash"))) {
       openShortcuts();
       return;
     }
-    if (key === "f" && e.shiftKey) {
-      $(".workspace").classList.toggle("side-collapsed");
+    if (letter === "f" && e.shiftKey) {
+      togglePanels();
       return;
     }
 
-    const toolId = toolByKey.get(key);
-    if (toolId) {
+    const toolId = toolByKey.get(letter);
+    if (toolId && !e.shiftKey) {
       setTool(toolId);
       e.preventDefault();
     }
   });
+}
+
+/** Hide or show the side panels (desktop) — the menu item and Shift+F. */
+export function togglePanels() {
+  $(".workspace").classList.toggle("side-collapsed");
 }
 
 /* ================================== init ================================== */
@@ -865,6 +1000,8 @@ export function initMenus() {
 
   $("#exportBtn").addEventListener("click", () => openExportDialog());
   $("#helpBtn").addEventListener("click", openShortcuts);
+  // the static tooltip uses the key that works here (see KEY_NEW)
+  $("#addLayerBtn").dataset.tip = `${t("New layer")} · ${platformKeys(KEY_NEW_LAYER)}`;
 
   // the crop tool asks the app to commit its rectangle
   on("crop-apply", (rect) => A.cropTo(rect));

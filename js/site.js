@@ -3,7 +3,9 @@
 
    The file is stored in this browser's IndexedDB (same origin, nothing is
    uploaded) and the editor opens it with the page's task, e.g. the crop tool
-   on /crop-image/.
+   on /crop-image/. The installed app starts in the editor itself (start_url),
+   so these pages never redirect: the editor's "All tools and guides" link
+   has to land here.
    ========================================================================== */
 
 import { HANDOFF_KEY, idbSet } from "./store.js";
@@ -12,19 +14,30 @@ const cfgEl = document.getElementById("dropConfig");
 const cfg = cfgEl ? JSON.parse(cfgEl.textContent) : null;
 const drop = document.querySelector("[data-drop]");
 const busy = document.querySelector("[data-busy]");
+const error = document.querySelector("[data-error]");
 
-// the installed app starts at the site root — take it straight to the editor
-if (cfg && !cfg.task && matchMedia("(display-mode: standalone)").matches) {
-  location.replace(`${cfg.editor}?lang=${cfg.lang}`);
-}
-
-const OPENABLE = /\.(png|jpe?g|webp|gif|bmp|svg|avif|heic|heif|psd|ico|tiff?)$/i;
-const isOpenable = (f) => f && (f.type.startsWith("image/") || OPENABLE.test(f.name));
+/** Images, Photoshop files and the editor's own .paint projects. */
+const OPENABLE = /\.(png|jpe?g|webp|gif|bmp|svg|avif|heic|heif|psd|paint|ico|tiff?)$/i;
+const isOpenable = (f) => !!f && (f.type.startsWith("image/") || OPENABLE.test(f.name));
 
 let opening = false;
 
+/** Show (or clear) a short message in the drop box; it is a live region. */
+function say(text) {
+  if (!error) return;
+  error.hidden = !text;
+  error.textContent = "";
+  // a frame later, so the now-visible live region announces the change
+  if (text) requestAnimationFrame(() => (error.textContent = text));
+}
+
 async function openInEditor(file) {
-  if (!cfg || !isOpenable(file) || opening) return;
+  if (!cfg || !file || opening) return;
+  if (!isOpenable(file)) {
+    say(cfg.notOpenable || "");
+    return;
+  }
+  say("");
   opening = true;
   drop?.classList.add("is-busy");
   if (busy) busy.hidden = false;
@@ -42,7 +55,11 @@ async function openInEditor(file) {
 }
 
 for (const input of document.querySelectorAll("[data-file]")) {
-  input.addEventListener("change", () => openInEditor(input.files[0]));
+  input.addEventListener("change", () => {
+    openInEditor(input.files[0]);
+    // picking the same file again after coming back must fire `change` again
+    input.value = "";
+  });
 }
 
 /* the whole page accepts a drop; the drop box lights up while dragging */
@@ -62,8 +79,10 @@ window.addEventListener("drop", (e) => {
   e.preventDefault();
   depth = 0;
   highlight(false);
-  const file = [...(e.dataTransfer?.files || [])].find(isOpenable);
-  if (file) openInEditor(file);
+  const files = [...(e.dataTransfer?.files || [])];
+  if (!files.length) return;
+  // an unsupported file gets a message instead of silently doing nothing
+  openInEditor(files.find(isOpenable) || files[0]);
 });
 
 document.addEventListener("paste", (e) => {

@@ -15,6 +15,8 @@ export const SITE = {
   /** first language is the default (x-default) and lives at the root */
   languages: ["en", "cs"],
   locales: { en: "en_US", cs: "cs_CZ" },
+  /** each language's name in that language, for the footer language links */
+  languageNames: { en: "English", cs: "Čeština" },
   /**
    * Cookie-free page counting with GoatCounter (https://www.goatcounter.com).
    * Put your site code here (e.g. "paintstudio" for paintstudio.goatcounter.com)

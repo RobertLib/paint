@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Zjistit barvu z obrázku – HEX a RGB | Paint Studio</title>
-    <meta name="description" content="Zjistěte barvu z obrázku nebo fotky: klikněte kamkoli a uvidíte kód HEX i RGB, který jedním kliknutím zkopírujete. Hodí se pro web, prezentace i grafiku." />
+    <meta name="description" content="Zjistěte barvu z obrázku nebo fotky: klikněte kamkoli a uvidíte kód HEX i hodnoty RGB. Kód HEX zkopírujete jedním kliknutím. Hodí se pro web i grafiku." />
     <link rel="canonical" href="https://robertlib.github.io/paint/cs/zjistit-barvu-z-obrazku/" />
     <link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/color-picker-from-image/" />
     <link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/zjistit-barvu-z-obrazku/" />
@@ -13,14 +13,16 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Paint Studio" />
     <meta property="og:title" content="Zjistit barvu z obrázku – HEX a RGB | Paint Studio" />
-    <meta property="og:description" content="Zjistěte barvu z obrázku nebo fotky: klikněte kamkoli a uvidíte kód HEX i RGB, který jedním kliknutím zkopírujete. Hodí se pro web, prezentace i grafiku." />
+    <meta property="og:description" content="Zjistěte barvu z obrázku nebo fotky: klikněte kamkoli a uvidíte kód HEX i hodnoty RGB. Kód HEX zkopírujete jedním kliknutím. Hodí se pro web i grafiku." />
     <meta property="og:url" content="https://robertlib.github.io/paint/cs/zjistit-barvu-z-obrazku/" />
     <meta property="og:image" content="https://robertlib.github.io/paint/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Paint Studio – editor obrázků v prohlížeči. Vrstvy, retuš, filtry." />
     <meta property="og:locale" content="cs_CZ" />
     <meta property="og:locale:alternate" content="en_US" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image:alt" content="Paint Studio – editor obrázků v prohlížeči. Vrstvy, retuš, filtry." />
 
     <link rel="icon" type="image/svg+xml" href="../../favicon.svg" />
     <link rel="icon" type="image/x-icon" href="../../favicon.ico" />
@@ -30,7 +32,6 @@
     <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
 
     <script>
-      // the editor's theme choice applies here too; otherwise follow the system
       try {
         var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
         document.documentElement.dataset.theme =
@@ -43,7 +44,7 @@
     <link rel="stylesheet" href="../../css/site.css" />
     <link rel="modulepreload" href="../../js/site.js" />
     <link rel="modulepreload" href="../../js/store.js" />
-    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/cs/"},{"@type":"ListItem","position":2,"name":"Zjistit barvu z obrázku","item":"https://robertlib.github.io/paint/cs/zjistit-barvu-z-obrazku/"}]},{"@type":"WebApplication","name":"Barva z obrázku — Paint Studio","url":"https://robertlib.github.io/paint/cs/zjistit-barvu-z-obrazku/","description":"Zjistěte barvu z obrázku nebo fotky: klikněte kamkoli a uvidíte kód HEX i RGB, který jedním kliknutím zkopírujete. Hodí se pro web, prezentace i grafiku.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (modern web browser)","inLanguage":"cs","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@id":"https://robertlib.github.io/paint/#website"}}]}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://robertlib.github.io/paint/cs/#website","name":"Paint Studio","url":"https://robertlib.github.io/paint/cs/","inLanguage":"cs"},{"@type":"WebApplication","@id":"https://robertlib.github.io/paint/cs/#app","name":"Paint Studio","url":"https://robertlib.github.io/paint/cs/","description":"Editor obrázků v prohlížeči: vrstvy, štětce, retuš, korekce, filtry a export do PNG, JPG, WebP i PSD. Zdarma, bez registrace a bez nahrávání fotek na server.","applicationCategory":"MultimediaApplication","applicationSubCategory":"Image editor","operatingSystem":"Any (modern web browser)","browserRequirements":"Requires JavaScript and HTML5 canvas","inLanguage":["en","cs"],"isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"image":"https://robertlib.github.io/paint/og-image.png","screenshot":"https://robertlib.github.io/paint/docs/screenshot.png","license":"https://opensource.org/licenses/MIT","codeRepository":"https://github.com/RobertLib/paint","author":{"@type":"Person","name":"RobertLib","url":"https://github.com/RobertLib"}},{"@type":"WebPage","@id":"https://robertlib.github.io/paint/cs/zjistit-barvu-z-obrazku/#webpage","url":"https://robertlib.github.io/paint/cs/zjistit-barvu-z-obrazku/","name":"Zjistit barvu z obrázku – HEX a RGB | Paint Studio","description":"Zjistěte barvu z obrázku nebo fotky: klikněte kamkoli a uvidíte kód HEX i hodnoty RGB. Kód HEX zkopírujete jedním kliknutím. Hodí se pro web i grafiku.","inLanguage":"cs","isPartOf":{"@id":"https://robertlib.github.io/paint/cs/#website"},"about":{"@id":"https://robertlib.github.io/paint/cs/#app"},"primaryImageOfPage":{"@type":"ImageObject","url":"https://robertlib.github.io/paint/og-image.png","width":1200,"height":630},"breadcrumb":{"@id":"https://robertlib.github.io/paint/cs/zjistit-barvu-z-obrazku/#breadcrumb"}},{"@type":"BreadcrumbList","@id":"https://robertlib.github.io/paint/cs/zjistit-barvu-z-obrazku/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/cs/"},{"@type":"ListItem","position":2,"name":"Barva z obrázku","item":"https://robertlib.github.io/paint/cs/zjistit-barvu-z-obrazku/"}]}]}</script>
     
   </head>
   <body class="site">
@@ -51,52 +52,53 @@
     
     <header class="site-head">
       <a class="site-brand" href="../../cs/">
-        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+        <span class="brand-mark" aria-hidden="true"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg></span>
         <span translate="no">Paint<em>Studio</em></span>
       </a>
-      <nav class="site-nav" aria-label="Všechny nástroje">
+      <nav class="site-nav" aria-label="Hlavní">
         <a href="../../cs/#tools">Všechny nástroje</a>
         <span class="langs" role="group" aria-label="Jazyk"><a class="lang" href="../../color-picker-from-image/" hreflang="en" lang="en">EN</a><span class="lang is-current" aria-current="true">CS</span></span>
-        <a class="btn btn-primary" href="../../editor/?lang=cs&task=eyedropper"><svg class="icon"><use href="#i-brush" /></svg><span>Otevřít editor</span></a>
+        <a class="btn btn-primary" href="../../editor/?lang=cs&task=eyedropper"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg><span>Otevřít editor</span></a>
       </nav>
     </header>
     <main>
       <section class="hero">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="../../cs/">Paint Studio</a><span aria-hidden="true">›</span><span>Barva z obrázku</span></nav>
+        <nav class="crumbs" aria-label="Drobečková navigace"><a href="../../cs/">Paint Studio</a><span aria-hidden="true">›</span><span aria-current="page">Barva z obrázku</span></nav>
         <h1>Zjistit barvu z obrázku</h1>
-        <p class="lead">Klikněte nástrojem Kapátko kamkoli do obrázku a hned uvidíte kód barvy ve formátu HEX i RGB. Tlačítkem pro kopírování ho přenesete do CSS, prezentace nebo jiného programu.</p>
+        <p class="lead">Klikněte nástrojem Kapátko kamkoli do obrázku a hned uvidíte kód barvy ve formátu HEX i hodnoty RGB. Tlačítkem Kopírovat HEX přenesete kód do CSS, prezentace nebo jiného programu.</p>
         
       <div class="drop" data-drop>
-        <svg class="icon drop-icon"><use href="#i-image" /></svg>
+        <svg class="icon drop-icon" aria-hidden="true" focusable="false"><use href="#i-image" /></svg>
         <strong class="drop-title">Přetáhněte sem obrázek</strong>
-        <label class="btn btn-primary btn-lg"><svg class="icon"><use href="#i-folder" /></svg><span>Vybrat obrázek</span>
-          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+        <label class="btn btn-primary btn-lg"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-folder" /></svg><span>Vybrat obrázek</span>
+          <input type="file" accept="image/*,.heic,.heif,.psd,.paint" class="sr-only" data-file /></label>
         <p class="drop-hint">nebo ho vložte ze schránky (Ctrl+V) · PNG, JPG, WebP, HEIC, PSD…</p>
         
-        <p class="drop-busy" data-busy hidden>Editor se otevírá…</p>
+        <p class="drop-busy" data-busy role="status" aria-live="polite" hidden>Editor se otevírá…</p>
+        <p class="drop-error" data-error role="alert" hidden></p>
       </div>
-      <script type="application/json" id="dropConfig">{"editor":"../../editor/","task":"eyedropper","lang":"cs"}</script>
-        <ul class="trust"><li><svg class="icon"><use href="#i-check" /></svg><span>Nic se nenahrává</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>Bez registrace</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>Bez vodoznaku</span></li></ul>
+      <script type="application/json" id="dropConfig">{"editor":"../../editor/","task":"eyedropper","lang":"cs","notOpenable":"Tento soubor tu otevřít nejde. Vyberte obrázek (PNG, JPG, WebP, HEIC…), soubor PSD nebo projekt .paint."}</script>
+        <ul class="trust"><li><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check" /></svg><span>Nic se nenahrává</span></li><li><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check" /></svg><span>Bez registrace</span></li><li><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check" /></svg><span>Bez vodoznaku</span></li></ul>
       </section>
 
       <section class="block steps">
         <h2>Jak na to</h2>
-        <ol><li>Přetáhněte obrázek nebo snímek obrazovky sem.</li><li>Nástrojem Kapátko klikněte nebo táhněte po místě s hledanou barvou.</li><li>Kód HEX nebo RGB zkopírujte tlačítkem v liště.</li></ol>
+        <ol><li>Přetáhněte obrázek nebo snímek obrazovky sem.</li><li>Nástrojem Kapátko klikněte nebo táhněte po místě s hledanou barvou.</li><li>Kód HEX zkopírujte tlačítkem Kopírovat HEX v liště.</li></ol>
       </section>
 
       <section class="block prose">
         <h2>HEX, nebo RGB?</h2>
-        <p>Lišta nástroje Kapátko ukáže vybranou barvu ve dvou zápisech. <strong>HEX</strong>, třeba <code>#1E88E5</code>, je šestimístný kód, který se používá v CSS, webových editorech, prezentacích i v manuálech firemní identity. <strong>RGB</strong>, například <code>30, 136, 229</code>, udává podíl červené, zelené a modré složky v rozsahu 0–255 a hodí se pro programy, které chtějí jednotlivé složky zvlášť. Oba zápisy popisují stejnou barvu, takže vyberte ten, který po vás program chce.</p>
+        <p>Lišta nástroje Kapátko ukáže vybranou barvu ve dvou zápisech. <strong>HEX</strong>, třeba <code>#1E88E5</code>, je šestimístný kód, který se používá v CSS, webových editorech, prezentacích i v manuálech firemní identity. <strong>RGB</strong>, například <code>30, 136, 229</code>, udává podíl červené, zelené a modré složky v rozsahu 0–255 a hodí se pro programy, které chtějí jednotlivé složky zvlášť. Oba zápisy popisují stejnou barvu. Tlačítko Kopírovat HEX vloží do schránky kód HEX, hodnoty RGB si z lišty opíšete.</p>
         <h2>Jak trefit přesný pixel</h2>
         <p>Fotky jsou plné šumu a přechodů, takže dva sousední pixely mívají trochu jiný odstín. Přibližte si obraz kolečkem myši nebo roztažením prstů – zoom jde až na 3200 %, kdy je každý pixel velký čtverec. Když nástrojem Kapátko táhnete po obrázku, kód se průběžně mění a vy ho pustíte na místě, které nejlépe odpovídá barvě, jakou vidíte. U loga a grafiky s plnými plochami je výsledek přesný na první kliknutí.</p>
         <h2>Všechny vrstvy, nebo jen aktivní, a paleta barev</h2>
-        <p>Kapátko umí brát barvu z výsledného obrazu všech vrstev, nebo jen z aktivní vrstvy – volbu najdete v jeho liště. Vybraná barva se zobrazí i v panelu Barva, takže s ní můžete hned malovat, psát text nebo vyplňovat plochy. Nasáté barvy se ukládají do řady naposledy použitých barev, a tak si z jedné fotky snadno poskládáte celou paletu, třeba pro web, pozvánku nebo prezentaci v barvách fotky.</p>
+        <p>Kapátko umí brát barvu z výsledného obrazu všech vrstev, nebo jen z aktivní vrstvy – volbu najdete v jeho liště. Vybraná barva se zobrazí i v panelu Barva, takže s ní můžete hned malovat, psát text nebo vyplňovat plochy. Nasáté barvy se ukládají do řady Nedávné, a tak si z jedné fotky snadno poskládáte celou paletu, třeba pro web, pozvánku nebo prezentaci v barvách fotky.</p>
       </section>
       
       <section class="block faq">
         <h2>Časté dotazy</h2>
         <h3>Jak zjistit kód barvy z obrázku?</h3>
-        <p>Otevřete obrázek na této stránce a editor rovnou zapne Kapátko. Klikněte na místo s hledanou barvou a v liště se zobrazí kód HEX i RGB. Tlačítkem pro kopírování ho vložíte do schránky a odtud kamkoli dál.</p>
+        <p>Otevřete obrázek na této stránce a editor rovnou zapne Kapátko. Klikněte na místo s hledanou barvou a v liště se zobrazí kód HEX i hodnoty RGB. Tlačítkem Kopírovat HEX vložíte kód do schránky a odtud kamkoli dál.</p>
         <h3>Můžu zjistit barvu z webové stránky?</h3>
         <p>Ano, přes snímek obrazovky. Ve Windows ho do schránky uložíte klávesami <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>, na Macu <kbd>⌘</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>4</kbd>. Pak ho sem vložte klávesami <kbd>Ctrl</kbd>+<kbd>V</kbd> (na Macu <kbd>⌘</kbd>+<kbd>V</kbd>) a nástrojem Kapátko klikněte na požadovanou barvu.</p>
         <h3>Proč se kód barvy liší od originálu?</h3>
@@ -106,13 +108,13 @@
       <section class="block">
         <h2>Související nástroje</h2>
         <ul class="tool-grid"><li><a class="tool-card" href="../../cs/prevod-obrazku/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-swap" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-swap" /></svg></span>
           <span class="tool-text"><strong>Převod formátů</strong><span>PNG, JPG, WebP a PSD z HEIC, AVIF, GIF, SVG i BMP</span></span>
         </a></li><li><a class="tool-card" href="../../cs/filtry-na-fotky/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-sparkles" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-sparkles" /></svg></span>
           <span class="tool-text"><strong>Filtry na fotky</strong><span>21 filtrů s náhledem přímo z vaší fotky</span></span>
         </a></li><li><a class="tool-card" href="../../cs/kresleni-do-fotky/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-brush" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg></span>
           <span class="tool-text"><strong>Kreslení do fotky</strong><span>Štětec, šipky a tvary pro poznámky a nákresy</span></span>
         </a></li></ul>
       </section>
@@ -121,14 +123,14 @@
       <div class="foot-inner">
         <div class="foot-about">
           <a class="site-brand" href="../../cs/">
-            <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+            <span class="brand-mark" aria-hidden="true"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg></span>
             <span translate="no">Paint<em>Studio</em></span>
           </a>
           <p>Paint Studio je zdarma a má otevřený zdrojový kód pod licencí MIT. Všechno běží přímo ve vašem prohlížeči, obrázky nikam neodcházejí.</p>
           <p><a href="https://github.com/RobertLib/paint" rel="noopener">Zdrojový kód na GitHubu</a> · <a href="../../color-picker-from-image/" hreflang="en" lang="en">English</a> · <a href="../../cs/zjistit-barvu-z-obrazku/" hreflang="cs" lang="cs">Čeština</a></p>
         </div>
-        <nav aria-label="Všechny nástroje">
-          <h2>Všechny nástroje</h2>
+        <nav aria-labelledby="foot-tools">
+          <h2 id="foot-tools">Všechny nástroje</h2>
           <ul class="foot-links"><li><a href="../../cs/oriznout-obrazek/">Oříznout fotku</a></li><li><a href="../../cs/zmenit-velikost-obrazku/">Změnit velikost</a></li><li><a href="../../cs/otocit-obrazek/">Otočit obrázek</a></li><li><a href="../../cs/zmensit-velikost-fotky/">Zmenšit velikost fotky</a></li><li><a href="../../cs/prevod-obrazku/">Převod formátů</a></li><li><a href="../../cs/png-na-jpg/">PNG na JPG</a></li><li><a href="../../cs/webp-na-jpg/">WebP na JPG</a></li><li><a href="../../cs/heic-na-jpg/">HEIC na JPG</a></li><li><a href="../../cs/rozmazat-fotku/">Rozmazat fotku</a></li><li><a href="../../cs/pridat-text-do-fotky/">Text do fotky</a></li><li><a href="../../cs/cernobila-fotka/">Černobílá fotka</a></li><li><a href="../../cs/invertovat-barvy/">Invertovat barvy</a></li><li><a href="../../cs/filtry-na-fotky/">Filtry na fotky</a></li><li><a href="../../cs/zesvetlit-fotku/">Zesvětlit fotku</a></li><li><a href="../../cs/pruhledne-pozadi/">Průhledné pozadí</a></li><li><a href="../../cs/zjistit-barvu-z-obrazku/">Barva z obrázku</a></li><li><a href="../../cs/kresleni-do-fotky/">Kreslení do fotky</a></li><li><a href="../../cs/malovani-online/">Malování online</a></li><li><a href="../../cs/otevrit-psd/">Otevřít PSD</a></li><li><a href="../../cs/retus-fotky/">Retuš fotky</a></li></ul>
         </nav>
       </div>

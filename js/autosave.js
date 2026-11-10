@@ -2,46 +2,80 @@
    Autosave — the open document is written to this browser's IndexedDB a
    moment after each change, so a closed tab, a crash or a reload never costs
    the work. Nothing is uploaded. The next visit offers to restore it.
+
+   Two slots: the current session and the one before it. Opening another
+   document (for example from a landing page) moves the previous session to
+   the second slot instead of overwriting it, so it can still be restored
+   from File › Restore previous session.
    ========================================================================== */
 
 import { Doc } from "./doc.js";
-import { history } from "./history.js";
+import { history, sessionsBusy, settleSessions } from "./history.js";
 import { t } from "./i18n.js";
 import { emit, on, state } from "./state.js";
-import { idbDelete, idbGet, idbSet } from "./store.js";
+import { idbGet, idbSet } from "./store.js";
 
-const KEY = "autosave";
+export const SLOT_CURRENT = "autosave";
+export const SLOT_PREVIOUS = "autosave-prev";
 const DELAY = 1500;
 /** Skip autosave for documents too big to write without stutter. */
 const MAX_PIXELS = 8000 * 8000 * 3;
 
 let timer = 0;
 let saving = null;
-let pending = false;
+/** session id held by the current slot (undefined = not read yet) */
+let storedSid;
 
+/* every document gets a session id; a restored one keeps its own */
+const sids = new WeakMap();
+const newSid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+export function sidOf(doc) {
+  let sid = sids.get(doc);
+  if (!sid) sids.set(doc, (sid = newSid()));
+  return sid;
+}
+
+const tooBig = (doc) => doc.layers.length * doc.width * doc.height > MAX_PIXELS;
+
+/** Write the open document. Resolves true when it is safely stored. */
 async function save() {
   timer = 0;
   const doc = state.doc;
-  if (!doc) return;
-  if (doc.layers.length * doc.width * doc.height > MAX_PIXELS) return;
+  if (!doc) return false;
+  // a live preview or a stroke holds pixels that are not final yet
+  if (sessionsBusy() || state.dragging) {
+    schedule();
+    return false;
+  }
+  if (tooBig(doc)) return false;
   if (saving) {
-    pending = true;
-    return;
+    // one write at a time; then write again with the newest state
+    await saving;
+    return save();
   }
   saving = (async () => {
     try {
+      const sid = sidOf(doc);
       const data = await doc.toStorable();
-      await idbSet(KEY, { savedAt: Date.now(), thumb: await thumbnail(doc), doc: data });
+      const thumb = await thumbnail(doc);
+      if (storedSid === undefined) storedSid = (await idbGet(SLOT_CURRENT))?.sid ?? null;
+      const existing = storedSid !== sid ? await idbGet(SLOT_CURRENT) : null;
+      // another document's session moves aside instead of being overwritten
+      if (existing?.doc) await idbSet(SLOT_PREVIOUS, existing);
+      const ok = await idbSet(SLOT_CURRENT, { sid, savedAt: Date.now(), thumb, doc: data });
+      if (ok === null) throw new Error("IndexedDB write failed");
+      storedSid = sid;
+      emit("autosave", { ok: true });
+      return true;
     } catch (err) {
       console.warn("[paint] autosave failed", err);
+      emit("autosave", { ok: false });
+      return false;
     }
   })();
-  await saving;
+  const ok = await saving;
   saving = null;
-  if (pending) {
-    pending = false;
-    schedule();
-  }
+  return ok;
 }
 
 function schedule() {
@@ -62,19 +96,26 @@ async function thumbnail(doc) {
   return new Promise((r) => c.toBlob(r, "image/png"));
 }
 
-/** Write immediately (before a reload). */
+/** Write immediately (before a reload). Resolves true when stored. */
 export async function flushAutosave() {
   clearTimeout(timer);
   timer = 0;
+  // a reload is coming: keep what is on screen (an open preview, a text box)
+  settleSessions();
   if (saving) await saving;
-  await save();
+  const doc = state.doc;
+  if (!doc) return true;
+  if (tooBig(doc)) return false;
+  return save();
 }
 
-/** What a previous session left behind, without loading the bitmaps. */
-export async function peekAutosave() {
-  const entry = await idbGet(KEY);
+/** What a session left behind, without loading the bitmaps. */
+export async function peekAutosave(slot = SLOT_CURRENT) {
+  const entry = await idbGet(slot);
   if (!entry?.doc) return null;
   return {
+    slot,
+    sid: entry.sid || null,
     name: entry.doc.name,
     width: entry.doc.width,
     height: entry.doc.height,
@@ -84,13 +125,20 @@ export async function peekAutosave() {
   };
 }
 
-export async function loadAutosave() {
-  const entry = await idbGet(KEY);
-  if (!entry?.doc) return null;
-  return Doc.fromJSON(entry.doc);
+/** Both stored sessions that are not the open document, newest first. */
+export async function listSessions() {
+  const open = state.doc ? sids.get(state.doc) : null;
+  const all = [await peekAutosave(SLOT_CURRENT), await peekAutosave(SLOT_PREVIOUS)];
+  return all.filter((s) => s && (!open || s.sid !== open));
 }
 
-export const clearAutosave = () => idbDelete(KEY);
+export async function loadAutosave(slot = SLOT_CURRENT) {
+  const entry = await idbGet(slot);
+  if (!entry?.doc) return null;
+  const doc = await Doc.fromJSON(entry.doc);
+  sids.set(doc, entry.sid || newSid());
+  return doc;
+}
 
 /** "5 minutes ago" in the UI language. */
 export function relativeTime(ts) {
@@ -108,7 +156,8 @@ export function initAutosave() {
     if (history.stack.length) schedule();
   });
   on("doc", ({ reason }) => {
-    // a freshly opened document replaces the saved one right away
+    // a freshly opened document is saved right away (the session before it
+    // moves to the second slot)
     if (reason === "open") schedule();
   });
   on("flush-autosave", () => flushAutosave());
@@ -119,5 +168,9 @@ export function initAutosave() {
       save();
     }
   });
+  // ask the browser not to evict the autosave under storage pressure
+  navigator.storage?.persisted?.().then((persisted) => {
+    if (!persisted) navigator.storage.persist?.().catch(() => {});
+  }).catch(() => {});
   emit("autosave-ready");
 }

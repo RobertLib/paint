@@ -12,28 +12,61 @@
   "lang": "en",
   "icons": [
     {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
       "src": "./icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "./icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "./docs/screenshot.png",
+      "sizes": "1440x860",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Paint Studio editing a photo: a black-and-white copy revealed through a gradient layer mask"
     }
   ],
   "shortcuts": [
     {
       "name": "New canvas",
       "url": "./editor/?task=paint",
-      "icons": [{ "src": "./icon-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "./icon-192x192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Crop an image",
       "url": "./editor/?task=crop",
-      "icons": [{ "src": "./icon-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "./icon-192x192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ],
   "file_handlers": [
@@ -44,7 +77,11 @@
         "image/jpeg": [".jpg", ".jpeg"],
         "image/webp": [".webp"],
         "image/gif": [".gif"],
-        "image/heic": [".heic", ".heif"],
+        "image/avif": [".avif"],
+        "image/bmp": [".bmp"],
+        "image/svg+xml": [".svg"],
+        "image/heic": [".heic"],
+        "image/heif": [".heif"],
         "image/vnd.adobe.photoshop": [".psd"],
         "application/x-paint-studio": [".paint"]
       }

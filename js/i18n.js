@@ -21,14 +21,15 @@ export const LANGS = [
 ];
 
 function detect() {
-  try {
-    const fromUrl = new URLSearchParams(location.search).get("lang");
-    if (fromUrl && LANGS.some(([code]) => code === fromUrl)) {
+  const fromUrl = new URLSearchParams(location.search).get("lang");
+  if (fromUrl && LANGS.some(([code]) => code === fromUrl)) {
+    // remembering the choice is a nicety; blocked storage must not undo it
+    try {
       localStorage.setItem(KEY, fromUrl);
-      return fromUrl;
+    } catch {
+      /* sandboxed storage */
     }
-  } catch {
-    /* sandboxed storage — fall through */
+    return fromUrl;
   }
   try {
     const saved = localStorage.getItem(KEY);
@@ -49,11 +50,27 @@ function detect() {
 export const lang = detect();
 const dict = DICTS[lang] || null;
 
+const fill = (s, vars) =>
+  vars ? s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : s;
+
 /** Translate an English source string, filling {placeholders} from `vars`. */
 export function t(source, vars) {
-  let out = (dict && dict[source]) || source;
-  if (vars) out = out.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
-  return out;
+  const entry = dict && dict[source];
+  return fill(typeof entry === "string" ? entry : source, vars);
+}
+
+/**
+ * Translate a count. English has "1 layer" / "2 layers"; a dictionary entry
+ * (keyed by the plural English string) may give the forms Czech needs:
+ * { one: "1", few: "2–4", many: "5 and more" }.
+ */
+export function tn(n, one, other, vars) {
+  const entry = dict && dict[other];
+  if (entry && typeof entry === "object") {
+    const form = n === 1 ? entry.one : n >= 2 && n <= 4 ? entry.few : entry.many;
+    return fill(form || entry.many || other, vars);
+  }
+  return fill(n === 1 ? one : other, vars);
 }
 
 /** Remember a language choice; the caller reloads so every table rebuilds. */
@@ -70,14 +87,34 @@ export function saveLang(code) {
 const ATTRS = ["aria-label", "data-tip", "title", "placeholder", "alt"];
 
 /** Tooltips read "Label · shortcut": translate the label, keep the keys. */
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+
+/**
+ * Shortcut glyphs in hand-written markup are Mac-style (⌘, ⌥, ⇧); elsewhere
+ * they read Ctrl+…, Alt+…, Shift+….
+ */
+export function platformKeys(s) {
+  if (isMac || !/[⌘⌥⇧⌫]/.test(s)) return s;
+  return s
+    .replace(/⇧⌘/g, "Ctrl+Shift+")
+    .replace(/⌥⌘/g, "Ctrl+Alt+")
+    .replace(/⌘\s?/g, "Ctrl+")
+    .replace(/⌥\s?/g, "Alt+")
+    .replace(/⇧\s?/g, "Shift+")
+    .replace(/⌫/g, "Backspace");
+}
+
 function translateValue(value) {
   const trimmed = value.trim();
   if (!trimmed) return value;
-  if (dict[trimmed]) return value.replace(trimmed, dict[trimmed]);
+  const word = (part) => (typeof dict?.[part] === "string" ? dict[part] : part);
+  if (dict && typeof dict[trimmed] === "string") {
+    return platformKeys(value.replace(trimmed, dict[trimmed]));
+  }
   if (trimmed.includes(" · ")) {
     return trimmed
       .split(" · ")
-      .map((part) => dict[part] || part)
+      .map((part) => platformKeys(word(part)))
       .join(" · ");
   }
   return value;
@@ -86,7 +123,7 @@ function translateValue(value) {
 /** Translate text nodes and UI attributes of hand-written markup in place. */
 export function translateDOM(root = document.body) {
   document.documentElement.lang = lang;
-  if (!dict) return;
+  if (dict && typeof dict[document.title] === "string") document.title = dict[document.title];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;

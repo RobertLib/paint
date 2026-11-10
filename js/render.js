@@ -25,9 +25,10 @@ export const overlay = {
 
 let pending = false;
 let antPhase = 0;
-let lastAnt = 0;
+let antTimer = 0;
 let checker = null;
 let checkerKey = "";
+let checkerColors = null;
 
 export function requestRender() {
   if (pending) return;
@@ -43,6 +44,7 @@ export function initRender(canvas, stage) {
   on("selection", requestRender);
   on("theme", () => {
     checkerKey = "";
+    checkerColors = null;
     requestRender();
   });
   const ro = new ResizeObserver(() => {
@@ -56,9 +58,15 @@ export function initRender(canvas, stage) {
 /* ------------------------------ checkerboard ----------------------------- */
 
 function checkerPattern(ctx) {
-  const css = getComputedStyle(document.documentElement);
-  const a = css.getPropertyValue("--check-a").trim() || "#2a2e39";
-  const b = css.getPropertyValue("--check-b").trim() || "#21242d";
+  // reading computed styles forces style work: do it once per theme
+  if (!checkerColors) {
+    const css = getComputedStyle(document.documentElement);
+    checkerColors = [
+      css.getPropertyValue("--check-a").trim() || "#2a2e39",
+      css.getPropertyValue("--check-b").trim() || "#21242d",
+    ];
+  }
+  const [a, b] = checkerColors;
   const key = `${a}|${b}|${view.dpr}`;
   if (checker && checkerKey === key) return checker;
 
@@ -116,10 +124,16 @@ function marqueePath() {
 }
 
 /** Stroke a document-space path as animated marching ants. */
-function ants(ctx, path, dash = 5) {
+function ants(ctx, path, dash = 5, { clip = false } = {}) {
   const z = view.zoom;
   ctx.save();
   ctx.setTransform(view.dpr * z, 0, 0, view.dpr * z, view.dpr * view.x, view.dpr * view.y);
+  if (clip && state.doc) {
+    // a selection never reaches past the canvas, so neither do its ants
+    ctx.beginPath();
+    ctx.rect(-1 / z, -1 / z, state.doc.width + 2 / z, state.doc.height + 2 / z);
+    ctx.clip();
+  }
   ctx.lineWidth = 1 / z;
   ctx.setLineDash([dash / z, dash / z]);
   ctx.lineDashOffset = -antPhase / z;
@@ -166,9 +180,10 @@ function draw(now = 0) {
     ctx.fillRect(0, 0, r.w, r.h);
     ctx.restore();
 
-    // the artwork
+    // the artwork: crisp pixels when zoomed in, smooth when zoomed out
     ctx.save();
     ctx.imageSmoothingEnabled = view.zoom < 1;
+    ctx.imageSmoothingQuality = "high";
     ctx.drawImage(doc.composite(), 0, 0, doc.width, doc.height, r.x, r.y, r.w, r.h);
     ctx.restore();
 
@@ -180,7 +195,9 @@ function draw(now = 0) {
     ctx.restore();
 
     if (overlay.crop) drawCrop(ctx, overlay.crop);
-    if (doc.selection && !overlay.crop && !overlay.transform) ants(ctx, selectionPath(doc.selection));
+    if (doc.selection && !overlay.crop && !overlay.transform) {
+      ants(ctx, selectionPath(doc.selection), 5, { clip: true });
+    }
     if (overlay.floatFrame) drawFloatFrame(ctx, overlay.floatFrame);
     if (overlay.transform) drawTransform(ctx, overlay.transform);
 
@@ -191,18 +208,19 @@ function draw(now = 0) {
     if (overlay.cursor) drawCursor(ctx, overlay.cursor);
   }
 
-  // keep the ants moving while a selection or marquee is on screen
+  // keep the ants moving while a selection or marquee is on screen — a step
+  // every 70 ms is all they need, not a full redraw every display frame
   const wantsAnimation = !!(
     (doc && doc.selection) ||
     overlay.marquee ||
     overlay.floatFrame
   );
-  if (wantsAnimation) {
-    if (now - lastAnt > 70) {
+  if (wantsAnimation && !antTimer && !document.hidden) {
+    antTimer = setTimeout(() => {
+      antTimer = 0;
       antPhase = (antPhase + 1.6) % 10;
-      lastAnt = now;
-    }
-    requestRender();
+      requestRender();
+    }, 70);
   }
 }
 

@@ -18,16 +18,18 @@
   --stroke-2: rgba(255, 255, 255, 0.12);
   --stroke-3: rgba(255, 255, 255, 0.2);
 
-  /* text */
+  /* text — every level keeps WCAG AA (4.5:1) on --bg-0…--bg-3 */
   --text: #e7e9f0;
-  --text-2: #9ba1b0;
-  --text-3: #6a7080;
+  --text-2: #a3a8b6;
+  --text-3: #8a8f9c;
 
   /* brand */
-  --accent: #6f7dff;
+  --accent: #6f7dff; /* glyphs, links, rings: 4.8:1+ on the dark surfaces */
   --accent-2: #a855f7;
   --accent-soft: rgba(111, 125, 255, 0.16);
   --accent-glow: rgba(111, 125, 255, 0.45);
+  /* filled backgrounds behind --accent-text (buttons, badges): white on it is 4.8:1 */
+  --accent-fill: #5562ee;
   --accent-text: #fff;
   --danger: #f4515f;
   --danger-soft: rgba(244, 81, 95, 0.15);
@@ -91,15 +93,18 @@
   --stroke-3: rgba(16, 20, 38, 0.24);
 
   --text: #171a24;
-  --text-2: #5c6373;
-  --text-3: #8b91a1;
+  --text-2: #4d5361;
+  --text-3: #5d6270;
 
-  --accent: #5b63f0;
+  /* dark enough for link text on the page backdrop and for white text on it */
+  --accent: #484fe0;
   --accent-2: #9333ea;
-  --accent-soft: rgba(91, 99, 240, 0.12);
-  --accent-glow: rgba(91, 99, 240, 0.3);
-  --danger: #e0384a;
-  --danger-soft: rgba(224, 56, 74, 0.12);
+  --accent-soft: rgba(72, 79, 224, 0.12);
+  --accent-glow: rgba(72, 79, 224, 0.3);
+  --accent-fill: #484fe0;
+  --danger: #c62a3c; /* also used for text: 5.5:1 on white */
+  --danger-soft: rgba(198, 42, 60, 0.12);
+  --ok: #047857;
 
   --sh-1: 0 1px 2px rgba(19, 23, 43, 0.08);
   --sh-2: 0 4px 14px rgba(19, 23, 43, 0.1);

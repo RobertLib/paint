@@ -49,6 +49,8 @@ export const state = {
   /** stage cursor position in document space, or null when outside */
   cursor: null,
   dirty: false,
+  /** a pointer gesture is in progress — shortcuts and undo wait for it */
+  dragging: false,
 };
 
 const PREFS_KEY = "paint-studio:prefs:v2";
@@ -61,6 +63,8 @@ export function setTool(id, { transient = false } = {}) {
   if (!transient) state.resumeTool = null;
   const prev = state.tool;
   state.tool = id;
+  // a transient tool (space-pan, Alt-pick) is not a choice worth keeping
+  if (!transient) savePrefs();
   emit("tool", { tool: id, prev });
 }
 
@@ -133,10 +137,15 @@ function pushRecent(c) {
 /* --------------------------------- theme --------------------------------- */
 
 export function setTheme(theme) {
-  state.theme = theme;
-  document.documentElement.dataset.theme = theme;
+  state.theme = theme === "light" ? "light" : "dark";
+  document.documentElement.dataset.theme = state.theme;
+  // the browser chrome follows the chosen theme, not the system one
+  const bar = state.theme === "light" ? "#f4f5f9" : "#0e0f14";
+  for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
+    meta.setAttribute("content", bar);
+  }
   savePrefs();
-  emit("theme", theme);
+  emit("theme", state.theme);
 }
 
 /* ------------------------------ persistence ------------------------------ */
@@ -174,12 +183,32 @@ export function loadPrefs() {
   const prefersLight =
     window.matchMedia?.("(prefers-color-scheme: light)").matches ?? false;
 
-  if (saved) {
-    if (saved.primary) state.primary = saved.primary;
-    if (saved.secondary) state.secondary = saved.secondary;
-    if (Array.isArray(saved.recent)) state.recent = saved.recent.slice(0, 12);
-    if (saved.opts && typeof saved.opts === "object") state.opts = saved.opts;
-    if (saved.tool) state.tool = saved.tool;
+  if (saved && typeof saved === "object") {
+    // stored data is checked piece by piece: one bad value must not keep the
+    // editor from starting
+    const channel = (v) => Math.min(255, Math.max(0, Math.round(v)));
+    const color = (c) =>
+      c && typeof c === "object" && [c.r, c.g, c.b].every(Number.isFinite)
+        ? {
+            r: channel(c.r),
+            g: channel(c.g),
+            b: channel(c.b),
+            a: Number.isFinite(c.a) ? Math.min(1, Math.max(0, c.a)) : 1,
+          }
+        : null;
+    state.primary = color(saved.primary) || state.primary;
+    state.secondary = color(saved.secondary) || state.secondary;
+    if (Array.isArray(saved.recent)) {
+      state.recent = saved.recent
+        .filter((h) => typeof h === "string" && /^#[0-9a-f]{3,8}$/i.test(h))
+        .slice(0, 12);
+    }
+    if (saved.opts && typeof saved.opts === "object" && !Array.isArray(saved.opts)) {
+      for (const [tool, bag] of Object.entries(saved.opts)) {
+        if (bag && typeof bag === "object" && !Array.isArray(bag)) state.opts[tool] = { ...bag };
+      }
+    }
+    if (typeof saved.tool === "string") state.tool = saved.tool;
   }
   setTheme(saved?.theme || (prefersLight ? "light" : "dark"));
 }

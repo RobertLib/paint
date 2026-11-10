@@ -9,7 +9,7 @@ import { cssColor, hsvToRgb, parseColor, rgbToHex, rgbToHsv } from "./color.js";
 import { BLEND_MODES, ctx2d, makeCanvas } from "./doc.js";
 import { ADJUST_GROUPS, EFFECTS } from "./filters.js";
 import { history } from "./history.js";
-import { t } from "./i18n.js";
+import { platformKeys, t } from "./i18n.js";
 import { requestRender } from "./render.js";
 import {
   on,
@@ -33,8 +33,11 @@ export function icon(name, cls = "icon") {
   return `<svg class="${cls}"><use href="#${name}" /></svg>`;
 }
 
-const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-export const MOD = isMac ? "⌘" : "Ctrl";
+/**
+ * The command key in shortcut labels. Labels are written Mac-style and pass
+ * through platformKeys() when shown, which reads Ctrl+… elsewhere.
+ */
+export const MOD = "⌘";
 
 /* ================================== rail ================================== */
 
@@ -135,7 +138,7 @@ function buildOptions() {
         </div>`);
     } else if (o.type === "toggle") {
       parts.push(
-        `<button class="opt-toggle${opt(o.key) ? " is-on" : ""}" data-toggle="${o.key}">
+        `<button class="opt-toggle${opt(o.key) ? " is-on" : ""}" data-toggle="${o.key}" aria-pressed="${!!opt(o.key)}">
            ${icon("i-check")}<span>${o.label}</span>
          </button>`
       );
@@ -149,7 +152,7 @@ function buildOptions() {
                 ([value, label]) =>
                   `<button class="seg-btn${
                     (opt(o.key) ?? o.def) === value ? " is-active" : ""
-                  }" data-value="${value}">${label}</button>`
+                  }" data-value="${value}" aria-pressed="${(opt(o.key) ?? o.def) === value}">${label}</button>`
               )
               .join("")}
           </div>
@@ -183,8 +186,8 @@ function buildOptions() {
     parts.push(
       `<span class="sep"></span>`,
       `<div class="opt"><label>${t("Color")}</label>
-         <button class="opt-swatch" data-pick="primary" data-tip="${t("Primary color")}"><i></i></button>
-         <button class="opt-swatch" data-pick="secondary" data-tip="${t("Secondary color")}"><i></i></button>
+         <button class="opt-swatch" data-pick="primary" data-tip="${t("Primary color")}" aria-label="${t("Primary color")}"><i></i></button>
+         <button class="opt-swatch" data-pick="secondary" data-tip="${t("Secondary color")}" aria-label="${t("Secondary color")}"><i></i></button>
        </div>`
     );
   }
@@ -202,17 +205,22 @@ function buildOptions() {
   bar.addEventListener("click", (e) => {
     const toggle = e.target.closest("[data-toggle]");
     if (toggle) {
-      setOpt(toggle.dataset.toggle, !opt(toggle.dataset.toggle));
-      toggle.classList.toggle("is-on");
+      const on = !opt(toggle.dataset.toggle);
+      setOpt(toggle.dataset.toggle, on);
+      toggle.classList.toggle("is-on", on);
+      toggle.setAttribute("aria-pressed", String(on));
+      activeTool().onOptsChange?.();
       return;
     }
     const seg = e.target.closest("[data-seg] .seg-btn");
     if (seg) {
       const key = seg.closest("[data-seg]").dataset.seg;
       setOpt(key, seg.dataset.value);
-      $$(".seg-btn", seg.parentElement).forEach((b) =>
-        b.classList.toggle("is-active", b === seg)
-      );
+      $$(".seg-btn", seg.parentElement).forEach((b) => {
+        b.classList.toggle("is-active", b === seg);
+        b.setAttribute("aria-pressed", String(b === seg));
+      });
+      activeTool().onOptsChange?.();
       return;
     }
     const actionBtn = e.target.closest("[data-action-btn]");
@@ -245,11 +253,26 @@ function onOptionInput(e) {
   if (num) {
     const key = num.dataset.num;
     const spec = (activeTool().opts || []).find((o) => o.key === key);
-    let value = parseFloat(num.value);
-    if (Number.isNaN(value)) value = opt(key);
-    value = Math.min(spec.max, Math.max(spec.min, value));
+    if (!spec) return;
+    const value = parseFloat(num.value);
+    const inRange = Number.isFinite(value) && value >= spec.min && value <= spec.max;
+    // while typing ("1" on the way to "12") take only values that already
+    // make sense and leave the field alone; tidy it up when editing ends
+    if (e.type === "input") {
+      if (!inRange) return;
+    } else {
+      const clamped = Number.isFinite(value)
+        ? Math.min(spec.max, Math.max(spec.min, Math.round(value)))
+        : opt(key) ?? spec.def;
+      num.value = String(clamped);
+      if (clamped === opt(key)) return;
+      setOpt(key, clamped);
+      const slider = $(`[data-key="${key}"]`, $("#optionsBar"));
+      if (slider) slider.value = String(clamped);
+      activeTool().onOptsChange?.();
+      return;
+    }
     setOpt(key, value);
-    num.value = String(value);
     const slider = $(`[data-key="${key}"]`, $("#optionsBar"));
     if (slider) slider.value = String(value);
     activeTool().onOptsChange?.();
@@ -309,13 +332,45 @@ function buildColorPanel() {
     clearTimeout(settleTimer);
     pickAt(e);
     const move = (ev) => pickAt(ev);
-    const up = () => {
+    const end = () => {
       field.removeEventListener("pointermove", move);
-      field.removeEventListener("pointerup", up);
+      field.removeEventListener("pointerup", end);
+      field.removeEventListener("pointercancel", end);
+      field.removeEventListener("lostpointercapture", end);
       recordRecent();
     };
     field.addEventListener("pointermove", move);
-    field.addEventListener("pointerup", up);
+    field.addEventListener("pointerup", end);
+    field.addEventListener("pointercancel", end);
+    field.addEventListener("lostpointercapture", end);
+  });
+
+  // the field works from the keyboard too: arrows move the picker
+  field.tabIndex = 0;
+  field.setAttribute("role", "slider");
+  field.setAttribute("aria-label", t("Saturation and brightness"));
+  field.addEventListener("keydown", (e) => {
+    const step = e.shiftKey ? 0.1 : 0.01;
+    const moves = {
+      ArrowLeft: [-step, 0],
+      ArrowRight: [step, 0],
+      ArrowUp: [0, step],
+      ArrowDown: [0, -step],
+    };
+    const m = moves[e.key];
+    if (!m) return;
+    e.preventDefault();
+    e.stopPropagation();
+    picker.s = Math.min(1, Math.max(0, picker.s + m[0]));
+    picker.v = Math.min(1, Math.max(0, picker.v + m[1]));
+    // the picker owns s/v here: rounding to RGB must not pull them back
+    picker.silent = true;
+    try {
+      commit();
+    } finally {
+      picker.silent = false;
+    }
+    settle();
   });
 
   hue.addEventListener("input", () => {
@@ -390,19 +445,26 @@ function drawSV(canvas) {
 /** Push state → picker widgets (called whenever the active color changes). */
 function syncColorPanel() {
   const color = state[state.activeChip];
-  const hsv = rgbToHsv(color);
-  // keep the hue slider steady on greys, where hue is undefined
-  picker.h = hsv.s > 0.004 ? hsv.h : picker.h;
-  picker.s = hsv.s;
-  picker.v = hsv.v;
+  if (!picker.silent) {
+    const hsv = rgbToHsv(color);
+    // keep the hue slider steady on greys, where hue is undefined
+    picker.h = hsv.s > 0.004 ? hsv.h : picker.h;
+    picker.s = hsv.s;
+    picker.v = hsv.v;
+  }
   picker.a = color.a ?? 1;
 
   drawSV($("#svCanvas"));
   const field = $("#svField");
   const thumb = $("#svThumb");
-  thumb.style.left = `${picker.s * field.clientWidth}px`;
-  thumb.style.top = `${(1 - picker.v) * field.clientHeight}px`;
+  // percentages stay right while the panel is hidden or resized
+  thumb.style.left = `${picker.s * 100}%`;
+  thumb.style.top = `${(1 - picker.v) * 100}%`;
   thumb.style.background = cssColor(color);
+  field.setAttribute(
+    "aria-valuetext",
+    `${t("Saturation")} ${Math.round(picker.s * 100)} %, ${t("Brightness")} ${Math.round(picker.v * 100)} %`
+  );
 
   $("#hueSlider").value = String(Math.round(picker.h));
   $("#alphaSlider").value = String(Math.round(picker.a * 100));
@@ -416,8 +478,12 @@ function syncColorPanel() {
   $("#secondaryChip .chip-fill").style.background = cssColor(state.secondary);
   $("#primaryChip").classList.toggle("is-active", state.activeChip === "primary");
   $("#secondaryChip").classList.toggle("is-active", state.activeChip === "secondary");
+  $("#primaryChip").setAttribute("aria-pressed", String(state.activeChip === "primary"));
+  $("#secondaryChip").setAttribute("aria-pressed", String(state.activeChip === "secondary"));
 
+  // stored preferences are only trusted as plain hex colours
   $("#recentRow").innerHTML = state.recent
+    .filter((c) => typeof c === "string" && /^#[0-9a-f]{3,8}$/i.test(c))
     .map(
       (c) =>
         `<button class="swatch" style="background:${c}" data-color="${c}" data-tip="${c.toUpperCase()}" aria-label="${c}"></button>`
@@ -535,6 +601,32 @@ function buildLayersPanel() {
     startRename(nameEl, index);
   });
 
+  // keyboard: Enter/Space selects, F2 renames, arrows move between rows
+  list.addEventListener("keydown", (e) => {
+    const item = e.target.closest?.(".layer-item");
+    if (!item || e.target !== item) return;
+    const index = Number(item.dataset.index);
+    const id = state.doc?.layers[index]?.id;
+    // keys handled here must not also reach the global shortcuts (Enter
+    // would apply a crop, Space would arm panning)
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      e.stopPropagation();
+      A.setActiveLayer(index);
+      focusLayer(id);
+    } else if (e.key === "F2") {
+      e.preventDefault();
+      e.stopPropagation();
+      const nameEl = $(".layer-name", item);
+      if (nameEl) startRename(nameEl, index);
+    } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      e.stopPropagation();
+      const next = index + (e.key === "ArrowUp" ? 1 : -1);
+      $(`.layer-item[data-index="${next}"]`, list)?.focus();
+    }
+  });
+
   // drag to reorder
   let dragIndex = null;
   list.addEventListener("dragstart", (e) => {
@@ -582,24 +674,44 @@ function buildLayersPanel() {
 
 function startRename(nameEl, index) {
   const layer = state.doc.layers[index];
+  if (!layer) return;
+  const id = layer.id;
   const input = document.createElement("input");
   input.className = "layer-name-input";
   input.value = layer.name;
+  input.setAttribute("aria-label", t("Layer name"));
   nameEl.replaceWith(input);
   input.focus();
   input.select();
-  const done = (save) => {
-    if (save && input.value.trim()) {
-      A.setLayerProp(index, "name", input.value.trim(), t("Rename layer"));
-    }
+  let finished = false;
+  const done = (save, { refocus = false } = {}) => {
+    // re-rendering removes the input, which fires blur: finish only once
+    if (finished) return;
+    finished = true;
+    input.removeEventListener("blur", onBlur);
+    const value = input.value.trim();
+    const at = state.doc?.indexOfLayer(id) ?? -1;
+    if (save && value && at >= 0) A.setLayerProp(at, "name", value, t("Rename layer"));
     syncLayers();
+    // back to the row after Enter/Escape — but a click elsewhere keeps the
+    // focus where the user put it
+    if (refocus) focusLayer(id);
   };
-  input.addEventListener("blur", () => done(true));
+  const onBlur = () => done(true);
+  input.addEventListener("blur", onBlur);
   input.addEventListener("keydown", (e) => {
     e.stopPropagation();
-    if (e.key === "Enter") done(true);
-    if (e.key === "Escape") done(false);
+    if (e.key === "Enter") done(true, { refocus: true });
+    if (e.key === "Escape") done(false, { refocus: true });
   });
+}
+
+/** Put keyboard focus back on a layer row after the list was rebuilt. */
+function focusLayer(id) {
+  const doc = state.doc;
+  const index = doc?.indexOfLayer(id) ?? -1;
+  if (index < 0) return;
+  $(`#layerList .layer-item[data-index="${index}"]`)?.focus();
 }
 
 function syncLayers() {
@@ -618,7 +730,8 @@ function syncLayers() {
     items.push(`
       <div class="layer-item${active ? " is-active" : ""}${
       layer.visible ? "" : " is-hidden"
-    }${editingMask ? " is-editing-mask" : ""}" data-index="${i}" draggable="true" role="listitem">
+    }${editingMask ? " is-editing-mask" : ""}" data-index="${i}" draggable="true" role="listitem"
+        tabindex="0" aria-current="${active ? "true" : "false"}" aria-label="${escapeHtml(layer.name)}">
         <span class="layer-thumb${active && !editingMask ? " is-target" : ""}" data-thumb="${i}" data-pick-target="layer" data-tip="${t("Edit layer pixels")}">${
           layer.text ? `<span class="layer-badge" aria-label="${t("Text layer")}">T</span>` : ""
         }</span>
@@ -647,6 +760,11 @@ function syncLayers() {
         </span>
       </div>`);
   }
+  // rebuilding the list drops focus: give it back to the same row
+  const focusedIndex = list.contains(document.activeElement)
+    ? document.activeElement.closest?.(".layer-item")?.dataset.index
+    : undefined;
+  const focusedId = focusedIndex !== undefined ? doc.layers[Number(focusedIndex)]?.id : null;
   list.innerHTML = items.join("");
 
   for (const holder of $$("[data-thumb]", list)) {
@@ -660,7 +778,9 @@ function syncLayers() {
   $$("[data-toggle-layer='locked']", list).forEach((btn) => {
     const index = Number(btn.closest(".layer-item").dataset.index);
     btn.classList.toggle("is-active", doc.layers[index].locked);
+    btn.setAttribute("aria-pressed", String(doc.layers[index].locked));
   });
+  if (focusedId) focusLayer(focusedId);
 
   const active = doc.active;
   if (active) {
@@ -781,7 +901,10 @@ function invalidateFilters() {
 function buildTabs() {
   $$(".tab").forEach((tab) => {
     tab.addEventListener("click", () => {
-      $$(".tab").forEach((t) => t.classList.toggle("is-active", t === tab));
+      $$(".tab").forEach((t) => {
+        t.classList.toggle("is-active", t === tab);
+        t.setAttribute("aria-selected", String(t === tab));
+      });
       $$(".tab-panel").forEach((p) =>
         p.classList.toggle("is-active", p.dataset.panel === tab.dataset.tab)
       );
@@ -793,6 +916,8 @@ function buildTabs() {
 export function openTab(name) {
   const tab = $(`.tab[data-tab="${name}"]`);
   tab?.click();
+  // the panel must be visible, also when the panels were hidden
+  $(".workspace")?.classList.remove("side-collapsed");
   $("#sidebar").classList.add("is-open");
 }
 
@@ -832,11 +957,11 @@ function syncHistoryButtons() {
   $("#undoBtn").disabled = !history.canUndo;
   $("#redoBtn").disabled = !history.canRedo;
   $("#undoBtn").dataset.tip = history.undoLabel
-    ? `${t("Undo {label}", { label: history.undoLabel })} · ${MOD}Z`
-    : `${t("Undo")} · ${MOD}Z`;
+    ? `${t("Undo {label}", { label: history.undoLabel })} · ${platformKeys(`${MOD}Z`)}`
+    : `${t("Undo")} · ${platformKeys(`${MOD}Z`)}`;
   $("#redoBtn").dataset.tip = history.redoLabel
-    ? `${t("Redo {label}", { label: history.redoLabel })} · ⇧${MOD}Z`
-    : `${t("Redo")} · ⇧${MOD}Z`;
+    ? `${t("Redo {label}", { label: history.redoLabel })} · ${platformKeys(`⇧${MOD}Z`)}`
+    : `${t("Redo")} · ${platformKeys(`⇧${MOD}Z`)}`;
 }
 
 function syncDocMeta() {
@@ -865,8 +990,24 @@ function syncStatus() {
 
 /* ================================= toasts ================================= */
 
+/** Keep a popover host shown and above everything shown before it. */
+function raise(el) {
+  if (!el.showPopover) return false;
+  try {
+    if (el.matches(":popover-open")) el.hidePopover();
+    el.showPopover();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function toast(msg, kind = "info", { action } = {}) {
   const host = $("#toasts");
+  // a modal dialog opened after the host would cover it: bring it back up
+  if (host.showPopover && (!host.matches(":popover-open") || document.querySelector("dialog[open]"))) {
+    raise(host);
+  }
   const el = document.createElement("div");
   el.className = `toast ${kind}`;
   el.innerHTML = `${icon(
@@ -943,12 +1084,22 @@ function initTooltips() {
 /** Shown by actions.js around slow synchronous work on large documents. */
 function setBusy(label) {
   const el = $("#busy");
+  const popover = !!el.showPopover;
   if (!label) {
+    if (popover) {
+      try {
+        el.hidePopover();
+      } catch {
+        /* already hidden */
+      }
+    }
     el.hidden = true;
     return;
   }
   $("#busyLabel").textContent = label;
   el.hidden = false;
+  // above any open dialog (exporting a PSD, decoding from the welcome screen)
+  if (popover) raise(el);
 }
 
 /* ================================== init ================================== */
@@ -1001,4 +1152,5 @@ export function initUI() {
   syncDocMeta();
   syncZoom();
   syncStatus();
+  raise($("#toasts"));
 }

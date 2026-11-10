@@ -18,9 +18,11 @@
     <meta property="og:image" content="https://robertlib.github.io/paint/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Paint Studio – editor obrázků v prohlížeči. Vrstvy, retuš, filtry." />
     <meta property="og:locale" content="cs_CZ" />
     <meta property="og:locale:alternate" content="en_US" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image:alt" content="Paint Studio – editor obrázků v prohlížeči. Vrstvy, retuš, filtry." />
 
     <link rel="icon" type="image/svg+xml" href="../../favicon.svg" />
     <link rel="icon" type="image/x-icon" href="../../favicon.ico" />
@@ -30,7 +32,6 @@
     <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
 
     <script>
-      // the editor's theme choice applies here too; otherwise follow the system
       try {
         var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
         document.documentElement.dataset.theme =
@@ -43,7 +44,7 @@
     <link rel="stylesheet" href="../../css/site.css" />
     <link rel="modulepreload" href="../../js/site.js" />
     <link rel="modulepreload" href="../../js/store.js" />
-    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/cs/"},{"@type":"ListItem","position":2,"name":"Přidat text do fotky","item":"https://robertlib.github.io/paint/cs/pridat-text-do-fotky/"}]},{"@type":"WebApplication","name":"Text do fotky — Paint Studio","url":"https://robertlib.github.io/paint/cs/pridat-text-do-fotky/","description":"Napište text do fotky přímo na plátno: šest písem, velikost až 400 px, tučně, kurzívou i s nižším krytím. Hodí se na meme, popisky a vodoznak. Zdarma.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (modern web browser)","inLanguage":"cs","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@id":"https://robertlib.github.io/paint/#website"}}]}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://robertlib.github.io/paint/cs/#website","name":"Paint Studio","url":"https://robertlib.github.io/paint/cs/","inLanguage":"cs"},{"@type":"WebApplication","@id":"https://robertlib.github.io/paint/cs/#app","name":"Paint Studio","url":"https://robertlib.github.io/paint/cs/","description":"Editor obrázků v prohlížeči: vrstvy, štětce, retuš, korekce, filtry a export do PNG, JPG, WebP i PSD. Zdarma, bez registrace a bez nahrávání fotek na server.","applicationCategory":"MultimediaApplication","applicationSubCategory":"Image editor","operatingSystem":"Any (modern web browser)","browserRequirements":"Requires JavaScript and HTML5 canvas","inLanguage":["en","cs"],"isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"image":"https://robertlib.github.io/paint/og-image.png","screenshot":"https://robertlib.github.io/paint/docs/screenshot.png","license":"https://opensource.org/licenses/MIT","codeRepository":"https://github.com/RobertLib/paint","author":{"@type":"Person","name":"RobertLib","url":"https://github.com/RobertLib"}},{"@type":"WebPage","@id":"https://robertlib.github.io/paint/cs/pridat-text-do-fotky/#webpage","url":"https://robertlib.github.io/paint/cs/pridat-text-do-fotky/","name":"Přidat text do fotky online | Paint Studio","description":"Napište text do fotky přímo na plátno: šest písem, velikost až 400 px, tučně, kurzívou i s nižším krytím. Hodí se na meme, popisky a vodoznak. Zdarma.","inLanguage":"cs","isPartOf":{"@id":"https://robertlib.github.io/paint/cs/#website"},"about":{"@id":"https://robertlib.github.io/paint/cs/#app"},"primaryImageOfPage":{"@type":"ImageObject","url":"https://robertlib.github.io/paint/og-image.png","width":1200,"height":630},"breadcrumb":{"@id":"https://robertlib.github.io/paint/cs/pridat-text-do-fotky/#breadcrumb"}},{"@type":"BreadcrumbList","@id":"https://robertlib.github.io/paint/cs/pridat-text-do-fotky/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/cs/"},{"@type":"ListItem","position":2,"name":"Text do fotky","item":"https://robertlib.github.io/paint/cs/pridat-text-do-fotky/"}]}]}</script>
     
   </head>
   <body class="site">
@@ -51,32 +52,33 @@
     
     <header class="site-head">
       <a class="site-brand" href="../../cs/">
-        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+        <span class="brand-mark" aria-hidden="true"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg></span>
         <span translate="no">Paint<em>Studio</em></span>
       </a>
-      <nav class="site-nav" aria-label="Všechny nástroje">
+      <nav class="site-nav" aria-label="Hlavní">
         <a href="../../cs/#tools">Všechny nástroje</a>
         <span class="langs" role="group" aria-label="Jazyk"><a class="lang" href="../../add-text-to-photo/" hreflang="en" lang="en">EN</a><span class="lang is-current" aria-current="true">CS</span></span>
-        <a class="btn btn-primary" href="../../editor/?lang=cs&task=text"><svg class="icon"><use href="#i-brush" /></svg><span>Otevřít editor</span></a>
+        <a class="btn btn-primary" href="../../editor/?lang=cs&task=text"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg><span>Otevřít editor</span></a>
       </nav>
     </header>
     <main>
       <section class="hero">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="../../cs/">Paint Studio</a><span aria-hidden="true">›</span><span>Text do fotky</span></nav>
+        <nav class="crumbs" aria-label="Drobečková navigace"><a href="../../cs/">Paint Studio</a><span aria-hidden="true">›</span><span aria-current="page">Text do fotky</span></nav>
         <h1>Přidat text do fotky</h1>
         <p class="lead">Klikněte do obrázku a pište – text se zobrazuje rovnou ve výsledném písmu a velikosti. Každý nápis zůstane na samostatné vrstvě, takže ho můžete později opravit nebo posunout.</p>
         
       <div class="drop" data-drop>
-        <svg class="icon drop-icon"><use href="#i-image" /></svg>
+        <svg class="icon drop-icon" aria-hidden="true" focusable="false"><use href="#i-image" /></svg>
         <strong class="drop-title">Přetáhněte sem obrázek</strong>
-        <label class="btn btn-primary btn-lg"><svg class="icon"><use href="#i-folder" /></svg><span>Vybrat obrázek</span>
-          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+        <label class="btn btn-primary btn-lg"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-folder" /></svg><span>Vybrat obrázek</span>
+          <input type="file" accept="image/*,.heic,.heif,.psd,.paint" class="sr-only" data-file /></label>
         <p class="drop-hint">nebo ho vložte ze schránky (Ctrl+V) · PNG, JPG, WebP, HEIC, PSD…</p>
         
-        <p class="drop-busy" data-busy hidden>Editor se otevírá…</p>
+        <p class="drop-busy" data-busy role="status" aria-live="polite" hidden>Editor se otevírá…</p>
+        <p class="drop-error" data-error role="alert" hidden></p>
       </div>
-      <script type="application/json" id="dropConfig">{"editor":"../../editor/","task":"text","lang":"cs"}</script>
-        <ul class="trust"><li><svg class="icon"><use href="#i-check" /></svg><span>Nic se nenahrává</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>Bez registrace</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>Bez vodoznaku</span></li></ul>
+      <script type="application/json" id="dropConfig">{"editor":"../../editor/","task":"text","lang":"cs","notOpenable":"Tento soubor tu otevřít nejde. Vyberte obrázek (PNG, JPG, WebP, HEIC…), soubor PSD nebo projekt .paint."}</script>
+        <ul class="trust"><li><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check" /></svg><span>Nic se nenahrává</span></li><li><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check" /></svg><span>Bez registrace</span></li><li><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check" /></svg><span>Bez vodoznaku</span></li></ul>
       </section>
 
       <section class="block steps">
@@ -88,7 +90,7 @@
         <h2>Písmo, velikost a barva</h2>
         <p>V liště nástroje Text vyberete jedno ze šesti písem – systémové bezpatkové, patkové, neproporcionální, Impact, ručně psané nebo Trebuchet – a velikost od 6 do 400 px. Text zarovnáte doleva, na střed nebo doprava a nastavíte mu tučný řez, kurzívu a krytí. Barvu určuje hlavní barva v panelu Barva, takže ji změníte stejně jako barvu štětce, případně ji nástrojem Kapátko nasajete přímo z fotky. Na meme se hodí Impact, na jemné popisky patkové písmo.</p>
         <h2>Text zůstává upravitelný</h2>
-        <p>Každý nápis vznikne jako samostatná textová vrstva v panelu Vrstvy. Překlep opravíte tak, že na text znovu kliknete nástrojem Text, a nástrojem Přesun ho posunete jinam. Upravitelný zůstává, dokud do jeho vrstvy nezačnete malovat nebo ji neotočíte či nepřevrátíte – pak se z něj stanou obyčejné pixely. Pokud chcete text natočit, udělejte to až úplně nakonec. Práci uloženou jako projekt <code>.paint</code> otevřete později i se všemi vrstvami.</p>
+        <p>Každý nápis vznikne jako samostatná textová vrstva v panelu Vrstvy. Překlep opravíte tak, že na text znovu kliknete nástrojem Text, a nástrojem Přesun ho posunete jinam. Upravitelný zůstává, dokud do jeho vrstvy nezačnete malovat nebo ji neotočíte či nepřeklopíte – pak se z něj stanou obyčejné pixely. Pokud chcete text natočit, udělejte to až úplně nakonec. Práci uloženou jako projekt <code>.paint</code> otevřete později i se všemi vrstvami.</p>
         <h2>Meme, popisky a vodoznak</h2>
         <p>Na meme napište krátký text velkým písmem Impact k hornímu a dolnímu okraji obrázku, bílá barva se dobře čte na většině fotek. Popisek k fotce působí čistěji menším písmem v rohu. Pro vodoznak napište jméno nebo adresu webu a krytí snižte na 30–50 %, aby nápis nepřekrýval motiv. Na pestrém pozadí pomůže, když pod text přidáte novou vrstvu a nástrojem Obdélník na ni nakreslíte poloprůhledný podklad.</p>
       </section>
@@ -98,7 +100,7 @@
         <h3>Jak napsat text do fotky na mobilu?</h3>
         <p>Otevřete tuto stránku v mobilním prohlížeči a vyberte fotku z galerie. Nástrojem Text klepněte na místo, kde má nápis začínat, a pište klávesnicí telefonu. Hotový nápis pak posunete nástrojem Přesun tažením prstu.</p>
         <h3>Můžu text později změnit?</h3>
-        <p>Ano. Text je na vlastní textové vrstvě, stačí na něj znovu kliknout nástrojem Text a nápis upravit. Změnu potvrďte klávesami <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (na Macu <kbd>⌘</kbd>+<kbd>Enter</kbd>). Upravitelnost končí, jakmile do vrstvy malujete nebo ji otočíte či převrátíte.</p>
+        <p>Ano. Text je na vlastní textové vrstvě, stačí na něj znovu kliknout nástrojem Text a nápis upravit. Změnu potvrďte klávesami <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (na Macu <kbd>⌘</kbd>+<kbd>Enter</kbd>). Upravitelnost končí, jakmile do vrstvy malujete nebo ji otočíte či překlopíte.</p>
         <h3>Jaká písma jsou k dispozici?</h3>
         <p>Šest: systémové bezpatkové, patkové, neproporcionální, Impact, ručně psané a Trebuchet. Vlastní písma nahrát nelze. Podoba systémových písem se může mírně lišit podle operačního systému, Impact a Trebuchet vypadají všude podobně, pokud je zařízení má nainstalované.</p>
         <h3>Jak udělat vodoznak na fotku?</h3>
@@ -108,13 +110,13 @@
       <section class="block">
         <h2>Související nástroje</h2>
         <ul class="tool-grid"><li><a class="tool-card" href="../../cs/kresleni-do-fotky/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-brush" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg></span>
           <span class="tool-text"><strong>Kreslení do fotky</strong><span>Štětec, šipky a tvary pro poznámky a nákresy</span></span>
         </a></li><li><a class="tool-card" href="../../cs/filtry-na-fotky/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-sparkles" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-sparkles" /></svg></span>
           <span class="tool-text"><strong>Filtry na fotky</strong><span>21 filtrů s náhledem přímo z vaší fotky</span></span>
         </a></li><li><a class="tool-card" href="../../cs/oriznout-obrazek/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-crop" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-crop" /></svg></span>
           <span class="tool-text"><strong>Oříznout fotku</strong><span>Ořez s poměry stran 1:1, 4:3, 16:9 a mřížkou třetin</span></span>
         </a></li></ul>
       </section>
@@ -123,14 +125,14 @@
       <div class="foot-inner">
         <div class="foot-about">
           <a class="site-brand" href="../../cs/">
-            <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+            <span class="brand-mark" aria-hidden="true"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg></span>
             <span translate="no">Paint<em>Studio</em></span>
           </a>
           <p>Paint Studio je zdarma a má otevřený zdrojový kód pod licencí MIT. Všechno běží přímo ve vašem prohlížeči, obrázky nikam neodcházejí.</p>
           <p><a href="https://github.com/RobertLib/paint" rel="noopener">Zdrojový kód na GitHubu</a> · <a href="../../add-text-to-photo/" hreflang="en" lang="en">English</a> · <a href="../../cs/pridat-text-do-fotky/" hreflang="cs" lang="cs">Čeština</a></p>
         </div>
-        <nav aria-label="Všechny nástroje">
-          <h2>Všechny nástroje</h2>
+        <nav aria-labelledby="foot-tools">
+          <h2 id="foot-tools">Všechny nástroje</h2>
           <ul class="foot-links"><li><a href="../../cs/oriznout-obrazek/">Oříznout fotku</a></li><li><a href="../../cs/zmenit-velikost-obrazku/">Změnit velikost</a></li><li><a href="../../cs/otocit-obrazek/">Otočit obrázek</a></li><li><a href="../../cs/zmensit-velikost-fotky/">Zmenšit velikost fotky</a></li><li><a href="../../cs/prevod-obrazku/">Převod formátů</a></li><li><a href="../../cs/png-na-jpg/">PNG na JPG</a></li><li><a href="../../cs/webp-na-jpg/">WebP na JPG</a></li><li><a href="../../cs/heic-na-jpg/">HEIC na JPG</a></li><li><a href="../../cs/rozmazat-fotku/">Rozmazat fotku</a></li><li><a href="../../cs/pridat-text-do-fotky/">Text do fotky</a></li><li><a href="../../cs/cernobila-fotka/">Černobílá fotka</a></li><li><a href="../../cs/invertovat-barvy/">Invertovat barvy</a></li><li><a href="../../cs/filtry-na-fotky/">Filtry na fotky</a></li><li><a href="../../cs/zesvetlit-fotku/">Zesvětlit fotku</a></li><li><a href="../../cs/pruhledne-pozadi/">Průhledné pozadí</a></li><li><a href="../../cs/zjistit-barvu-z-obrazku/">Barva z obrázku</a></li><li><a href="../../cs/kresleni-do-fotky/">Kreslení do fotky</a></li><li><a href="../../cs/malovani-online/">Malování online</a></li><li><a href="../../cs/otevrit-psd/">Otevřít PSD</a></li><li><a href="../../cs/retus-fotky/">Retuš fotky</a></li></ul>
         </nav>
       </div>

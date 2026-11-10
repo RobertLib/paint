@@ -33,6 +33,7 @@ export const view = {
     const rect = this.stage.getBoundingClientRect();
     this.w = Math.max(1, rect.width);
     this.h = Math.max(1, rect.height);
+    this._rect = null;
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     const bw = Math.round(this.w * this.dpr);
     const bh = Math.round(this.h * this.dpr);
@@ -41,6 +42,11 @@ export const view = {
       this.canvas.height = bh;
     }
     emit("view", this);
+    // a fit asked for before the stage had a size happens now
+    if (this._fitPending && this.w > 120 && this.h > 120) {
+      this._fitPending = false;
+      this.fit();
+    }
   },
 
   /* ------------------------------ transforms ----------------------------- */
@@ -53,9 +59,12 @@ export const view = {
     return { x: dx * this.zoom + this.x, y: dy * this.zoom + this.y };
   },
 
-  /** Stage-relative CSS coordinates for a pointer event. */
+  /**
+   * Stage-relative CSS coordinates for a pointer event. The canvas rectangle
+   * is cached (resize() drops it) so pointer moves cause no layout reads.
+   */
   eventPos(e) {
-    const rect = this.canvas.getBoundingClientRect();
+    const rect = (this._rect ||= this.canvas.getBoundingClientRect());
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   },
 
@@ -121,9 +130,12 @@ export const view = {
   fit({ padding = 56, max = 8 } = {}) {
     const doc = state.doc;
     if (!doc) return;
+    // not laid out yet (or a tiny stage): fit again once it has a size
+    this._fitPending = this.w <= 120 || this.h <= 120;
+    const pad = Math.min(padding, this.w / 4, this.h / 4);
     const z = Math.min(
-      (this.w - padding) / doc.width,
-      (this.h - padding) / doc.height
+      Math.max(1, this.w - pad) / doc.width,
+      Math.max(1, this.h - pad) / doc.height
     );
     this.zoom = clamp(z, MIN_ZOOM, max);
     this.center();

@@ -18,9 +18,11 @@
     <meta property="og:image" content="https://robertlib.github.io/paint/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Paint Studio — image editor in your browser. Layers, retouching, filters." />
     <meta property="og:locale" content="en_US" />
     <meta property="og:locale:alternate" content="cs_CZ" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image:alt" content="Paint Studio — image editor in your browser. Layers, retouching, filters." />
 
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="icon" type="image/x-icon" href="./favicon.ico" />
@@ -30,7 +32,6 @@
     <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
 
     <script>
-      // the editor's theme choice applies here too; otherwise follow the system
       try {
         var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
         document.documentElement.dataset.theme =
@@ -43,7 +44,7 @@
     <link rel="stylesheet" href="./css/site.css" />
     <link rel="modulepreload" href="./js/site.js" />
     <link rel="modulepreload" href="./js/store.js" />
-    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://robertlib.github.io/paint/#website","name":"Paint Studio","url":"https://robertlib.github.io/paint/","inLanguage":"en"},{"@type":"WebApplication","name":"Paint Studio","url":"https://robertlib.github.io/paint/","description":"Edit photos and paint online for free. Layers, brushes, filters, PSD and HEIC support — all in your browser, with no upload, no sign-up and no watermark.","applicationCategory":"MultimediaApplication","applicationSubCategory":"Image editor","operatingSystem":"Any (modern web browser)","browserRequirements":"Requires JavaScript and HTML5 canvas","inLanguage":["en","cs"],"isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"image":"https://robertlib.github.io/paint/og-image.png","screenshot":"https://robertlib.github.io/paint/og-image.png","license":"https://opensource.org/licenses/MIT","codeRepository":"https://github.com/RobertLib/paint","author":{"@type":"Person","name":"RobertLib","url":"https://github.com/RobertLib"}}]}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://robertlib.github.io/paint/#website","name":"Paint Studio","url":"https://robertlib.github.io/paint/","inLanguage":"en"},{"@type":"WebApplication","@id":"https://robertlib.github.io/paint/#app","name":"Paint Studio","url":"https://robertlib.github.io/paint/","description":"Edit photos and paint online for free. Layers, brushes, filters, PSD and HEIC support — all in your browser, with no upload, no sign-up and no watermark.","applicationCategory":"MultimediaApplication","applicationSubCategory":"Image editor","operatingSystem":"Any (modern web browser)","browserRequirements":"Requires JavaScript and HTML5 canvas","inLanguage":["en","cs"],"isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"image":"https://robertlib.github.io/paint/og-image.png","screenshot":"https://robertlib.github.io/paint/docs/screenshot.png","license":"https://opensource.org/licenses/MIT","codeRepository":"https://github.com/RobertLib/paint","author":{"@type":"Person","name":"RobertLib","url":"https://github.com/RobertLib"}},{"@type":"WebPage","@id":"https://robertlib.github.io/paint/#webpage","url":"https://robertlib.github.io/paint/","name":"Paint Studio — Free Image Editor in Your Browser","description":"Edit photos and paint online for free. Layers, brushes, filters, PSD and HEIC support — all in your browser, with no upload, no sign-up and no watermark.","inLanguage":"en","isPartOf":{"@id":"https://robertlib.github.io/paint/#website"},"about":{"@id":"https://robertlib.github.io/paint/#app"},"primaryImageOfPage":{"@type":"ImageObject","url":"https://robertlib.github.io/paint/og-image.png","width":1200,"height":630}}]}</script>
     
   </head>
   <body class="site">
@@ -51,13 +52,13 @@
     
     <header class="site-head">
       <a class="site-brand" href="./">
-        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+        <span class="brand-mark" aria-hidden="true"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg></span>
         <span translate="no">Paint<em>Studio</em></span>
       </a>
-      <nav class="site-nav" aria-label="All tools">
+      <nav class="site-nav" aria-label="Main">
         <a href="./#tools">All tools</a>
         <span class="langs" role="group" aria-label="Language"><span class="lang is-current" aria-current="true">EN</span><a class="lang" href="./cs/" hreflang="cs" lang="cs">CS</a></span>
-        <a class="btn btn-primary" href="./editor/?lang=en"><svg class="icon"><use href="#i-brush" /></svg><span>Open editor</span></a>
+        <a class="btn btn-primary" href="./editor/?lang=en"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg><span>Open editor</span></a>
       </nav>
     </header>
     <main>
@@ -66,79 +67,80 @@
         <p class="lead">Crop, resize, retouch, convert or paint from scratch — Paint Studio is a full layer-based editor that works in any modern browser. Your images are opened and processed on your own device, so nothing is uploaded and there is no account to create.</p>
         
       <div class="drop" data-drop>
-        <svg class="icon drop-icon"><use href="#i-image" /></svg>
+        <svg class="icon drop-icon" aria-hidden="true" focusable="false"><use href="#i-image" /></svg>
         <strong class="drop-title">Drop an image here</strong>
-        <label class="btn btn-primary btn-lg"><svg class="icon"><use href="#i-folder" /></svg><span>Choose image</span>
-          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+        <label class="btn btn-primary btn-lg"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-folder" /></svg><span>Choose image</span>
+          <input type="file" accept="image/*,.heic,.heif,.psd,.paint" class="sr-only" data-file /></label>
         <p class="drop-hint">or paste with Ctrl+V · PNG, JPG, WebP, HEIC, PSD…</p>
         <a class="drop-blank-link" href="./editor/?lang=en&task=paint">Start with a blank canvas</a>
-        <p class="drop-busy" data-busy hidden>Opening the editor…</p>
+        <p class="drop-busy" data-busy role="status" aria-live="polite" hidden>Opening the editor…</p>
+        <p class="drop-error" data-error role="alert" hidden></p>
       </div>
-      <script type="application/json" id="dropConfig">{"editor":"./editor/","task":"","lang":"en"}</script>
-        <ul class="trust"><li><svg class="icon"><use href="#i-check" /></svg><span>Nothing is uploaded</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No sign-up</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No watermark</span></li></ul>
+      <script type="application/json" id="dropConfig">{"editor":"./editor/","task":"","lang":"en","notOpenable":"This file can’t be opened here. Choose an image (PNG, JPG, WebP, HEIC…), a PSD file or a .paint project."}</script>
+        <ul class="trust"><li><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check" /></svg><span>Nothing is uploaded</span></li><li><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check" /></svg><span>No sign-up</span></li><li><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check" /></svg><span>No watermark</span></li></ul>
       </section>
 
       <section class="block" id="tools">
         <h2>All tools</h2>
         <ul class="tool-grid"><li><a class="tool-card" href="./crop-image/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-crop" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-crop" /></svg></span>
           <span class="tool-text"><strong>Crop image</strong><span>Cut out the part you want, with ratio presets</span></span>
         </a></li><li><a class="tool-card" href="./resize-image/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-frame" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-frame" /></svg></span>
           <span class="tool-text"><strong>Resize image</strong><span>Change width and height in pixels</span></span>
         </a></li><li><a class="tool-card" href="./rotate-image/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-rotate-cw" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-rotate-cw" /></svg></span>
           <span class="tool-text"><strong>Rotate image</strong><span>Rotate 90°, flip or straighten at any angle</span></span>
         </a></li><li><a class="tool-card" href="./compress-image/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-download" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-download" /></svg></span>
           <span class="tool-text"><strong>Compress image</strong><span>Shrink file size with quality and scale</span></span>
         </a></li><li><a class="tool-card" href="./image-converter/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-swap" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-swap" /></svg></span>
           <span class="tool-text"><strong>Image converter</strong><span>Convert between PNG, JPG, WebP and PSD</span></span>
         </a></li><li><a class="tool-card" href="./png-to-jpg/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-image" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-image" /></svg></span>
           <span class="tool-text"><strong>PNG to JPG</strong><span>Turn PNGs into compact, compatible JPGs</span></span>
         </a></li><li><a class="tool-card" href="./webp-to-jpg/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-image" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-image" /></svg></span>
           <span class="tool-text"><strong>WebP to JPG</strong><span>Make web images open in any app</span></span>
         </a></li><li><a class="tool-card" href="./heic-to-jpg/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-image" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-image" /></svg></span>
           <span class="tool-text"><strong>HEIC to JPG</strong><span>Open iPhone photos anywhere as JPG</span></span>
         </a></li><li><a class="tool-card" href="./blur-image/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-blur" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-blur" /></svg></span>
           <span class="tool-text"><strong>Blur image</strong><span>Blur or pixelate faces and private details</span></span>
         </a></li><li><a class="tool-card" href="./add-text-to-photo/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-text" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-text" /></svg></span>
           <span class="tool-text"><strong>Add text</strong><span>Captions, memes and watermarks on photos</span></span>
         </a></li><li><a class="tool-card" href="./black-and-white-photo/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-image" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-image" /></svg></span>
           <span class="tool-text"><strong>Black and white</strong><span>Grayscale, Noir and Sepia in one click</span></span>
         </a></li><li><a class="tool-card" href="./invert-colors/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-swap" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-swap" /></svg></span>
           <span class="tool-text"><strong>Invert colors</strong><span>Make a negative in one click</span></span>
         </a></li><li><a class="tool-card" href="./photo-filters/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-sparkles" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-sparkles" /></svg></span>
           <span class="tool-text"><strong>Photo filters</strong><span>21 effects previewed on your own photo</span></span>
         </a></li><li><a class="tool-card" href="./brighten-photo/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-sun" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-sun" /></svg></span>
           <span class="tool-text"><strong>Brighten photo</strong><span>Fix dark photos with exposure and Levels</span></span>
         </a></li><li><a class="tool-card" href="./make-background-transparent/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-wand" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-wand" /></svg></span>
           <span class="tool-text"><strong>Transparent background</strong><span>Remove plain backgrounds from logos and photos</span></span>
         </a></li><li><a class="tool-card" href="./color-picker-from-image/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-eyedropper" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-eyedropper" /></svg></span>
           <span class="tool-text"><strong>Color picker</strong><span>Get HEX and RGB codes from any pixel</span></span>
         </a></li><li><a class="tool-card" href="./draw-on-image/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-brush" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg></span>
           <span class="tool-text"><strong>Draw on image</strong><span>Arrows, shapes and freehand notes on photos</span></span>
         </a></li><li><a class="tool-card" href="./paint-online/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-brush" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg></span>
           <span class="tool-text"><strong>Paint online</strong><span>A blank canvas with brushes and layers</span></span>
         </a></li><li><a class="tool-card" href="./open-psd-online/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-layers" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-layers" /></svg></span>
           <span class="tool-text"><strong>Open PSD</strong><span>View and edit Photoshop files with layers</span></span>
         </a></li><li><a class="tool-card" href="./retouch-photo/">
-          <span class="tool-icon"><svg class="icon"><use href="#i-clone" /></svg></span>
+          <span class="tool-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-clone" /></svg></span>
           <span class="tool-text"><strong>Retouch photo</strong><span>Remove blemishes, dust and small objects</span></span>
         </a></li></ul>
       </section>
@@ -165,7 +167,7 @@
         <h3>Can I use it on a phone, tablet or Chromebook?</h3>
         <p>Yes. It runs in any modern browser and supports touch, pinch zoom and stylus input, including pen pressure where the browser reports it. A tablet with a pen is comfortable for drawing; on a phone it is best for quick crops, conversions, filters and adjustments.</p>
         <h3>Which file formats can I open and save?</h3>
-        <p>You can open PNG, JPEG, WebP, GIF (first frame only), SVG, BMP, AVIF when your browser decodes it, HEIC/HEIF and 8-bit PSD files, plus .paint projects. You can export PNG, JPEG and WebP, a layered PSD, or a .paint project that keeps layers for later editing.</p>
+        <p>You can open PNG, JPEG, WebP, GIF (first frame only), SVG, BMP, AVIF when your browser decodes it, HEIC/HEIF, 8-, 16- and 32-bit RGB or grayscale PSD files with their layers, plus .paint projects. You can export PNG, JPEG and WebP, a layered PSD, or a .paint project that keeps layers for later editing.</p>
         <h3>How large can an image be?</h3>
         <p>Documents can be up to 8000 × 8000 pixels, which covers photos from most phones and cameras. Bigger images are scaled down to fit within 8000 px when they are opened, so you can still edit them, just at a slightly lower resolution.</p>
         <h3>Does it have AI features like automatic background removal?</h3>
@@ -178,14 +180,14 @@
       <div class="foot-inner">
         <div class="foot-about">
           <a class="site-brand" href="./">
-            <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+            <span class="brand-mark" aria-hidden="true"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-brush" /></svg></span>
             <span translate="no">Paint<em>Studio</em></span>
           </a>
           <p>Paint Studio is a free, open-source image editor under the MIT license. It runs entirely in your browser, so your images never leave your device.</p>
           <p><a href="https://github.com/RobertLib/paint" rel="noopener">Source code on GitHub</a> · <a href="./" hreflang="en" lang="en">English</a> · <a href="./cs/" hreflang="cs" lang="cs">Čeština</a></p>
         </div>
-        <nav aria-label="All tools">
-          <h2>All tools</h2>
+        <nav aria-labelledby="foot-tools">
+          <h2 id="foot-tools">All tools</h2>
           <ul class="foot-links"><li><a href="./crop-image/">Crop image</a></li><li><a href="./resize-image/">Resize image</a></li><li><a href="./rotate-image/">Rotate image</a></li><li><a href="./compress-image/">Compress image</a></li><li><a href="./image-converter/">Image converter</a></li><li><a href="./png-to-jpg/">PNG to JPG</a></li><li><a href="./webp-to-jpg/">WebP to JPG</a></li><li><a href="./heic-to-jpg/">HEIC to JPG</a></li><li><a href="./blur-image/">Blur image</a></li><li><a href="./add-text-to-photo/">Add text</a></li><li><a href="./black-and-white-photo/">Black and white</a></li><li><a href="./invert-colors/">Invert colors</a></li><li><a href="./photo-filters/">Photo filters</a></li><li><a href="./brighten-photo/">Brighten photo</a></li><li><a href="./make-background-transparent/">Transparent background</a></li><li><a href="./color-picker-from-image/">Color picker</a></li><li><a href="./draw-on-image/">Draw on image</a></li><li><a href="./paint-online/">Paint online</a></li><li><a href="./open-psd-online/">Open PSD</a></li><li><a href="./retouch-photo/">Retouch photo</a></li></ul>
         </nav>
       </div>

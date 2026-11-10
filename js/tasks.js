@@ -24,22 +24,39 @@ const effectName = (id) => EFFECTS.find((e) => e.id === id)?.name || id;
 
 /** Blur/pixelate strong enough to really hide what is selected. */
 function privacyFilter(id) {
+  A.settle();
   const doc = state.doc;
   if (!doc) return;
-  const b = doc.selection?.bounds || { w: doc.width, h: doc.height };
+  // hiding "everything" is never what this task means
+  const b = doc.selection?.bounds;
+  if (!b) {
+    emit("toast", { msg: t("Select what to hide first"), kind: "info" });
+    return;
+  }
   const short = Math.min(b.w, b.h);
   if (id === "blur") A.applyFilter("blur", { radius: Math.max(6, Math.round(short / 9)) });
   else A.applyFilter("pixelate", { block: Math.max(6, Math.round(short / 10)) });
 }
 
-/** Swap the filter a task applied for another one, as a single step. */
-function swapFilter(from, to) {
-  if (history.undoLabel === effectName(from)) A.undo();
-  A.applyFilter(to);
+/** The filter this task applied last, while it is still the latest step. */
+let taskFilter = null;
+
+async function applyTaskFilter(id) {
+  if (await A.applyFilter(id)) taskFilter = { label: effectName(id), entry: history.stack[history.index] };
 }
 
+/** Swap the filter a task applied for another one, as a single step. */
+async function swapFilter(to) {
+  const last = history.stack[history.index];
+  if (taskFilter && last && last === taskFilter.entry) A.undo();
+  await applyTaskFilter(to);
+}
+
+/** The colour the picker is editing (the eyedropper fills that one). */
+const pickedColor = () => state[state.activeChip] || state.primary;
+
 async function copyHex() {
-  const hex = rgbToHex(state.primary).toUpperCase();
+  const hex = rgbToHex(pickedColor()).toUpperCase();
   try {
     await navigator.clipboard.writeText(hex);
     emit("toast", { msg: t("Copied {hex}", { hex }), kind: "ok" });
@@ -49,7 +66,7 @@ async function copyHex() {
 }
 
 const colorText = () => {
-  const c = state.primary;
+  const c = pickedColor();
   return `${rgbToHex(c).toUpperCase()} · RGB ${c.r}, ${c.g}, ${c.b}`;
 };
 
@@ -107,8 +124,8 @@ const TASKS = {
     panel: "filters",
     hint: t("Black & white applied"),
     actions: [
-      { label: effectName("noir"), run: () => swapFilter("grayscale", "noir") },
-      { label: effectName("sepia"), run: () => swapFilter("grayscale", "sepia") },
+      { label: effectName("noir"), run: () => swapFilter("noir") },
+      { label: effectName("sepia"), run: () => swapFilter("sepia") },
       { label: t("Undo"), icon: "i-undo", run: () => A.undo() },
     ],
   },
@@ -169,6 +186,7 @@ const TASKS = {
 };
 
 export const isBlankTask = (id) => !!TASKS[id]?.blank;
+export const isTask = (id) => Object.hasOwn(TASKS, id);
 
 /* --------------------------------- task bar -------------------------------- */
 
@@ -216,28 +234,41 @@ async function run(task) {
   if (task.tool) setTool(task.tool);
   if (task.panel) openTab(task.panel);
   showBar(task);
-  if (task.filter) await A.applyFilter(task.filter);
+  if (task.filter) await applyTaskFilter(task.filter);
   task.run?.();
 }
 
 /**
  * Apply a task now if a document is open, otherwise as soon as one is.
- * Blank-canvas tasks create their own document.
+ * Blank-canvas tasks create their own document. A document restored from
+ * the autosave is the user's earlier work: one-shot tasks (filters, dialogs)
+ * are not applied to it, only the tool and the hints.
  */
-export function startTask(id) {
-  const task = TASKS[id];
+export function startTask(id, { restored = false, again = false } = {}) {
+  const task = isTask(id) ? TASKS[id] : null;
   if (!task) return;
+  if (again) applied = false;
   if (task.blank && !state.doc) {
     A.newDocument({ width: 1600, height: 1000, background: "#ffffff" });
   }
   if (state.doc) {
-    run(task);
+    run(restored ? gentle(task) : task);
     return;
   }
-  const off = on("doc", ({ reason }) => {
+  const off = on("doc", ({ reason, restored: wasRestored }) => {
     if (reason !== "open" || !state.doc) return;
     off();
     // let the document settle (fit, tool activation) before acting on it
-    requestAnimationFrame(() => run(task));
+    requestAnimationFrame(() => run(wasRestored ? gentle(task) : task));
   });
 }
+
+/** The parts of a task that never change the picture. */
+const gentle = (task) => ({
+  tool: task.tool,
+  panel: task.panel,
+  hint: task.filter ? null : task.hint,
+  actions: task.actions,
+  live: task.live,
+  noExport: task.noExport,
+});
