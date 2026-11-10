@@ -1,13 +1,15 @@
 {
   "name": "Paint Studio — Image Editor & Drawing App",
   "short_name": "Paint Studio",
-  "description": "Free online image editor and drawing app with layers, selections, retouching tools, photo adjustments and filters. Everything runs on your device.",
-  "start_url": "./",
+  "description": "Free image editor and drawing app with layers, masks, selections, retouching tools, photo adjustments and filters. Everything runs on your device.",
+  "id": "./",
+  "start_url": "./editor/",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0a0b0f",
   "theme_color": "#6f7dff",
   "orientation": "any",
+  "lang": "en",
   "icons": [
     {
       "src": "./icon-192x192.png",
@@ -22,5 +24,32 @@
       "purpose": "any maskable"
     }
   ],
+  "shortcuts": [
+    {
+      "name": "New canvas",
+      "url": "./editor/?task=paint",
+      "icons": [{ "src": "./icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Crop an image",
+      "url": "./editor/?task=crop",
+      "icons": [{ "src": "./icon-192x192.png", "sizes": "192x192" }]
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "./editor/",
+      "accept": {
+        "image/png": [".png"],
+        "image/jpeg": [".jpg", ".jpeg"],
+        "image/webp": [".webp"],
+        "image/gif": [".gif"],
+        "image/heic": [".heic", ".heif"],
+        "image/vnd.adobe.photoshop": [".psd"],
+        "application/x-paint-studio": [".paint"]
+      }
+    }
+  ],
+  "launch_handler": { "client_mode": "focus-existing" },
   "categories": ["graphics", "photo", "productivity", "utilities"]
 }

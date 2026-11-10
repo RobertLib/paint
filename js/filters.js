@@ -9,38 +9,39 @@
 
 import { clamp255, hsvToRgb, parseColor, rgbToHsv } from "./color.js";
 import { ctx2d, makeCanvas } from "./doc.js";
+import { t } from "./i18n.js";
 
 /* ------------------------------ adjustments ------------------------------ */
 
 export const ADJUST_GROUPS = [
   {
-    group: "Light",
+    group: t("Light"),
     items: [
-      { id: "exposure", label: "Exposure", min: -100, max: 100 },
-      { id: "brightness", label: "Brightness", min: -100, max: 100 },
-      { id: "contrast", label: "Contrast", min: -100, max: 100 },
-      { id: "highlights", label: "Highlights", min: -100, max: 100 },
-      { id: "shadows", label: "Shadows", min: -100, max: 100 },
-      { id: "gamma", label: "Gamma", min: -100, max: 100 },
+      { id: "exposure", label: t("Exposure"), min: -100, max: 100 },
+      { id: "brightness", label: t("Brightness"), min: -100, max: 100 },
+      { id: "contrast", label: t("Contrast"), min: -100, max: 100 },
+      { id: "highlights", label: t("Highlights"), min: -100, max: 100 },
+      { id: "shadows", label: t("Shadows"), min: -100, max: 100 },
+      { id: "gamma", label: t("Gamma"), min: -100, max: 100 },
     ],
   },
   {
-    group: "Color",
+    group: t("Color"),
     items: [
-      { id: "saturation", label: "Saturation", min: -100, max: 100 },
-      { id: "vibrance", label: "Vibrance", min: -100, max: 100 },
-      { id: "temperature", label: "Temperature", min: -100, max: 100 },
-      { id: "tint", label: "Tint", min: -100, max: 100 },
-      { id: "hue", label: "Hue shift", min: -180, max: 180, unit: "°" },
+      { id: "saturation", label: t("Saturation"), min: -100, max: 100 },
+      { id: "vibrance", label: t("Vibrance"), min: -100, max: 100 },
+      { id: "temperature", label: t("Temperature"), min: -100, max: 100 },
+      { id: "tint", label: t("Tint"), min: -100, max: 100 },
+      { id: "hue", label: t("Hue shift"), min: -180, max: 180, unit: "°" },
     ],
   },
   {
-    group: "Detail",
+    group: t("Detail"),
     items: [
-      { id: "clarity", label: "Clarity", min: 0, max: 100 },
-      { id: "softness", label: "Softness", min: 0, max: 100 },
-      { id: "grain", label: "Grain", min: 0, max: 100 },
-      { id: "vignette", label: "Vignette", min: -100, max: 100 },
+      { id: "clarity", label: t("Clarity"), min: 0, max: 100 },
+      { id: "softness", label: t("Softness"), min: 0, max: 100 },
+      { id: "grain", label: t("Grain"), min: 0, max: 100 },
+      { id: "vignette", label: t("Vignette"), min: -100, max: 100 },
     ],
   },
 ];
@@ -223,40 +224,60 @@ function pixelPass(img, v, docW, docH, region) {
 
 /* ------------------------------ convolution ------------------------------ */
 
-function boxBlurData(src, w, h, radius) {
+/**
+ * Box blur with a sliding window — cost is independent of the radius, so the
+ * same code serves a 1px soften and a 120px privacy blur.
+ */
+export function boxBlurData(src, w, h, radius) {
+  const r = Math.max(0, Math.round(radius));
   const out = new Uint8ClampedArray(src.length);
-  const tmp = new Uint8ClampedArray(src.length);
-  const pass = (from, to, horizontal) => {
-    const outer = horizontal ? h : w;
-    const inner = horizontal ? w : h;
-    for (let o = 0; o < outer; o++) {
-      for (let n = 0; n < inner; n++) {
-        let r = 0,
-          g = 0,
-          b = 0,
-          a = 0,
-          count = 0;
-        for (let k = -radius; k <= radius; k++) {
-          const p = n + k;
-          if (p < 0 || p >= inner) continue;
-          const idx = horizontal ? (o * w + p) * 4 : (p * w + o) * 4;
-          r += from[idx];
-          g += from[idx + 1];
-          b += from[idx + 2];
-          a += from[idx + 3];
-          count++;
-        }
-        const t = horizontal ? (o * w + n) * 4 : (n * w + o) * 4;
-        to[t] = r / count;
-        to[t + 1] = g / count;
-        to[t + 2] = b / count;
-        to[t + 3] = a / count;
+  if (r === 0) {
+    out.set(src);
+    return out;
+  }
+  const tmp = new Float32Array(src.length);
+  const span = r * 2 + 1;
+  // horizontal: src -> tmp
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    for (let ch = 0; ch < 4; ch++) {
+      let acc = 0;
+      for (let k = -r; k <= r; k++) {
+        const x = Math.min(w - 1, Math.max(0, k));
+        acc += src[(row + x) * 4 + ch];
+      }
+      for (let x = 0; x < w; x++) {
+        tmp[(row + x) * 4 + ch] = acc / span;
+        const add = Math.min(w - 1, x + r + 1);
+        const sub = Math.max(0, x - r);
+        acc += src[(row + add) * 4 + ch] - src[(row + sub) * 4 + ch];
       }
     }
-  };
-  pass(src, tmp, true);
-  pass(tmp, out, false);
+  }
+  // vertical: tmp -> out
+  for (let x = 0; x < w; x++) {
+    for (let ch = 0; ch < 4; ch++) {
+      let acc = 0;
+      for (let k = -r; k <= r; k++) {
+        const y = Math.min(h - 1, Math.max(0, k));
+        acc += tmp[(y * w + x) * 4 + ch];
+      }
+      for (let y = 0; y < h; y++) {
+        out[(y * w + x) * 4 + ch] = acc / span;
+        const add = Math.min(h - 1, y + r + 1);
+        const sub = Math.max(0, y - r);
+        acc += tmp[(add * w + x) * 4 + ch] - tmp[(sub * w + x) * 4 + ch];
+      }
+    }
+  }
   return out;
+}
+
+/** Three box passes approximate a gaussian closely enough for any use here. */
+export function gaussData(src, w, h, sigma) {
+  if (sigma <= 0.3) return new Uint8ClampedArray(src);
+  const r = Math.max(1, Math.round(sigma * 0.94));
+  return boxBlurData(boxBlurData(boxBlurData(src, w, h, r), w, h, r), w, h, r);
 }
 
 /** In-place unsharp mask on a canvas. */
@@ -332,7 +353,7 @@ function eachPixel(canvas, fn) {
   return canvas;
 }
 
-function gaussianBlur(canvas, px) {
+export function gaussianBlur(canvas, px) {
   if (supportsFilter) {
     const out = makeCanvas(canvas.width, canvas.height);
     const ctx = ctx2d(out);
@@ -343,8 +364,7 @@ function gaussianBlur(canvas, px) {
   }
   const ctx = canvas.getContext("2d");
   const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const blurred = boxBlurData(img.data, canvas.width, canvas.height, Math.max(1, px | 0));
-  img.data.set(blurred);
+  img.data.set(gaussData(img.data, canvas.width, canvas.height, px / 2));
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
@@ -354,7 +374,7 @@ const grayOf = (d, i) => 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
 export const EFFECTS = [
   {
     id: "grayscale",
-    name: "Grayscale",
+    name: t("Grayscale"),
     fn: (c) =>
       eachPixel(c, (d, i) => {
         const g = grayOf(d, i);
@@ -363,7 +383,7 @@ export const EFFECTS = [
   },
   {
     id: "noir",
-    name: "Noir",
+    name: t("Noir"),
     fn: (c) =>
       eachPixel(c, (d, i) => {
         const g = clamp255((grayOf(d, i) - 128) * 1.55 + 118);
@@ -372,7 +392,7 @@ export const EFFECTS = [
   },
   {
     id: "sepia",
-    name: "Sepia",
+    name: t("Sepia"),
     fn: (c) =>
       eachPixel(c, (d, i) => {
         const r = d[i],
@@ -385,7 +405,7 @@ export const EFFECTS = [
   },
   {
     id: "invert",
-    name: "Invert",
+    name: t("Invert"),
     fn: (c) =>
       eachPixel(c, (d, i) => {
         d[i] = 255 - d[i];
@@ -395,7 +415,7 @@ export const EFFECTS = [
   },
   {
     id: "vivid",
-    name: "Vivid",
+    name: t("Vivid"),
     fn: (c) =>
       eachPixel(c, (d, i) => {
         const l = grayOf(d, i);
@@ -406,7 +426,7 @@ export const EFFECTS = [
   },
   {
     id: "fade",
-    name: "Fade",
+    name: t("Fade"),
     fn: (c) =>
       eachPixel(c, (d, i) => {
         const l = grayOf(d, i);
@@ -417,7 +437,7 @@ export const EFFECTS = [
   },
   {
     id: "warm",
-    name: "Warm",
+    name: t("Warm"),
     fn: (c) =>
       eachPixel(c, (d, i) => {
         d[i] = clamp255(d[i] * 1.11 + 8);
@@ -427,7 +447,7 @@ export const EFFECTS = [
   },
   {
     id: "cool",
-    name: "Cool",
+    name: t("Cool"),
     fn: (c) =>
       eachPixel(c, (d, i) => {
         d[i] = clamp255(d[i] * 0.92);
@@ -437,7 +457,7 @@ export const EFFECTS = [
   },
   {
     id: "vintage",
-    name: "Vintage",
+    name: t("Vintage"),
     fn: (c) =>
       eachPixel(c, (d, i) => {
         const r = d[i],
@@ -450,7 +470,7 @@ export const EFFECTS = [
   },
   {
     id: "duotone",
-    name: "Duotone",
+    name: t("Duotone"),
     fn: (c, { primary, secondary }) => {
       const a = parseColor(primary) || { r: 20, g: 20, b: 60 };
       const b = parseColor(secondary) || { r: 255, g: 220, b: 120 };
@@ -464,7 +484,7 @@ export const EFFECTS = [
   },
   {
     id: "posterize",
-    name: "Posterize",
+    name: t("Posterize"),
     fn: (c) => {
       const steps = 5;
       const q = 255 / (steps - 1);
@@ -477,7 +497,7 @@ export const EFFECTS = [
   },
   {
     id: "threshold",
-    name: "Threshold",
+    name: t("Threshold"),
     fn: (c) =>
       eachPixel(c, (d, i) => {
         const g = grayOf(d, i) > 128 ? 255 : 0;
@@ -486,7 +506,7 @@ export const EFFECTS = [
   },
   {
     id: "solarize",
-    name: "Solarize",
+    name: t("Solarize"),
     fn: (c) =>
       eachPixel(c, (d, i) => {
         for (let k = 0; k < 3; k++) {
@@ -494,16 +514,16 @@ export const EFFECTS = [
         }
       }),
   },
-  { id: "blur", name: "Soft blur", fn: (c) => gaussianBlur(c, 5) },
-  { id: "sharpen", name: "Sharpen", fn: (c) => unsharp(c, 0.9, 1) },
+  { id: "blur", name: t("Soft blur"), fn: (c, o) => gaussianBlur(c, o.radius ?? 5) },
+  { id: "sharpen", name: t("Sharpen"), fn: (c) => unsharp(c, 0.9, 1) },
   {
     id: "emboss",
-    name: "Emboss",
+    name: t("Emboss"),
     fn: (c) => convolve(c, [-2, -1, 0, -1, 1, 1, 0, 1, 2], { divisor: 1, bias: 0 }),
   },
   {
     id: "edges",
-    name: "Edge detect",
+    name: t("Edge detect"),
     fn: (c) => {
       const out = convolve(c, [0, -1, 0, -1, 4, -1, 0, -1, 0], { divisor: 1 });
       return eachPixel(out, (d, i) => {
@@ -514,7 +534,7 @@ export const EFFECTS = [
   },
   {
     id: "sketch",
-    name: "Pencil sketch",
+    name: t("Pencil sketch"),
     fn: (c) => {
       const base = makeCanvas(c.width, c.height);
       ctx2d(base).drawImage(c, 0, 0);
@@ -545,7 +565,7 @@ export const EFFECTS = [
   },
   {
     id: "bloom",
-    name: "Bloom",
+    name: t("Bloom"),
     fn: (c) => {
       const bright = makeCanvas(c.width, c.height);
       const bc = ctx2d(bright);
@@ -572,9 +592,9 @@ export const EFFECTS = [
   },
   {
     id: "pixelate",
-    name: "Pixelate",
-    fn: (c) => {
-      const size = Math.max(2, Math.round(Math.min(c.width, c.height) / 90));
+    name: t("Pixelate"),
+    fn: (c, o) => {
+      const size = o.block ?? Math.max(2, Math.round(Math.min(c.width, c.height) / 90));
       const small = makeCanvas(
         Math.max(1, Math.ceil(c.width / size)),
         Math.max(1, Math.ceil(c.height / size))
@@ -591,7 +611,7 @@ export const EFFECTS = [
   },
   {
     id: "vignette",
-    name: "Vignette",
+    name: t("Vignette"),
     fn: (c) => {
       const out = makeCanvas(c.width, c.height);
       const oc = ctx2d(out);
@@ -620,4 +640,151 @@ export function applyEffect(id, canvas, ctxColors = {}) {
   const effect = EFFECTS.find((e) => e.id === id);
   if (!effect) return canvas;
   return effect.fn(canvas, ctxColors) || canvas;
+}
+
+/* ---------------------------- levels & curves ---------------------------- */
+
+/** Per-channel histograms of the visible pixels inside `region`. */
+export function histogram(canvas, region = null) {
+  const r = region || { x: 0, y: 0, w: canvas.width, h: canvas.height };
+  const out = {
+    rgb: new Uint32Array(256),
+    r: new Uint32Array(256),
+    g: new Uint32Array(256),
+    b: new Uint32Array(256),
+  };
+  if (r.w < 1 || r.h < 1) return out;
+  const { data } = canvas.getContext("2d").getImageData(r.x, r.y, r.w, r.h);
+  // large images: sample a grid — the shape of the histogram is what matters
+  const step = Math.max(1, Math.floor(Math.sqrt((r.w * r.h) / 1_500_000))) * 4;
+  for (let i = 0; i < data.length; i += step) {
+    if (data[i + 3] < 8) continue;
+    const R = data[i];
+    const G = data[i + 1];
+    const B = data[i + 2];
+    out.r[R]++;
+    out.g[G]++;
+    out.b[B]++;
+    out.rgb[Math.round(0.299 * R + 0.587 * G + 0.114 * B)]++;
+  }
+  return out;
+}
+
+/** Lookup table for a levels setting: input black/white, gamma, output range. */
+export function levelsLUT({ inBlack = 0, inWhite = 255, gamma = 1, outBlack = 0, outWhite = 255 } = {}) {
+  const lut = new Uint8ClampedArray(256);
+  const span = Math.max(1, inWhite - inBlack);
+  const g = 1 / Math.max(0.01, gamma);
+  for (let v = 0; v < 256; v++) {
+    const n = Math.min(1, Math.max(0, (v - inBlack) / span));
+    lut[v] = outBlack + Math.pow(n, g) * (outWhite - outBlack);
+  }
+  return lut;
+}
+
+/** Black/white points that clip `clip` of the pixels at each end. */
+export function autoRange(hist, clip = 0.001) {
+  let total = 0;
+  for (let i = 0; i < 256; i++) total += hist[i];
+  if (!total) return { inBlack: 0, inWhite: 255 };
+  const limit = total * clip;
+  let lo = 0;
+  let acc = 0;
+  while (lo < 254 && acc + hist[lo] <= limit) acc += hist[lo++];
+  let hi = 255;
+  acc = 0;
+  while (hi > lo + 1 && acc + hist[hi] <= limit) acc += hist[hi--];
+  return { inBlack: lo, inWhite: hi };
+}
+
+/**
+ * Smooth monotone curve through control points (0–255 on both axes) using
+ * Fritsch–Carlson tangents, so the curve never overshoots between points.
+ */
+export function curveLUT(points) {
+  const pts = [...points].sort((a, b) => a.x - b.x);
+  const lut = new Uint8ClampedArray(256);
+  const n = pts.length;
+  if (n === 0) {
+    for (let i = 0; i < 256; i++) lut[i] = i;
+    return lut;
+  }
+  if (n === 1) {
+    lut.fill(pts[0].y);
+    return lut;
+  }
+  const dx = [];
+  const slope = [];
+  for (let i = 0; i < n - 1; i++) {
+    dx[i] = Math.max(1e-6, pts[i + 1].x - pts[i].x);
+    slope[i] = (pts[i + 1].y - pts[i].y) / dx[i];
+  }
+  const m = new Array(n);
+  m[0] = slope[0];
+  m[n - 1] = slope[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    m[i] = slope[i - 1] * slope[i] <= 0 ? 0 : (slope[i - 1] + slope[i]) / 2;
+  }
+  for (let i = 0; i < n - 1; i++) {
+    if (slope[i] === 0) {
+      m[i] = m[i + 1] = 0;
+      continue;
+    }
+    const a = m[i] / slope[i];
+    const b = m[i + 1] / slope[i];
+    const h = a * a + b * b;
+    if (h > 9) {
+      const k = 3 / Math.sqrt(h);
+      m[i] = k * a * slope[i];
+      m[i + 1] = k * b * slope[i];
+    }
+  }
+  let seg = 0;
+  for (let x = 0; x < 256; x++) {
+    if (x <= pts[0].x) {
+      lut[x] = pts[0].y;
+      continue;
+    }
+    if (x >= pts[n - 1].x) {
+      lut[x] = pts[n - 1].y;
+      continue;
+    }
+    while (seg < n - 2 && x > pts[seg + 1].x) seg++;
+    const h = dx[seg];
+    const tt = (x - pts[seg].x) / h;
+    const t2 = tt * tt;
+    const t3 = t2 * tt;
+    lut[x] =
+      (2 * t3 - 3 * t2 + 1) * pts[seg].y +
+      (t3 - 2 * t2 + tt) * h * m[seg] +
+      (-2 * t3 + 3 * t2) * pts[seg + 1].y +
+      (t3 - t2) * h * m[seg + 1];
+  }
+  return lut;
+}
+
+/** Compose two lookup tables: out = second(first(v)). */
+export function chainLUT(first, second) {
+  const out = new Uint8ClampedArray(256);
+  for (let v = 0; v < 256; v++) out[v] = second[first[v]];
+  return out;
+}
+
+/** Apply per-channel lookup tables, returning a processed copy. */
+export function applyLUTs(src, { r, g, b }, region = null) {
+  const out = makeCanvas(src.width, src.height);
+  const ctx = ctx2d(out);
+  ctx.drawImage(src, 0, 0);
+  const reg = region || { x: 0, y: 0, w: out.width, h: out.height };
+  if (reg.w < 1 || reg.h < 1) return out;
+  const img = ctx.getImageData(reg.x, reg.y, reg.w, reg.h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] === 0) continue;
+    d[i] = r[d[i]];
+    d[i + 1] = g[d[i + 1]];
+    d[i + 2] = b[d[i + 2]];
+  }
+  ctx.putImageData(img, reg.x, reg.y);
+  return out;
 }

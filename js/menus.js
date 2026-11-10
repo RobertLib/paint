@@ -5,8 +5,10 @@
 import * as A from "./actions.js";
 import { clamp } from "./color.js";
 import { history } from "./history.js";
+import { LANGS, lang, saveLang, t } from "./i18n.js";
 import { overlay, requestRender } from "./render.js";
 import { emit, on, opt, setOpt, setTheme, setTool, state, swapColors } from "./state.js";
+import { openCurves, openLevels } from "./tone.js";
 import { TOOL_LIST, TOOLS, isTypingTarget } from "./tools.js";
 import { MOD, icon, openTab } from "./ui.js";
 import { view } from "./viewport.js";
@@ -15,116 +17,167 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 const SIZE_PRESETS = [
-  { name: "HD", w: 1920, h: 1080 },
-  { name: "Square post", w: 1080, h: 1080 },
-  { name: "Story", w: 1080, h: 1920 },
-  { name: "Social card", w: 1200, h: 630 },
-  { name: "A4 · 300 dpi", w: 2480, h: 3508 },
-  { name: "Classic", w: 800, h: 600 },
+  { name: t("HD"), w: 1920, h: 1080 },
+  { name: t("Square post"), w: 1080, h: 1080 },
+  { name: t("Story"), w: 1080, h: 1920 },
+  { name: t("Social card"), w: 1200, h: 630 },
+  { name: t("A4 · 300 dpi"), w: 2480, h: 3508 },
+  { name: t("Classic"), w: 800, h: 600 },
 ];
+
+/** Landing pages live one level up; the Czech ones under /cs/. */
+export const SITE_HOME = lang === "cs" ? "../cs/" : "../";
 
 /* ================================== menus ================================= */
 
+function startTransform() {
+  if (!state.doc) return;
+  if (state.tool === "transform") TOOLS.transform._begin();
+  else setTool("transform");
+}
+
 const MENUS = [
   {
-    name: "File",
+    name: t("File"),
     items: () => [
-      { label: "New…", keys: `${MOD}N`, icon: "i-file", run: openNewDialog },
-      { label: "Open image…", keys: `${MOD}O`, icon: "i-image", run: () => $("#imageInput").click() },
-      { label: "Open project…", icon: "i-folder", run: () => $("#projectInput").click() },
+      { label: t("New…"), keys: `${MOD}N`, icon: "i-file", run: openNewDialog },
+      { label: t("Open image…"), keys: `${MOD}O`, icon: "i-image", run: () => $("#imageInput").click() },
+      { label: t("Open project…"), icon: "i-folder", run: () => $("#projectInput").click() },
       { divider: true },
-      { label: "Save project", keys: `${MOD}S`, icon: "i-save", run: A.saveProject, enabled: !!state.doc },
-      { label: "Export image…", keys: `⇧${MOD}E`, icon: "i-download", run: openExportDialog, enabled: !!state.doc },
+      { label: t("Save project"), keys: `${MOD}S`, icon: "i-save", run: A.saveProject, enabled: !!state.doc },
+      { label: t("Export image…"), keys: `⇧${MOD}E`, icon: "i-download", run: openExportDialog, enabled: !!state.doc },
       { divider: true },
-      { label: "Copy", keys: `${MOD}C`, icon: "i-copy", run: A.copyToClipboard, enabled: !!state.doc },
-      { label: "Paste", keys: `${MOD}V`, icon: "i-paste", run: A.pasteFromClipboard },
+      { label: t("Copy"), keys: `${MOD}C`, icon: "i-copy", run: A.copyToClipboard, enabled: !!state.doc },
+      { label: t("Paste"), keys: `${MOD}V`, icon: "i-paste", run: A.pasteFromClipboard },
     ],
   },
   {
-    name: "Edit",
+    name: t("Edit"),
     items: () => [
-      { label: "Undo", keys: `${MOD}Z`, icon: "i-undo", run: A.undo, enabled: history.canUndo },
-      { label: "Redo", keys: `⇧${MOD}Z`, icon: "i-redo", run: A.redo, enabled: history.canRedo },
+      { label: t("Undo"), keys: `${MOD}Z`, icon: "i-undo", run: A.undo, enabled: history.canUndo },
+      { label: t("Redo"), keys: `⇧${MOD}Z`, icon: "i-redo", run: A.redo, enabled: history.canRedo },
       { divider: true },
-      { label: "Select all", keys: `${MOD}A`, icon: "i-select-rect", run: A.selectAll, enabled: !!state.doc },
-      { label: "Deselect", keys: `${MOD}D`, run: A.deselect, enabled: !!state.doc?.selection },
-      { label: "Invert selection", keys: `⇧${MOD}I`, run: A.invertSelection, enabled: !!state.doc?.selection },
+      { label: t("Free transform"), keys: `⌥${MOD}T`, icon: "i-transform", run: startTransform, enabled: !!state.doc },
       { divider: true },
-      { label: "Fill with primary", keys: "⌥⌫", icon: "i-bucket", run: () => A.fillSelection("primary"), enabled: !!state.doc },
-      { label: "Delete selected pixels", keys: "⌫", icon: "i-trash", run: A.clearSelectionPixels, enabled: !!state.doc },
-      { label: "Selection to new layer", keys: `⇧${MOD}J`, icon: "i-layers", run: A.duplicateSelectionToLayer, enabled: !!state.doc?.selection },
+      { label: t("Select all"), keys: `${MOD}A`, icon: "i-select-rect", run: A.selectAll, enabled: !!state.doc },
+      { label: t("Deselect"), keys: `${MOD}D`, run: A.deselect, enabled: !!state.doc?.selection },
+      { label: t("Invert selection"), keys: `⇧${MOD}I`, run: A.invertSelection, enabled: !!state.doc?.selection },
+      { divider: true },
+      { label: t("Fill with primary"), keys: "⌥⌫", icon: "i-bucket", run: () => A.fillSelection("primary"), enabled: !!state.doc },
+      { label: t("Delete selected pixels"), keys: "⌫", icon: "i-trash", run: A.clearSelectionPixels, enabled: !!state.doc },
+      { label: t("Selection to new layer"), keys: `⇧${MOD}J`, icon: "i-layers", run: A.duplicateSelectionToLayer, enabled: !!state.doc?.selection },
     ],
   },
   {
-    name: "Image",
+    name: t("Image"),
     items: () => [
-      { label: "Image size…", icon: "i-frame", run: () => openResizeDialog("image"), enabled: !!state.doc },
-      { label: "Canvas size…", icon: "i-grid", run: () => openResizeDialog("canvas"), enabled: !!state.doc },
+      { label: t("Image size…"), icon: "i-frame", run: () => openResizeDialog("image"), enabled: !!state.doc },
+      { label: t("Canvas size…"), icon: "i-grid", run: () => openResizeDialog("canvas"), enabled: !!state.doc },
       { divider: true },
-      { label: "Crop to selection", icon: "i-crop", run: A.cropToSelection, enabled: !!state.doc?.selection },
-      { label: "Trim transparent edges", run: A.trimTransparent, enabled: !!state.doc },
+      { label: t("Crop to selection"), icon: "i-crop", run: A.cropToSelection, enabled: !!state.doc?.selection },
+      { label: t("Trim transparent edges"), run: A.trimTransparent, enabled: !!state.doc },
       { divider: true },
-      { label: "Rotate 90° right", icon: "i-rotate-cw", run: () => A.rotate(1), enabled: !!state.doc },
-      { label: "Rotate 90° left", icon: "i-rotate-ccw", run: () => A.rotate(-1), enabled: !!state.doc },
-      { label: "Rotate 180°", run: () => A.rotate(180), enabled: !!state.doc },
-      { label: "Flip horizontal", icon: "i-flip-h", run: () => A.flip("h"), enabled: !!state.doc },
-      { label: "Flip vertical", icon: "i-flip-v", run: () => A.flip("v"), enabled: !!state.doc },
+      { label: t("Rotate 90° right"), icon: "i-rotate-cw", run: () => A.rotate(1), enabled: !!state.doc },
+      { label: t("Rotate 90° left"), icon: "i-rotate-ccw", run: () => A.rotate(-1), enabled: !!state.doc },
+      { label: t("Rotate 180°"), run: () => A.rotate(180), enabled: !!state.doc },
+      { label: t("Flip horizontal"), icon: "i-flip-h", run: () => A.flip("h"), enabled: !!state.doc },
+      { label: t("Flip vertical"), icon: "i-flip-v", run: () => A.flip("v"), enabled: !!state.doc },
     ],
   },
   {
-    name: "Layer",
+    name: t("Layer"),
+    items: () => {
+      const layer = state.doc?.active;
+      const hasMask = !!layer?.mask;
+      return [
+        { label: t("New layer"), keys: `⇧${MOD}N`, icon: "i-plus", run: A.addLayer, enabled: !!state.doc },
+        { label: t("Duplicate layer"), keys: `${MOD}J`, icon: "i-copy", run: A.duplicateLayer, enabled: !!state.doc },
+        { label: t("Delete layer"), icon: "i-trash", run: () => A.deleteLayer(), enabled: (state.doc?.layers.length || 0) > 1 },
+        { divider: true },
+        { label: t("Add mask (reveal all)"), icon: "i-mask", run: () => A.addMask("reveal"), enabled: !!layer && !hasMask },
+        { label: t("Add mask from selection"), run: () => A.addMask("selection"), enabled: !!layer && !hasMask && !!state.doc?.selection },
+        { label: t("Invert mask"), run: A.invertMask, enabled: hasMask },
+        { label: layer?.maskEnabled === false ? t("Enable mask") : t("Disable mask"), run: () => A.toggleMaskEnabled(), enabled: hasMask },
+        { label: t("Apply mask"), run: A.applyLayerMask, enabled: hasMask },
+        { label: t("Delete mask"), run: A.deleteMask, enabled: hasMask },
+        { divider: true },
+        { label: t("Merge down"), keys: `${MOD}E`, icon: "i-merge", run: A.mergeDown, enabled: (state.doc?.activeIndex || 0) > 0 },
+        { label: t("Flatten image"), icon: "i-layers", run: A.flattenImage, enabled: (state.doc?.layers.length || 0) > 1 },
+        { divider: true },
+        { label: t("Bring forward"), run: () => A.raiseLayer(1), enabled: !!state.doc },
+        { label: t("Send backward"), run: () => A.raiseLayer(-1), enabled: !!state.doc },
+      ];
+    },
+  },
+  {
+    name: t("Adjust"),
     items: () => [
-      { label: "New layer", keys: `⇧${MOD}N`, icon: "i-plus", run: A.addLayer, enabled: !!state.doc },
-      { label: "Duplicate layer", keys: `${MOD}J`, icon: "i-copy", run: A.duplicateLayer, enabled: !!state.doc },
-      { label: "Delete layer", icon: "i-trash", run: () => A.deleteLayer(), enabled: (state.doc?.layers.length || 0) > 1 },
+      { label: t("Adjustments panel"), icon: "i-sliders", run: () => openTab("adjust") },
+      { label: t("Filter gallery"), icon: "i-sparkles", run: () => openTab("filters") },
       { divider: true },
-      { label: "Merge down", keys: `${MOD}E`, icon: "i-merge", run: A.mergeDown, enabled: (state.doc?.activeIndex || 0) > 0 },
-      { label: "Flatten image", icon: "i-layers", run: A.flattenImage, enabled: (state.doc?.layers.length || 0) > 1 },
+      { label: t("Levels…"), keys: `${MOD}L`, icon: "i-levels", run: openLevels, enabled: !!state.doc },
+      { label: t("Curves…"), keys: `${MOD}M`, icon: "i-curves", run: openCurves, enabled: !!state.doc },
+      { label: t("Auto levels"), run: () => openLevels({ auto: true, apply: true }), enabled: !!state.doc },
       { divider: true },
-      { label: "Bring forward", run: () => A.raiseLayer(1), enabled: !!state.doc },
-      { label: "Send backward", run: () => A.raiseLayer(-1), enabled: !!state.doc },
+      { label: t("Auto contrast"), run: () => quickAdjust({ contrast: 18, clarity: 12 }), enabled: !!state.doc },
+      { label: t("Warm up"), run: () => quickAdjust({ temperature: 22, saturation: 8 }), enabled: !!state.doc },
+      { label: t("Cool down"), run: () => quickAdjust({ temperature: -22 }), enabled: !!state.doc },
+      { label: t("Punchy"), run: () => quickAdjust({ contrast: 14, vibrance: 24, clarity: 18 }), enabled: !!state.doc },
     ],
   },
   {
-    name: "Adjust",
+    name: t("View"),
     items: () => [
-      { label: "Adjustments panel", icon: "i-sliders", run: () => openTab("adjust") },
-      { label: "Filter gallery", icon: "i-sparkles", run: () => openTab("filters") },
-      { divider: true },
-      { label: "Auto contrast", run: () => quickAdjust({ contrast: 18, clarity: 12 }), enabled: !!state.doc },
-      { label: "Warm up", run: () => quickAdjust({ temperature: 22, saturation: 8 }), enabled: !!state.doc },
-      { label: "Cool down", run: () => quickAdjust({ temperature: -22 }), enabled: !!state.doc },
-      { label: "Punchy", run: () => quickAdjust({ contrast: 14, vibrance: 24, clarity: 18 }), enabled: !!state.doc },
-    ],
-  },
-  {
-    name: "View",
-    items: () => [
-      { label: "Zoom in", keys: `${MOD}+`, run: () => view.zoomStep(1) },
-      { label: "Zoom out", keys: `${MOD}−`, run: () => view.zoomStep(-1) },
-      { label: "Fit on screen", keys: `${MOD}0`, icon: "i-fit", run: () => view.fit() },
-      { label: "Actual pixels", keys: `${MOD}1`, run: () => view.actualSize() },
+      { label: t("Zoom in"), keys: `${MOD}+`, run: () => view.zoomStep(1) },
+      { label: t("Zoom out"), keys: `${MOD}−`, run: () => view.zoomStep(-1) },
+      { label: t("Fit on screen"), keys: `${MOD}0`, icon: "i-fit", run: () => view.fit() },
+      { label: t("Actual pixels"), keys: `${MOD}1`, run: () => view.actualSize() },
       { divider: true },
       {
-        label: state.theme === "dark" ? "Light theme" : "Dark theme",
+        label: state.theme === "dark" ? t("Light theme") : t("Dark theme"),
         icon: state.theme === "dark" ? "i-sun" : "i-moon",
         run: () => setTheme(state.theme === "dark" ? "light" : "dark"),
       },
       {
-        label: "Toggle panels",
+        label: t("Toggle panels"),
         icon: "i-panel",
         run: () => $(".workspace").classList.toggle("side-collapsed"),
       },
+      { divider: true },
+      ...LANGS.map(([code, name]) => ({
+        label: name,
+        icon: code === lang ? "i-check" : null,
+        run: () => switchLanguage(code),
+      })),
     ],
   },
   {
-    name: "Help",
+    name: t("Help"),
     items: () => [
-      { label: "Keyboard shortcuts", keys: "?", icon: "i-help", run: openShortcuts },
-      { label: "About Paint Studio", icon: "i-sparkles", run: openAbout },
+      { label: t("Keyboard shortcuts"), keys: "?", icon: "i-help", run: openShortcuts },
+      { label: t("All tools and guides"), icon: "i-sparkles", run: () => window.open(SITE_HOME, "_blank", "noopener") },
+      {
+        label: t("Source code on GitHub"),
+        icon: "i-file",
+        run: () => window.open("https://github.com/RobertLib/paint", "_blank", "noopener"),
+      },
     ],
   },
 ];
+
+/** Reload in another language; the autosave brings the document back. */
+async function switchLanguage(code) {
+  if (code === lang) return;
+  saveLang(code);
+  emit("flush-autosave");
+  const { flushAutosave } = await import("./autosave.js");
+  await flushAutosave();
+  const url = new URL(location.href);
+  url.searchParams.set("lang", code);
+  if (state.doc) url.searchParams.set("restore", "1");
+  url.searchParams.delete("task");
+  location.href = url.toString();
+}
 
 function quickAdjust(values) {
   A.previewAdjustments(values);
@@ -136,27 +189,27 @@ function quickAdjust(values) {
 function buildMenubar() {
   const bar = $("#menubar");
   bar.innerHTML = MENUS.map(
-    (m) => `<button class="menu-btn" data-menu="${m.name}">${m.name}</button>`
+    (m, i) => `<button class="menu-btn" data-menu="${i}">${m.name}</button>`
   ).join("");
 
-  let openName = null;
+  let openIndex = null;
 
   const close = () => {
     $("#menuPopover").hidden = true;
     $$(".menu-btn", bar).forEach((b) => b.classList.remove("is-open"));
-    openName = null;
+    openIndex = null;
   };
 
-  const open = (name, btn) => {
-    const menu = MENUS.find((m) => m.name === name);
+  const open = (index, btn) => {
+    const menu = MENUS[index];
     if (!menu) return;
+    const items = menu.items();
     const pop = $("#menuPopover");
-    pop.innerHTML = menu
-      .items()
-      .map((item) =>
+    pop.innerHTML = items
+      .map((item, i) =>
         item.divider
           ? `<div class="menu-divider"></div>`
-          : `<button class="menu-item" data-item="${item.label}"${
+          : `<button class="menu-item" data-item="${i}"${
               item.enabled === false ? " disabled" : ""
             }>${item.icon ? icon(item.icon) : `<span class="icon"></span>`}
                <span>${item.label}</span>
@@ -166,15 +219,15 @@ function buildMenubar() {
       .join("");
     pop.hidden = false;
     const r = btn.getBoundingClientRect();
-    pop.style.left = `${Math.min(r.left, innerWidth - pop.offsetWidth - 8)}px`;
+    pop.style.left = `${Math.max(4, Math.min(r.left, innerWidth - pop.offsetWidth - 8))}px`;
     pop.style.top = `${r.bottom + 4}px`;
     $$(".menu-btn", bar).forEach((b) => b.classList.toggle("is-open", b === btn));
-    openName = name;
+    openIndex = index;
 
     pop.onclick = (e) => {
       const el = e.target.closest("[data-item]");
       if (!el) return;
-      const item = menu.items().find((i) => i.label === el.dataset.item);
+      const item = items[Number(el.dataset.item)];
       close();
       item?.run?.();
     };
@@ -183,13 +236,16 @@ function buildMenubar() {
   bar.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-menu]");
     if (!btn) return;
-    if (openName === btn.dataset.menu) close();
-    else open(btn.dataset.menu, btn);
+    const index = Number(btn.dataset.menu);
+    if (openIndex === index) close();
+    else open(index, btn);
   });
 
   bar.addEventListener("pointerover", (e) => {
     const btn = e.target.closest("[data-menu]");
-    if (btn && openName && openName !== btn.dataset.menu) open(btn.dataset.menu, btn);
+    if (btn && openIndex !== null && openIndex !== Number(btn.dataset.menu)) {
+      open(Number(btn.dataset.menu), btn);
+    }
   });
 
   document.addEventListener("pointerdown", (e) => {
@@ -198,11 +254,17 @@ function buildMenubar() {
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") close();
   });
+
+  // tasks can open a menu programmatically
+  on("open-menu", (index) => {
+    const btn = $(`[data-menu="${index}"]`, bar);
+    if (btn) open(index, btn);
+  });
 }
 
 /* ================================= dialogs ================================ */
 
-function wireDialog(dialog) {
+export function wireDialog(dialog) {
   $$("[data-close]", dialog).forEach((btn) =>
     btn.addEventListener("click", () => dialog.close())
   );
@@ -269,9 +331,11 @@ function openResizeDialog(mode) {
   const doc = state.doc;
   if (!doc) return;
   resizeMode = mode;
-  $("#resizeTitle").textContent = mode === "image" ? "Image size" : "Canvas size";
+  $("#resizeTitle").textContent = mode === "image" ? t("Image size") : t("Canvas size");
   $("#resizeW").value = String(doc.width);
   $("#resizeH").value = String(doc.height);
+  $("#resizePct").value = "100";
+  $("#resizePctRow").hidden = mode !== "image";
   $("#anchorPicker").hidden = mode !== "canvas";
   $("#resizeLock").checked = mode === "image";
   $("#resizeDialog").showModal();
@@ -295,19 +359,31 @@ function initResizeDialog() {
 
   const w = $("#resizeW");
   const h = $("#resizeH");
+  const pct = $("#resizePct");
   const lock = $("#resizeLock");
   const ratio = () => (state.doc ? state.doc.width / state.doc.height : 1);
   w.addEventListener("input", () => {
     if (lock.checked) h.value = String(Math.max(1, Math.round(Number(w.value) / ratio())));
+    if (state.doc) pct.value = String(Math.round((Number(w.value) / state.doc.width) * 100));
   });
   h.addEventListener("input", () => {
     if (lock.checked) w.value = String(Math.max(1, Math.round(Number(h.value) * ratio())));
+  });
+  pct.addEventListener("input", () => {
+    const doc = state.doc;
+    const k = Number(pct.value) / 100;
+    if (!doc || !k) return;
+    w.value = String(Math.max(1, Math.round(doc.width * k)));
+    h.value = String(Math.max(1, Math.round(doc.height * k)));
   });
 
   $("#resizeApply").addEventListener("click", () => {
     const width = Number(w.value);
     const height = Number(h.value);
     if (!width || !height) return;
+    if (width > A.MAX_DIM || height > A.MAX_DIM) {
+      emit("toast", { msg: t("The largest supported size is 8000 × 8000 px"), kind: "info" });
+    }
     if (resizeMode === "image") A.resizeImage(width, height);
     else A.resizeCanvas(width, height, resizeAnchor);
     dialog.close();
@@ -319,9 +395,31 @@ function initResizeDialog() {
 let exportFormat = "image/png";
 let sizeTimer = 0;
 
-function openExportDialog() {
+function setExportFormat(format) {
+  exportFormat = format;
+  $$(".seg-btn", $("#exportFormat")).forEach((b) =>
+    b.classList.toggle("is-active", b.dataset.format === format)
+  );
+  $("#qualityRow").hidden = format === "image/png" || format === "psd";
+  $("#scaleRow").hidden = format === "psd";
+  $("#exportFormatHint").textContent =
+    format === "image/jpeg"
+      ? t("JPEG has no transparency — transparent areas become white.")
+      : format === "psd"
+      ? t("Layered Photoshop file: layers, masks, opacity and blend modes are kept.")
+      : format === "image/webp"
+      ? t("WebP keeps transparency and is usually the smallest file.")
+      : t("PNG is lossless and keeps transparency.");
+}
+
+function openExportDialog({ format, quality } = {}) {
   if (!state.doc) return;
   $("#exportName").value = state.doc.name || "paint-studio";
+  if (format) setExportFormat(format);
+  if (quality) {
+    $("#exportQuality").value = String(quality);
+    $("#exportQualityOut").value = String(quality);
+  }
   $("#exportDialog").showModal();
   refreshExportPreview();
 }
@@ -329,15 +427,12 @@ function openExportDialog() {
 function initExportDialog() {
   const dialog = $("#exportDialog");
   wireDialog(dialog);
+  setExportFormat(exportFormat);
 
   $("#exportFormat").addEventListener("click", (e) => {
     const btn = e.target.closest("[data-format]");
     if (!btn) return;
-    exportFormat = btn.dataset.format;
-    $$(".seg-btn", $("#exportFormat")).forEach((b) =>
-      b.classList.toggle("is-active", b === btn)
-    );
-    $("#qualityRow").hidden = exportFormat === "image/png";
+    setExportFormat(btn.dataset.format);
     refreshExportPreview();
   });
 
@@ -361,10 +456,15 @@ function initExportDialog() {
   });
 }
 
+const formatSize = (bytes) => {
+  const kb = bytes / 1024;
+  return kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`;
+};
+
 function refreshExportPreview() {
   const doc = state.doc;
   if (!doc) return;
-  const scale = Number($("#exportScale").value) / 100;
+  const scale = exportFormat === "psd" ? 1 : Number($("#exportScale").value) / 100;
   const w = Math.max(1, Math.round(doc.width * scale));
   const h = Math.max(1, Math.round(doc.height * scale));
 
@@ -381,18 +481,21 @@ function refreshExportPreview() {
   }
   ctx.drawImage(doc.composite(), 0, 0, preview.width, preview.height);
 
-  $("#exportInfo").textContent = `${w} × ${h} px — calculating size…`;
+  $("#exportInfo").textContent = t("{w} × {h} px — calculating size…", { w, h });
   clearTimeout(sizeTimer);
+  const format = exportFormat;
   sizeTimer = setTimeout(async () => {
-    const canvas = A.exportCanvas({ scale, format: exportFormat });
-    if (!canvas) return;
-    const blob = await new Promise((r) =>
-      canvas.toBlob(r, exportFormat, Number($("#exportQuality").value) / 100)
-    );
-    const kb = blob ? blob.size / 1024 : 0;
-    $("#exportInfo").textContent = `${w} × ${h} px — about ${
-      kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.round(kb)} KB`
-    }`;
+    const blob = await A.exportBlob({
+      format,
+      quality: Number($("#exportQuality").value) / 100,
+      scale,
+    });
+    if (format !== exportFormat) return;
+    $("#exportInfo").textContent = t("{w} × {h} px — about {size}", {
+      w,
+      h,
+      size: blob ? formatSize(blob.size) : "?",
+    });
   }, 260);
 }
 
@@ -400,66 +503,68 @@ function refreshExportPreview() {
 
 const SHORTCUT_GROUPS = [
   {
-    title: "File",
+    title: t("File"),
     rows: [
-      ["New document", `${MOD} N`],
-      ["Open image", `${MOD} O`],
-      ["Save project", `${MOD} S`],
-      ["Export image", `⇧ ${MOD} E`],
-      ["Paste image", `${MOD} V`],
+      [t("New document"), `${MOD} N`],
+      [t("Open image"), `${MOD} O`],
+      [t("Save project"), `${MOD} S`],
+      [t("Export image"), `⇧ ${MOD} E`],
+      [t("Paste image"), `${MOD} V`],
     ],
   },
   {
-    title: "Edit",
+    title: t("Edit"),
     rows: [
-      ["Undo / Redo", `${MOD} Z · ⇧${MOD} Z`],
-      ["Select all / Deselect", `${MOD} A · ${MOD} D`],
-      ["Invert selection", `⇧ ${MOD} I`],
-      ["Delete selected pixels", "⌫"],
-      ["Fill with primary color", "⌥ ⌫"],
-      ["Selection to new layer", `⇧ ${MOD} J`],
+      [t("Undo / Redo"), `${MOD} Z · ⇧${MOD} Z`],
+      [t("Free transform"), `⌥ ${MOD} T`],
+      [t("Select all / Deselect"), `${MOD} A · ${MOD} D`],
+      [t("Invert selection"), `⇧ ${MOD} I`],
+      [t("Delete selected pixels"), "⌫"],
+      [t("Fill with primary color"), "⌥ ⌫"],
+      [t("Selection to new layer"), `⇧ ${MOD} J`],
     ],
   },
   {
-    title: "Layers",
+    title: t("Layers"),
     rows: [
-      ["New layer", `⇧ ${MOD} N`],
-      ["Duplicate layer", `${MOD} J`],
-      ["Merge down", `${MOD} E`],
+      [t("New layer"), `⇧ ${MOD} N`],
+      [t("Duplicate layer"), `${MOD} J`],
+      [t("Merge down"), `${MOD} E`],
+      [t("Levels / Curves"), `${MOD} L · ${MOD} M`],
     ],
   },
   {
-    title: "View",
+    title: t("View"),
     rows: [
-      ["Zoom in / out", `${MOD} + · ${MOD} −`],
-      ["Fit on screen", `${MOD} 0`],
-      ["Actual pixels", `${MOD} 1`],
-      ["Pan the canvas", "Space + drag"],
-      ["Zoom at pointer", "Scroll"],
+      [t("Zoom in / out"), `${MOD} + · ${MOD} −`],
+      [t("Fit on screen"), `${MOD} 0`],
+      [t("Actual pixels"), `${MOD} 1`],
+      [t("Pan the canvas"), t("Space + drag")],
+      [t("Zoom at pointer"), t("Scroll")],
     ],
   },
   {
-    title: "Painting",
+    title: t("Painting"),
     rows: [
-      ["Brush size down / up", "[ · ]"],
-      ["Swap primary / secondary", "X"],
-      ["Pick color while painting", "Alt + click"],
-      ["Constrain shape / straight line", "Shift"],
-      ["Draw shape from centre", "Alt"],
-      ["Add / subtract selection", "Shift · Alt"],
-      ["Apply crop", "Enter"],
-      ["Cancel current action", "Esc"],
+      [t("Brush size down / up"), "[ · ]"],
+      [t("Swap primary / secondary"), "X"],
+      [t("Pick color while painting"), t("Alt + click")],
+      [t("Constrain shape / straight line"), "Shift"],
+      [t("Draw shape from centre"), "Alt"],
+      [t("Add / subtract selection"), "Shift · Alt"],
+      [t("Apply crop or transform"), "Enter"],
+      [t("Cancel current action"), "Esc"],
     ],
   },
 ];
 
 function openShortcuts() {
   const host = $("#shortcutList");
-  const toolRows = TOOL_LIST.filter((t) => t.shortcut).map((t) => [
-    t.label,
-    t.shortcut.toUpperCase(),
+  const toolRows = TOOL_LIST.filter((tool) => tool.shortcut).map((tool) => [
+    tool.label,
+    tool.shortcut.toUpperCase(),
   ]);
-  const groups = [...SHORTCUT_GROUPS, { title: "Tools", rows: toolRows }];
+  const groups = [...SHORTCUT_GROUPS, { title: t("Tools"), rows: toolRows }];
   host.innerHTML = groups
     .map(
       (g) => `
@@ -475,33 +580,6 @@ function openShortcuts() {
     )
     .join("");
   $("#shortcutsDialog").showModal();
-}
-
-/* --- about --- */
-
-const isAboutOpen = () => $("#about")?.hidden === false;
-
-function openAbout() {
-  const el = $("#about");
-  if (!el || !el.hidden) return;
-  // a modal dialog lives in the top layer, which would cover this section
-  $("#welcomeDialog").close();
-  el.hidden = false;
-  el.scrollTop = 0;
-}
-
-function closeAbout() {
-  const el = $("#about");
-  if (!el || el.hidden) return;
-  el.hidden = true;
-  // there is nothing behind the welcome screen until a document exists
-  const welcome = $("#welcomeDialog");
-  if (!state.doc && !welcome.open) welcome.showModal();
-}
-
-function initAbout() {
-  $("#aboutLaunch").addEventListener("click", closeAbout);
-  $("#welcomeAbout").addEventListener("click", openAbout);
 }
 
 /* --- welcome --- */
@@ -528,13 +606,20 @@ function initWelcome() {
     else if (kind === "open") $("#imageInput").click();
     else if (kind === "project") $("#projectInput").click();
     else if (kind === "paste") A.pasteFromClipboard();
+    else if (kind === "restore") emit("restore-autosave");
   });
+
+  $("#welcomeAbout").setAttribute("href", SITE_HOME);
 
   on("doc", ({ reason }) => {
     if (reason === "open" && state.doc) dialog.close();
   });
+}
 
-  if (!state.doc) dialog.showModal();
+/** Called by main.js once it knows whether a document is coming. */
+export function showWelcome() {
+  const dialog = $("#welcomeDialog");
+  if (!state.doc && !dialog.open) dialog.showModal();
 }
 
 /* ================================ file input ============================== */
@@ -559,7 +644,7 @@ function initDragDrop() {
   const zone = $("#dropzone");
   let depth = 0;
 
-  const show = (on) => zone.classList.toggle("is-active", on);
+  const show = (visible) => zone.classList.toggle("is-active", visible);
 
   window.addEventListener("dragenter", (e) => {
     if (![...e.dataTransfer.types].includes("Files")) return;
@@ -582,7 +667,12 @@ function initDragDrop() {
       await A.openProjectFile(project);
       return;
     }
-    for (const file of files.filter((f) => f.type.startsWith("image/"))) {
+    const psd = files.find((f) => /\.psd$/i.test(f.name));
+    if (psd) {
+      await A.openImageFile(psd);
+      return;
+    }
+    for (const file of files.filter(A.isOpenable)) {
       await A.openImageFile(file, { asLayer: !!state.doc });
     }
   });
@@ -605,19 +695,22 @@ function initPaste() {
 
 function initShortcuts() {
   const toolByKey = new Map(
-    TOOL_LIST.filter((t) => t.shortcut).map((t) => [t.shortcut, t.id])
+    TOOL_LIST.filter((tool) => tool.shortcut).map((tool) => [tool.shortcut, tool.id])
   );
 
   window.addEventListener("keydown", (e) => {
-    if (isAboutOpen()) {
-      if (e.key === "Escape") closeAbout();
-      return;
-    }
     if (isTypingTarget(e.target)) return;
+    if (document.querySelector("dialog[open]:not(#welcomeDialog)")) return;
     const mod = e.metaKey || e.ctrlKey;
     const key = e.key.toLowerCase();
 
     if (mod) {
+      // ⌥⌘T on a Mac reports "†" as the key; match the physical key instead
+      if (e.altKey && e.code === "KeyT") {
+        e.preventDefault();
+        startTransform();
+        return;
+      }
       switch (key) {
         case "z":
           e.preventDefault();
@@ -661,6 +754,14 @@ function initShortcuts() {
             A.invertSelection();
           }
           return;
+        case "l":
+          e.preventDefault();
+          openLevels();
+          return;
+        case "m":
+          e.preventDefault();
+          openCurves();
+          return;
         case "c":
           e.preventDefault();
           A.copyToClipboard();
@@ -689,7 +790,7 @@ function initShortcuts() {
 
     if (e.key === "Escape") {
       const tool = TOOLS[state.tool];
-      if (overlay.crop) {
+      if (overlay.crop || overlay.transform) {
         tool.cancel?.();
       } else if (state.doc?.selection) {
         A.deselect();
@@ -703,6 +804,9 @@ function initShortcuts() {
     if (e.key === "Enter") {
       if (state.tool === "crop") {
         TOOLS.crop.apply();
+        e.preventDefault();
+      } else if (state.tool === "transform") {
+        TOOLS.transform.apply();
         e.preventDefault();
       }
       return;
@@ -758,9 +862,8 @@ export function initMenus() {
   initPaste();
   initShortcuts();
   initWelcome();
-  initAbout();
 
-  $("#exportBtn").addEventListener("click", openExportDialog);
+  $("#exportBtn").addEventListener("click", () => openExportDialog());
   $("#helpBtn").addEventListener("click", openShortcuts);
 
   // the crop tool asks the app to commit its rectangle

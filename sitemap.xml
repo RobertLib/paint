@@ -1,9 +1,297 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://robertlib.github.io/paint/</loc>
-    <lastmod>2026-08-27</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>1.0</priority>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/crop-image/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/crop-image/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/oriznout-obrazek/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/crop-image/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/oriznout-obrazek/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/crop-image/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/oriznout-obrazek/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/crop-image/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/resize-image/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/resize-image/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/zmenit-velikost-obrazku/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/resize-image/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/zmenit-velikost-obrazku/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/resize-image/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/zmenit-velikost-obrazku/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/resize-image/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/rotate-image/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/rotate-image/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/otocit-obrazek/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/rotate-image/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/otocit-obrazek/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/rotate-image/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/otocit-obrazek/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/rotate-image/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/compress-image/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/compress-image/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/zmensit-velikost-fotky/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/compress-image/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/zmensit-velikost-fotky/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/compress-image/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/zmensit-velikost-fotky/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/compress-image/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/image-converter/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/image-converter/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/prevod-obrazku/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/image-converter/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/prevod-obrazku/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/image-converter/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/prevod-obrazku/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/image-converter/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/png-to-jpg/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/png-to-jpg/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/png-na-jpg/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/png-to-jpg/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/png-na-jpg/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/png-to-jpg/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/png-na-jpg/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/png-to-jpg/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/webp-to-jpg/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/webp-to-jpg/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/webp-na-jpg/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/webp-to-jpg/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/webp-na-jpg/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/webp-to-jpg/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/webp-na-jpg/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/webp-to-jpg/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/heic-to-jpg/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/heic-to-jpg/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/heic-na-jpg/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/heic-to-jpg/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/heic-na-jpg/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/heic-to-jpg/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/heic-na-jpg/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/heic-to-jpg/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/blur-image/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/blur-image/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/rozmazat-fotku/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/blur-image/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/rozmazat-fotku/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/blur-image/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/rozmazat-fotku/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/blur-image/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/add-text-to-photo/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/add-text-to-photo/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/pridat-text-do-fotky/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/add-text-to-photo/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/pridat-text-do-fotky/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/add-text-to-photo/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/pridat-text-do-fotky/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/add-text-to-photo/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/black-and-white-photo/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/black-and-white-photo/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/cernobila-fotka/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/black-and-white-photo/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/cernobila-fotka/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/black-and-white-photo/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/cernobila-fotka/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/black-and-white-photo/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/invert-colors/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/invert-colors/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/invertovat-barvy/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/invert-colors/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/invertovat-barvy/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/invert-colors/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/invertovat-barvy/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/invert-colors/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/photo-filters/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/photo-filters/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/filtry-na-fotky/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/photo-filters/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/filtry-na-fotky/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/photo-filters/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/filtry-na-fotky/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/photo-filters/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/brighten-photo/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/brighten-photo/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/zesvetlit-fotku/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/brighten-photo/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/zesvetlit-fotku/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/brighten-photo/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/zesvetlit-fotku/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/brighten-photo/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/make-background-transparent/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/make-background-transparent/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/pruhledne-pozadi/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/make-background-transparent/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/pruhledne-pozadi/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/make-background-transparent/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/pruhledne-pozadi/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/make-background-transparent/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/color-picker-from-image/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/color-picker-from-image/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/zjistit-barvu-z-obrazku/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/color-picker-from-image/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/zjistit-barvu-z-obrazku/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/color-picker-from-image/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/zjistit-barvu-z-obrazku/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/color-picker-from-image/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/draw-on-image/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/draw-on-image/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/kresleni-do-fotky/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/draw-on-image/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/kresleni-do-fotky/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/draw-on-image/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/kresleni-do-fotky/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/draw-on-image/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/paint-online/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/paint-online/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/malovani-online/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/paint-online/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/malovani-online/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/paint-online/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/malovani-online/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/paint-online/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/open-psd-online/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/open-psd-online/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/otevrit-psd/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/open-psd-online/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/otevrit-psd/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/open-psd-online/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/otevrit-psd/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/open-psd-online/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/retouch-photo/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/retouch-photo/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/retus-fotky/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/retouch-photo/" />
+  </url>
+  <url>
+    <loc>https://robertlib.github.io/paint/cs/retus-fotky/</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/retouch-photo/" />
+    <xhtml:link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/retus-fotky/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/retouch-photo/" />
   </url>
 </urlset>

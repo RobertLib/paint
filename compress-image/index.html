@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Compress Image – Reduce File Size Online | Paint Studio</title>
+    <meta name="description" content="Compress an image online and reduce its file size: adjust JPEG or WebP quality and scale, and see the new size before you download. Free, private, no upload." />
+    <link rel="canonical" href="https://robertlib.github.io/paint/compress-image/" />
+    <link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/compress-image/" />
+    <link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/zmensit-velikost-fotky/" />
+    <link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/compress-image/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Paint Studio" />
+    <meta property="og:title" content="Compress Image – Reduce File Size Online | Paint Studio" />
+    <meta property="og:description" content="Compress an image online and reduce its file size: adjust JPEG or WebP quality and scale, and see the new size before you download. Free, private, no upload." />
+    <meta property="og:url" content="https://robertlib.github.io/paint/compress-image/" />
+    <meta property="og:image" content="https://robertlib.github.io/paint/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="cs_CZ" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+    <link rel="manifest" href="../manifest.json" />
+    <meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+
+    <script>
+      // the editor's theme choice applies here too; otherwise follow the system
+      try {
+        var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
+        document.documentElement.dataset.theme =
+          (t && t.theme) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      } catch (e) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    </script>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/site.css" />
+    <link rel="modulepreload" href="../js/site.js" />
+    <link rel="modulepreload" href="../js/store.js" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/"},{"@type":"ListItem","position":2,"name":"Compress image online","item":"https://robertlib.github.io/paint/compress-image/"}]},{"@type":"WebApplication","name":"Compress image — Paint Studio","url":"https://robertlib.github.io/paint/compress-image/","description":"Compress an image online and reduce its file size: adjust JPEG or WebP quality and scale, and see the new size before you download. Free, private, no upload.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (modern web browser)","inLanguage":"en","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@id":"https://robertlib.github.io/paint/#website"}}]}</script>
+    
+  </head>
+  <body class="site">
+    <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true"><defs><symbol id="i-brush" viewBox="0 0 24 24"><path d="M9.1 11.9l8-8.1a2.85 2.85 0 0 1 4.05 4.05l-8.1 8.05"/><path d="M7.05 14.95a3 3 0 0 0-3 3c0 1.35-2.5 1.5-2 2 1.1 1.1 2.5 2 4 2a4 4 0 0 0 4-4 3 3 0 0 0-3-3z"/></symbol><symbol id="i-image" viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol><symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></symbol><symbol id="i-frame" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16M8 4v16M16 4v16"/></symbol><symbol id="i-swap" viewBox="0 0 24 24"><path d="M16 3l4 4-4 4M20 7H9M8 21l-4-4 4-4M4 17h11"/></symbol></defs></svg>
+    
+    <header class="site-head">
+      <a class="site-brand" href="../">
+        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+        <span translate="no">Paint<em>Studio</em></span>
+      </a>
+      <nav class="site-nav" aria-label="All tools">
+        <a href="../#tools">All tools</a>
+        <span class="langs" role="group" aria-label="Language"><span class="lang is-current" aria-current="true">EN</span><a class="lang" href="../cs/zmensit-velikost-fotky/" hreflang="cs" lang="cs">CS</a></span>
+        <a class="btn btn-primary" href="../editor/?lang=en&task=compress"><svg class="icon"><use href="#i-brush" /></svg><span>Open editor</span></a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Paint Studio</a><span aria-hidden="true">›</span><span>Compress image</span></nav>
+        <h1>Compress image online</h1>
+        <p class="lead">Make a photo small enough for an email, a web form or a website. The Export dialog opens ready to go, with JPEG at quality 75 and a live estimate of the final file size.</p>
+        
+      <div class="drop" data-drop>
+        <svg class="icon drop-icon"><use href="#i-image" /></svg>
+        <strong class="drop-title">Drop an image here</strong>
+        <label class="btn btn-primary btn-lg"><svg class="icon"><use href="#i-folder" /></svg><span>Choose image</span>
+          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+        <p class="drop-hint">or paste with Ctrl+V · PNG, JPG, WebP, HEIC, PSD…</p>
+        
+        <p class="drop-busy" data-busy hidden>Opening the editor…</p>
+      </div>
+      <script type="application/json" id="dropConfig">{"editor":"../editor/","task":"compress","lang":"en"}</script>
+        <ul class="trust"><li><svg class="icon"><use href="#i-check" /></svg><span>Nothing is uploaded</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No sign-up</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No watermark</span></li></ul>
+      </section>
+
+      <section class="block steps">
+        <h2>How it works</h2>
+        <ol><li>Drop your image — the Export dialog opens with JPEG at quality 75.</li><li>Lower the quality or the scale until the estimated size fits your limit.</li><li>Click Download to save the compressed copy.</li></ol>
+      </section>
+
+      <section class="block prose">
+        <h2>Quality, scale and format: what shrinks a file most</h2>
+        <p>Three controls decide the file size. <strong>Scale</strong> reduces the pixel dimensions and has by far the biggest effect: at 50 % only a quarter of the pixels remain, and the file shrinks accordingly. <strong>Quality</strong> controls how much detail JPEG and WebP discard; going from 100 down to around 80 typically saves a lot of space with little visible change. <strong>Format</strong> matters too — WebP usually produces smaller files than JPEG at similar quality. Start with scale if the image is larger than it will ever be displayed, then fine-tune quality.</p>
+        <h2>Settings that work for common limits</h2>
+        <p>For photos on a website or in an email, quality 70–80 is usually indistinguishable from the original at normal viewing size. Go down to 50–60 only for thumbnails, where artifacts are hard to spot. If a form says “max 1 MB” or “max 500 KB”, watch the estimate in the dialog and lower the scale first, then the quality, until it fits. Screenshots with text compress poorly as JPEG — letters get fuzzy halos — so try WebP or keep PNG and reduce the scale instead.</p>
+        <h2>What compression can’t do</h2>
+        <p>Lossy compression throws information away for good, so keep your original and compress a copy. Saving an already compressed JPEG again and again adds a little blockiness each time. PNG is lossless: quality settings don’t shrink it, and a photo saved as PNG is often much bigger than the JPEG you started with. Transparency survives in WebP and PNG but not in JPEG, where transparent areas turn white. Paint Studio compresses one image at a time; there is no batch mode.</p>
+      </section>
+      
+      <section class="block faq">
+        <h2>Frequently asked questions</h2>
+        <h3>What quality setting should I use for JPEG?</h3>
+        <p>For most photos, 70–85 is a good balance between size and sharpness, and the preset 75 suits web pages and email. Use 90 or more for images you plan to print or edit further, and 50–60 only when size matters more than detail.</p>
+        <h3>Is WebP better than JPEG for small files?</h3>
+        <p>Usually, yes. At similar visual quality WebP files tend to be smaller, and WebP can also keep transparency. JPEG is still the safest choice when the file must open everywhere, for example in older software or strict upload forms.</p>
+        <h3>How can I get a photo under a size limit like 1 MB?</h3>
+        <p>Lower the Scale slider first, because fewer pixels shrink the file the most, then reduce Quality. The estimate updates as you drag, so you can stop as soon as it fits. For very small targets, combine a low scale with moderate quality rather than pushing quality to the minimum, which looks blocky.</p>
+        <h3>Will compressing remove transparency?</h3>
+        <p>Only if you choose JPEG, which can’t store transparency and fills those areas with white. Pick WebP to keep transparency and still get a compact file, or PNG for lossless output.</p>
+      </section>
+
+      <section class="block">
+        <h2>Related tools</h2>
+        <ul class="tool-grid"><li><a class="tool-card" href="../resize-image/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-frame" /></svg></span>
+          <span class="tool-text"><strong>Resize image</strong><span>Change width and height in pixels</span></span>
+        </a></li><li><a class="tool-card" href="../image-converter/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-swap" /></svg></span>
+          <span class="tool-text"><strong>Image converter</strong><span>Convert between PNG, JPG, WebP and PSD</span></span>
+        </a></li><li><a class="tool-card" href="../png-to-jpg/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-image" /></svg></span>
+          <span class="tool-text"><strong>PNG to JPG</strong><span>Turn PNGs into compact, compatible JPGs</span></span>
+        </a></li></ul>
+      </section>
+    </main>
+    <footer class="site-foot">
+      <div class="foot-inner">
+        <div class="foot-about">
+          <a class="site-brand" href="../">
+            <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+            <span translate="no">Paint<em>Studio</em></span>
+          </a>
+          <p>Paint Studio is a free, open-source image editor under the MIT license. It runs entirely in your browser, so your images never leave your device.</p>
+          <p><a href="https://github.com/RobertLib/paint" rel="noopener">Source code on GitHub</a> · <a href="../compress-image/" hreflang="en" lang="en">English</a> · <a href="../cs/zmensit-velikost-fotky/" hreflang="cs" lang="cs">Čeština</a></p>
+        </div>
+        <nav aria-label="All tools">
+          <h2>All tools</h2>
+          <ul class="foot-links"><li><a href="../crop-image/">Crop image</a></li><li><a href="../resize-image/">Resize image</a></li><li><a href="../rotate-image/">Rotate image</a></li><li><a href="../compress-image/">Compress image</a></li><li><a href="../image-converter/">Image converter</a></li><li><a href="../png-to-jpg/">PNG to JPG</a></li><li><a href="../webp-to-jpg/">WebP to JPG</a></li><li><a href="../heic-to-jpg/">HEIC to JPG</a></li><li><a href="../blur-image/">Blur image</a></li><li><a href="../add-text-to-photo/">Add text</a></li><li><a href="../black-and-white-photo/">Black and white</a></li><li><a href="../invert-colors/">Invert colors</a></li><li><a href="../photo-filters/">Photo filters</a></li><li><a href="../brighten-photo/">Brighten photo</a></li><li><a href="../make-background-transparent/">Transparent background</a></li><li><a href="../color-picker-from-image/">Color picker</a></li><li><a href="../draw-on-image/">Draw on image</a></li><li><a href="../paint-online/">Paint online</a></li><li><a href="../open-psd-online/">Open PSD</a></li><li><a href="../retouch-photo/">Retouch photo</a></li></ul>
+        </nav>
+      </div>
+    </footer>
+    <script type="module" src="../js/site.js"></script>
+  </body>
+</html>

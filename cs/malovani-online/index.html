@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="cs">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Malování a kreslení online zdarma | Paint Studio</title>
+    <meta name="description" content="Malování online zdarma na prázdném plátně: štětce s přítlakem pera, vrstvy, výplň, přechody, tvary a text. Funguje na počítači, tabletu i Chromebooku." />
+    <link rel="canonical" href="https://robertlib.github.io/paint/cs/malovani-online/" />
+    <link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/paint-online/" />
+    <link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/malovani-online/" />
+    <link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/paint-online/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Paint Studio" />
+    <meta property="og:title" content="Malování a kreslení online zdarma | Paint Studio" />
+    <meta property="og:description" content="Malování online zdarma na prázdném plátně: štětce s přítlakem pera, vrstvy, výplň, přechody, tvary a text. Funguje na počítači, tabletu i Chromebooku." />
+    <meta property="og:url" content="https://robertlib.github.io/paint/cs/malovani-online/" />
+    <meta property="og:image" content="https://robertlib.github.io/paint/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="cs_CZ" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" type="image/svg+xml" href="../../favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="../../favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../../apple-touch-icon.png" />
+    <link rel="manifest" href="../../manifest.json" />
+    <meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+
+    <script>
+      // the editor's theme choice applies here too; otherwise follow the system
+      try {
+        var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
+        document.documentElement.dataset.theme =
+          (t && t.theme) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      } catch (e) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    </script>
+    <link rel="stylesheet" href="../../css/tokens.css" />
+    <link rel="stylesheet" href="../../css/site.css" />
+    <link rel="modulepreload" href="../../js/site.js" />
+    <link rel="modulepreload" href="../../js/store.js" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/cs/"},{"@type":"ListItem","position":2,"name":"Malování online na prázdném plátně","item":"https://robertlib.github.io/paint/cs/malovani-online/"}]},{"@type":"WebApplication","name":"Malování online — Paint Studio","url":"https://robertlib.github.io/paint/cs/malovani-online/","description":"Malování online zdarma na prázdném plátně: štětce s přítlakem pera, vrstvy, výplň, přechody, tvary a text. Funguje na počítači, tabletu i Chromebooku.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (modern web browser)","inLanguage":"cs","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@id":"https://robertlib.github.io/paint/#website"}}]}</script>
+    
+  </head>
+  <body class="site">
+    <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true"><defs><symbol id="i-brush" viewBox="0 0 24 24"><path d="M9.1 11.9l8-8.1a2.85 2.85 0 0 1 4.05 4.05l-8.1 8.05"/><path d="M7.05 14.95a3 3 0 0 0-3 3c0 1.35-2.5 1.5-2 2 1.1 1.1 2.5 2 4 2a4 4 0 0 0 4-4 3 3 0 0 0-3-3z"/></symbol><symbol id="i-image" viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol><symbol id="i-text" viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><path d="M12 4v16M8.5 20h7"/></symbol><symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M11 3l1.8 4.7L17.5 9.5l-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8z"/><path d="M18.5 14.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/></symbol></defs></svg>
+    
+    <header class="site-head">
+      <a class="site-brand" href="../../cs/">
+        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+        <span translate="no">Paint<em>Studio</em></span>
+      </a>
+      <nav class="site-nav" aria-label="Všechny nástroje">
+        <a href="../../cs/#tools">Všechny nástroje</a>
+        <span class="langs" role="group" aria-label="Jazyk"><a class="lang" href="../../paint-online/" hreflang="en" lang="en">EN</a><span class="lang is-current" aria-current="true">CS</span></span>
+        <a class="btn btn-primary" href="../../editor/?lang=cs&task=paint"><svg class="icon"><use href="#i-brush" /></svg><span>Otevřít editor</span></a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../../cs/">Paint Studio</a><span aria-hidden="true">›</span><span>Malování online</span></nav>
+        <h1>Malování online na prázdném plátně</h1>
+        <p class="lead">Nepotřebujete žádný soubor: jedním tlačítkem otevřete bílé plátno 1600 × 1000 px s připraveným nástrojem Štětec a můžete začít. Rozpracovaný obrázek se průběžně ukládá v prohlížeči.</p>
+        
+      <div class="drop drop-blank">
+        <a class="btn btn-primary btn-lg" href="../../editor/?lang=cs&task=paint"><svg class="icon"><use href="#i-brush" /></svg><span>Začít s prázdným plátnem</span></a>
+        <p class="drop-hint">nebo ho vložte ze schránky (Ctrl+V) · PNG, JPG, WebP, HEIC, PSD…</p>
+        <label class="btn btn-ghost"><svg class="icon"><use href="#i-image" /></svg><span>Vybrat obrázek</span>
+          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+      </div>
+      <script type="application/json" id="dropConfig">{"editor":"../../editor/","task":"draw","lang":"cs"}</script>
+        <ul class="trust"><li><svg class="icon"><use href="#i-check" /></svg><span>Nic se nenahrává</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>Bez registrace</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>Bez vodoznaku</span></li></ul>
+      </section>
+
+      <section class="block steps">
+        <h2>Jak na to</h2>
+        <ol><li>Klikněte na Začít s prázdným plátnem.</li><li>V panelu Barva vyberte barvu a malujte nástrojem Štětec.</li><li>Hotový obrázek uložte přes Exportovat, nebo jako projekt <code>.paint</code>.</li></ol>
+      </section>
+
+      <section class="block prose">
+        <h2>Štětce, které reagují na pero</h2>
+        <p>Štětec má nastavitelnou velikost, krytí, tvrdost a vyhlazení, které uhladí roztřesené tahy myší. S grafickým tabletem, stylusem nebo Apple Pencil mění v prohlížeči tloušťku podle přítlaku, takže tah se zužuje a rozšiřuje jako u skutečného štětce. Tužka kreslí tvrdé pixelové čáry vhodné pro pixel art, Sprej měkce rozprašuje barvu a Guma maže. Velké plochy vybarvíte nástrojem Výplň, plynulou oblohu nebo pozadí nástrojem Přechod, lineárním nebo kruhovým.</p>
+        <h2>Vrstvy pro skicu, linku a barvy</h2>
+        <p>Kresbu si rozdělte do vrstev: na jednu skicu, na další čistou linku a pod ni barvy. Skicu pak skryjete nebo jí snížíte krytí a barvy opravujete, aniž byste poškodili obrys. Vrstev může být libovolně mnoho a 16 režimů prolnutí pomůže se stíny a světly. Přiblížení až na 3200 % umožní dokreslit detaily, historie vrátí až 60 kroků. K dispozici jsou i tvary a nástroj Text, třeba pro komiksové bubliny nebo přání k narozeninám.</p>
+        <h2>Pro děti i dospělé, na čemkoli s prohlížečem</h2>
+        <p>Malování a kreslení online funguje bez instalace na počítači, školním Chromebooku, tabletu i telefonu. Nevyžaduje účet ani e-mail a nezobrazuje reklamy, takže ho můžete bez obav pustit i dětem. Rozpracovaný obrázek se automaticky ukládá do úložiště prohlížeče a při další návštěvě vám ho editor nabídne k obnovení. Hotové dílo uložíte jako PNG, JPEG nebo WebP, s vrstvami jako PSD, nebo jako projekt <code>.paint</code> pro pozdější pokračování.</p>
+      </section>
+      
+      <section class="block faq">
+        <h2>Časté dotazy</h2>
+        <h3>Je malování vhodné pro děti?</h3>
+        <p>Ano. Nevyžaduje registraci, neobsahuje reklamy ani nákupy a nic se nikam neodesílá. Rozhraní je v češtině a pro začátek stačí Štětec, Výplň a Guma. Rozpracovaný obrázek je ale uložený jen v prohlížeči a po vymazání jeho dat zmizí, proto hotové kresby exportujte.</p>
+        <h3>Můžu kreslit perem na tabletu nebo iPadu?</h3>
+        <p>Ano. Štětec v prohlížeči reaguje na přítlak pera, ať jde o grafický tablet připojený k počítači, nebo Apple Pencil na iPadu. Plátno přiblížíte roztažením dvou prstů. Citlivost na přítlak funguje tam, kde ji prohlížeč a zařízení předávají.</p>
+        <h3>Jak změnit velikost plátna?</h3>
+        <p>Výchozí plátno má 1600 × 1000 px. Rozměry změníte v nabídce Obrázek přes Velikost plátna…, kde ukotvením zvolíte i to, kde zůstane stávající kresba. Dokument může mít nejvýš 8000 × 8000 px.</p>
+        <h3>Kde najdu obrázek, když zavřu okno?</h3>
+        <p>Editor průběžně ukládá práci do úložiště prohlížeče a při další návštěvě ve stejném prohlížeči vám ji nabídne k obnovení. Na jiném zařízení ji ale mít nebudete – pro přenos nebo zálohu uložte projekt <code>.paint</code> přes nabídku Soubor.</p>
+      </section>
+
+      <section class="block">
+        <h2>Související nástroje</h2>
+        <ul class="tool-grid"><li><a class="tool-card" href="../../cs/kresleni-do-fotky/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-brush" /></svg></span>
+          <span class="tool-text"><strong>Kreslení do fotky</strong><span>Štětec, šipky a tvary pro poznámky a nákresy</span></span>
+        </a></li><li><a class="tool-card" href="../../cs/pridat-text-do-fotky/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-text" /></svg></span>
+          <span class="tool-text"><strong>Text do fotky</strong><span>Popisky, meme a vodoznaky na upravitelných vrstvách</span></span>
+        </a></li><li><a class="tool-card" href="../../cs/filtry-na-fotky/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-sparkles" /></svg></span>
+          <span class="tool-text"><strong>Filtry na fotky</strong><span>21 filtrů s náhledem přímo z vaší fotky</span></span>
+        </a></li></ul>
+      </section>
+    </main>
+    <footer class="site-foot">
+      <div class="foot-inner">
+        <div class="foot-about">
+          <a class="site-brand" href="../../cs/">
+            <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+            <span translate="no">Paint<em>Studio</em></span>
+          </a>
+          <p>Paint Studio je zdarma a má otevřený zdrojový kód pod licencí MIT. Všechno běží přímo ve vašem prohlížeči, obrázky nikam neodcházejí.</p>
+          <p><a href="https://github.com/RobertLib/paint" rel="noopener">Zdrojový kód na GitHubu</a> · <a href="../../paint-online/" hreflang="en" lang="en">English</a> · <a href="../../cs/malovani-online/" hreflang="cs" lang="cs">Čeština</a></p>
+        </div>
+        <nav aria-label="Všechny nástroje">
+          <h2>Všechny nástroje</h2>
+          <ul class="foot-links"><li><a href="../../cs/oriznout-obrazek/">Oříznout fotku</a></li><li><a href="../../cs/zmenit-velikost-obrazku/">Změnit velikost</a></li><li><a href="../../cs/otocit-obrazek/">Otočit obrázek</a></li><li><a href="../../cs/zmensit-velikost-fotky/">Zmenšit velikost fotky</a></li><li><a href="../../cs/prevod-obrazku/">Převod formátů</a></li><li><a href="../../cs/png-na-jpg/">PNG na JPG</a></li><li><a href="../../cs/webp-na-jpg/">WebP na JPG</a></li><li><a href="../../cs/heic-na-jpg/">HEIC na JPG</a></li><li><a href="../../cs/rozmazat-fotku/">Rozmazat fotku</a></li><li><a href="../../cs/pridat-text-do-fotky/">Text do fotky</a></li><li><a href="../../cs/cernobila-fotka/">Černobílá fotka</a></li><li><a href="../../cs/invertovat-barvy/">Invertovat barvy</a></li><li><a href="../../cs/filtry-na-fotky/">Filtry na fotky</a></li><li><a href="../../cs/zesvetlit-fotku/">Zesvětlit fotku</a></li><li><a href="../../cs/pruhledne-pozadi/">Průhledné pozadí</a></li><li><a href="../../cs/zjistit-barvu-z-obrazku/">Barva z obrázku</a></li><li><a href="../../cs/kresleni-do-fotky/">Kreslení do fotky</a></li><li><a href="../../cs/malovani-online/">Malování online</a></li><li><a href="../../cs/otevrit-psd/">Otevřít PSD</a></li><li><a href="../../cs/retus-fotky/">Retuš fotky</a></li></ul>
+        </nav>
+      </div>
+    </footer>
+    <script type="module" src="../../js/site.js"></script>
+  </body>
+</html>

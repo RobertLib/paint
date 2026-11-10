@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Make Background Transparent Online | Paint Studio</title>
+    <meta name="description" content="Make an image background transparent online: click it with the Magic wand, delete it, refine the edges and save as PNG. Ideal for logos and signatures." />
+    <link rel="canonical" href="https://robertlib.github.io/paint/make-background-transparent/" />
+    <link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/make-background-transparent/" />
+    <link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/pruhledne-pozadi/" />
+    <link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/make-background-transparent/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Paint Studio" />
+    <meta property="og:title" content="Make Background Transparent Online | Paint Studio" />
+    <meta property="og:description" content="Make an image background transparent online: click it with the Magic wand, delete it, refine the edges and save as PNG. Ideal for logos and signatures." />
+    <meta property="og:url" content="https://robertlib.github.io/paint/make-background-transparent/" />
+    <meta property="og:image" content="https://robertlib.github.io/paint/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="cs_CZ" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+    <link rel="manifest" href="../manifest.json" />
+    <meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+
+    <script>
+      // the editor's theme choice applies here too; otherwise follow the system
+      try {
+        var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
+        document.documentElement.dataset.theme =
+          (t && t.theme) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      } catch (e) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    </script>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/site.css" />
+    <link rel="modulepreload" href="../js/site.js" />
+    <link rel="modulepreload" href="../js/store.js" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/"},{"@type":"ListItem","position":2,"name":"Make an image background transparent","item":"https://robertlib.github.io/paint/make-background-transparent/"}]},{"@type":"WebApplication","name":"Transparent background — Paint Studio","url":"https://robertlib.github.io/paint/make-background-transparent/","description":"Make an image background transparent online: click it with the Magic wand, delete it, refine the edges and save as PNG. Ideal for logos and signatures.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (modern web browser)","inLanguage":"en","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@id":"https://robertlib.github.io/paint/#website"}}]}</script>
+    
+  </head>
+  <body class="site">
+    <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true"><defs><symbol id="i-brush" viewBox="0 0 24 24"><path d="M9.1 11.9l8-8.1a2.85 2.85 0 0 1 4.05 4.05l-8.1 8.05"/><path d="M7.05 14.95a3 3 0 0 0-3 3c0 1.35-2.5 1.5-2 2 1.1 1.1 2.5 2 4 2a4 4 0 0 0 4-4 3 3 0 0 0-3-3z"/></symbol><symbol id="i-image" viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol><symbol id="i-wand" viewBox="0 0 24 24"><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8l1.4 1.4M17.8 6.2l1.4-1.4M12.2 6.2l-1.4-1.4"/><path d="M3.5 20.5L14 10"/></symbol><symbol id="i-swap" viewBox="0 0 24 24"><path d="M16 3l4 4-4 4M20 7H9M8 21l-4-4 4-4M4 17h11"/></symbol><symbol id="i-crop" viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></symbol><symbol id="i-text" viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><path d="M12 4v16M8.5 20h7"/></symbol></defs></svg>
+    
+    <header class="site-head">
+      <a class="site-brand" href="../">
+        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+        <span translate="no">Paint<em>Studio</em></span>
+      </a>
+      <nav class="site-nav" aria-label="All tools">
+        <a href="../#tools">All tools</a>
+        <span class="langs" role="group" aria-label="Language"><span class="lang is-current" aria-current="true">EN</span><a class="lang" href="../cs/pruhledne-pozadi/" hreflang="cs" lang="cs">CS</a></span>
+        <a class="btn btn-primary" href="../editor/?lang=en&task=transparent"><svg class="icon"><use href="#i-brush" /></svg><span>Open editor</span></a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Paint Studio</a><span aria-hidden="true">›</span><span>Transparent background</span></nav>
+        <h1>Make an image background transparent</h1>
+        <p class="lead">Remove a plain background from a logo, product photo or signature and save it with transparency. Click the background with the Magic wand, delete it and download a PNG.</p>
+        
+      <div class="drop" data-drop>
+        <svg class="icon drop-icon"><use href="#i-image" /></svg>
+        <strong class="drop-title">Drop an image here</strong>
+        <label class="btn btn-primary btn-lg"><svg class="icon"><use href="#i-folder" /></svg><span>Choose image</span>
+          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+        <p class="drop-hint">or paste with Ctrl+V · PNG, JPG, WebP, HEIC, PSD…</p>
+        
+        <p class="drop-busy" data-busy hidden>Opening the editor…</p>
+      </div>
+      <script type="application/json" id="dropConfig">{"editor":"../editor/","task":"transparent","lang":"en"}</script>
+        <ul class="trust"><li><svg class="icon"><use href="#i-check" /></svg><span>Nothing is uploaded</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No sign-up</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No watermark</span></li></ul>
+      </section>
+
+      <section class="block steps">
+        <h2>How it works</h2>
+        <ol><li>Drop your image — the Magic wand is ready.</li><li>Click the background, Shift-click to add more, and press <kbd>Delete</kbd>.</li><li>Refine the edges if needed, then Export as PNG or WebP.</li></ol>
+      </section>
+
+      <section class="block prose">
+        <h2>When this works best</h2>
+        <p>The Magic wand selects pixels by color, so it shines on plain, evenly colored backgrounds: logos on white, product shots on a studio backdrop, scanned signatures, icons and clip art. A busy background — a street, a forest, a patterned sofa — has too many different colors for one click and needs more manual work with the Lasso and Eraser. There is no AI subject detection, so you stay in control of exactly which pixels disappear. A checkerboard pattern shows the areas that are already transparent.</p>
+        <h2>Getting a clean selection</h2>
+        <p><strong>Tolerance</strong> decides how similar a color must be to get selected: low values for crisp graphics, higher values for backgrounds with shadows or JPEG noise. Shift-click adds areas, such as the gaps inside letters like “o” or “a”, and Alt-click (Option-click on a Mac) removes areas you grabbed by accident. Turning off Contiguous selects the color everywhere in the image at once. After deleting, zoom in on the edges: a pale fringe left behind usually means the tolerance was too low.</p>
+        <h2>Refining edges and saving</h2>
+        <p>For non-destructive work, use a layer mask instead of deleting: after selecting the background, invert the selection and create a mask from it. The background is hidden rather than erased, and painting black or white on the mask hides or reveals pixels again, so a stray click is easy to fix. The Eraser cleans up anything the wand missed. Trim transparent edges in the Image menu cuts the empty margin around a logo. Export as PNG for compatibility or WebP for a smaller file; JPEG can’t store transparency and fills it with white.</p>
+      </section>
+      
+      <section class="block faq">
+        <h2>Frequently asked questions</h2>
+        <h3>Can it remove the background from a portrait automatically?</h3>
+        <p>No. Paint Studio has no AI background removal. You can still cut out a person with the Lasso, the Magic wand and a layer mask, but hair and complex backgrounds take patience. Plain backgrounds, like a white wall, are much quicker.</p>
+        <h3>Why does my transparent image have a white background after saving?</h3>
+        <p>It was most likely saved as JPEG, which has no transparency and fills those areas with white. Export again and choose PNG or WebP. Also check your viewer: some apps display transparent areas as white or black even when the file is transparent.</p>
+        <h3>How do I make a signature transparent?</h3>
+        <p>Photograph or scan the signature on white paper, then raise Contrast in the Adjust panel so the paper becomes whiter and the ink darker. Click the paper with the Magic wand, delete it, use Trim transparent edges and export as PNG.</p>
+        <h3>How do I remove a white background from a logo?</h3>
+        <p>Click the white area with the Magic wand, then Shift-click inside closed letters — or turn off Contiguous to grab all the white at once, as long as the logo itself contains no white. Press Delete and export as PNG.</p>
+      </section>
+
+      <section class="block">
+        <h2>Related tools</h2>
+        <ul class="tool-grid"><li><a class="tool-card" href="../image-converter/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-swap" /></svg></span>
+          <span class="tool-text"><strong>Image converter</strong><span>Convert between PNG, JPG, WebP and PSD</span></span>
+        </a></li><li><a class="tool-card" href="../crop-image/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-crop" /></svg></span>
+          <span class="tool-text"><strong>Crop image</strong><span>Cut out the part you want, with ratio presets</span></span>
+        </a></li><li><a class="tool-card" href="../add-text-to-photo/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-text" /></svg></span>
+          <span class="tool-text"><strong>Add text</strong><span>Captions, memes and watermarks on photos</span></span>
+        </a></li></ul>
+      </section>
+    </main>
+    <footer class="site-foot">
+      <div class="foot-inner">
+        <div class="foot-about">
+          <a class="site-brand" href="../">
+            <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+            <span translate="no">Paint<em>Studio</em></span>
+          </a>
+          <p>Paint Studio is a free, open-source image editor under the MIT license. It runs entirely in your browser, so your images never leave your device.</p>
+          <p><a href="https://github.com/RobertLib/paint" rel="noopener">Source code on GitHub</a> · <a href="../make-background-transparent/" hreflang="en" lang="en">English</a> · <a href="../cs/pruhledne-pozadi/" hreflang="cs" lang="cs">Čeština</a></p>
+        </div>
+        <nav aria-label="All tools">
+          <h2>All tools</h2>
+          <ul class="foot-links"><li><a href="../crop-image/">Crop image</a></li><li><a href="../resize-image/">Resize image</a></li><li><a href="../rotate-image/">Rotate image</a></li><li><a href="../compress-image/">Compress image</a></li><li><a href="../image-converter/">Image converter</a></li><li><a href="../png-to-jpg/">PNG to JPG</a></li><li><a href="../webp-to-jpg/">WebP to JPG</a></li><li><a href="../heic-to-jpg/">HEIC to JPG</a></li><li><a href="../blur-image/">Blur image</a></li><li><a href="../add-text-to-photo/">Add text</a></li><li><a href="../black-and-white-photo/">Black and white</a></li><li><a href="../invert-colors/">Invert colors</a></li><li><a href="../photo-filters/">Photo filters</a></li><li><a href="../brighten-photo/">Brighten photo</a></li><li><a href="../make-background-transparent/">Transparent background</a></li><li><a href="../color-picker-from-image/">Color picker</a></li><li><a href="../draw-on-image/">Draw on image</a></li><li><a href="../paint-online/">Paint online</a></li><li><a href="../open-psd-online/">Open PSD</a></li><li><a href="../retouch-photo/">Retouch photo</a></li></ul>
+        </nav>
+      </div>
+    </footer>
+    <script type="module" src="../js/site.js"></script>
+  </body>
+</html>

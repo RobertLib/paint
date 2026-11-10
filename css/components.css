@@ -1540,125 +1540,7 @@ kbd {
   }
 }
 
-/* ================================== about ================================= */
-/* Landing copy. Present and visible in the served HTML — it is what a crawler
-   or a JavaScript-less visitor gets — then stepped aside once the app boots and
-   reachable again from the welcome screen and the Help menu. */
-
-.about {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  background: var(--stage);
-  color: var(--text);
-  font-size: 14.5px;
-  line-height: 1.7;
-}
-
-.about[hidden] {
-  display: none;
-}
-
-.about-inner {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 56px 24px 72px;
-}
-
-.about-head {
-  display: grid;
-  justify-items: center;
-  gap: 18px;
-  text-align: center;
-  padding-bottom: 40px;
-  border-bottom: 1px solid var(--stroke);
-}
-
-.about-head h1 {
-  max-width: 20ch;
-  font-size: clamp(26px, 4.4vw, 38px);
-  font-weight: 680;
-  line-height: 1.2;
-  letter-spacing: -0.8px;
-}
-
-.about-lead {
-  max-width: 62ch;
-  color: var(--text-2);
-}
-
-.about-cta {
-  height: 42px;
-  padding: 0 22px;
-  font-size: 14px;
-}
-
-.about-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 30px 40px;
-  padding: 44px 0;
-}
-
-.about-grid h2,
-.about-faq h2 {
-  font-size: 17px;
-  font-weight: 640;
-  letter-spacing: -0.3px;
-  margin-bottom: 8px;
-}
-
-.about-grid p,
-.about-faq p {
-  color: var(--text-2);
-}
-
-.about-faq {
-  padding-top: 40px;
-  border-top: 1px solid var(--stroke);
-}
-
-.about-faq h2 {
-  font-size: 22px;
-  letter-spacing: -0.5px;
-  margin-bottom: 22px;
-}
-
-.about-faq h3 {
-  font-size: 15px;
-  font-weight: 620;
-  margin-bottom: 4px;
-}
-
-.about-faq h3 + p {
-  margin-bottom: 22px;
-}
-
-.about code,
-.about kbd {
-  font-family: var(--mono);
-  font-size: 0.88em;
-  padding: 1px 5px;
-  border-radius: var(--r-xs);
-  background: var(--bg-2);
-  border: 1px solid var(--stroke);
-}
-
-.about-foot {
-  margin-top: 40px;
-  padding-top: 22px;
-  border-top: 1px solid var(--stroke);
-  color: var(--text-3);
-  font-size: 13px;
-}
-
-.about a {
-  color: var(--accent);
-}
-
-/* link back into the copy from the welcome screen */
+/* link to the landing pages from the welcome screen */
 .welcome-more {
   padding: 0 18px 20px;
 }
@@ -1678,14 +1560,224 @@ kbd {
   color: var(--text);
 }
 
+
+/* ================================ small btns ============================== */
+
+.btn.sm {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 12px;
+  gap: 5px;
+}
+
+.btn.sm .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* ================================= task bar =============================== */
+/* What a landing page promised, one click away: shown over the stage. */
+
+.taskbar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 10px;
+  max-width: calc(100% - 24px);
+  padding: 7px 8px 7px 14px;
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--stroke-2);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-2);
+  font-size: 12.5px;
+  animation: dialog-in var(--t-slow) both;
+}
+
+.taskbar-text {
+  color: var(--text);
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+
+.taskbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 @media (max-width: 760px) {
-  .about-inner {
-    padding: 36px 18px 56px;
+  /* a compact strip along the top of the stage; the actions scroll sideways */
+  .taskbar {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    transform: none;
+    max-width: none;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 6px 6px 6px 10px;
+    animation: none;
   }
 
-  .about-grid {
-    grid-template-columns: 1fr;
-    gap: 26px;
-    padding: 34px 0;
+  .taskbar-text {
+    display: none;
   }
+
+  .taskbar-actions {
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .taskbar-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .taskbar .btn {
+    flex: none;
+  }
+}
+
+/* ============================== restore card ============================== */
+
+.restore-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: calc(100% - 36px);
+  margin: 0 18px 14px;
+  padding: 10px 12px;
+  text-align: left;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  cursor: pointer;
+  transition: background var(--t-fast);
+}
+
+.restore-card:hover {
+  background: color-mix(in oklab, var(--accent-soft) 70%, var(--accent) 12%);
+}
+
+.restore-card img {
+  width: 64px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: var(--r-xs);
+  background-image: var(--check-bg);
+  background-size: 8px 8px;
+  flex: none;
+}
+
+.restore-text {
+  display: grid;
+  gap: 1px;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+.restore-text strong {
+  font-size: 13px;
+}
+
+.restore-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.restore-meta {
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+/* ============================ masks & text layers ========================= */
+
+.layer-thumb {
+  position: relative;
+}
+
+.layer-thumb.is-target {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.mask-thumb {
+  background: #000;
+}
+
+.mask-thumb.is-disabled::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top right, transparent calc(50% - 1px), var(--danger) 50%, transparent calc(50% + 1px));
+}
+
+.layer-badge {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 2px;
+  border-radius: 3px;
+  font: 700 9px/13px var(--font);
+  text-align: center;
+  color: #fff;
+  background: var(--accent);
+}
+
+.icon-btn.is-active {
+  color: var(--accent);
+}
+
+/* ============================== tone dialogs ============================== */
+
+.tone-dialog {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.histogram,
+.curves-canvas {
+  width: 100%;
+  border-radius: var(--r-md);
+  border: 1px solid var(--stroke-2);
+  background: var(--bg-2);
+}
+
+.histogram {
+  height: auto;
+  aspect-ratio: 512 / 150;
+}
+
+.curves-canvas {
+  aspect-ratio: 1;
+  max-width: 340px;
+  align-self: center;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.tone-row {
+  display: grid;
+  grid-template-columns: 92px 1fr 64px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.tone-row .opt-num {
+  width: 100%;
 }

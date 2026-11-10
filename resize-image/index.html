@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Resize Image Online – Change Pixel Size | Paint Studio</title>
+    <meta name="description" content="Resize an image online for free: set the exact width and height in pixels, keep the aspect ratio and scale the export. Fast, private, no upload needed." />
+    <link rel="canonical" href="https://robertlib.github.io/paint/resize-image/" />
+    <link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/resize-image/" />
+    <link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/zmenit-velikost-obrazku/" />
+    <link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/resize-image/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Paint Studio" />
+    <meta property="og:title" content="Resize Image Online – Change Pixel Size | Paint Studio" />
+    <meta property="og:description" content="Resize an image online for free: set the exact width and height in pixels, keep the aspect ratio and scale the export. Fast, private, no upload needed." />
+    <meta property="og:url" content="https://robertlib.github.io/paint/resize-image/" />
+    <meta property="og:image" content="https://robertlib.github.io/paint/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="cs_CZ" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+    <link rel="manifest" href="../manifest.json" />
+    <meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+
+    <script>
+      // the editor's theme choice applies here too; otherwise follow the system
+      try {
+        var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
+        document.documentElement.dataset.theme =
+          (t && t.theme) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      } catch (e) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    </script>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/site.css" />
+    <link rel="modulepreload" href="../js/site.js" />
+    <link rel="modulepreload" href="../js/store.js" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/"},{"@type":"ListItem","position":2,"name":"Resize image online","item":"https://robertlib.github.io/paint/resize-image/"}]},{"@type":"WebApplication","name":"Resize image — Paint Studio","url":"https://robertlib.github.io/paint/resize-image/","description":"Resize an image online for free: set the exact width and height in pixels, keep the aspect ratio and scale the export. Fast, private, no upload needed.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (modern web browser)","inLanguage":"en","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@id":"https://robertlib.github.io/paint/#website"}}]}</script>
+    
+  </head>
+  <body class="site">
+    <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true"><defs><symbol id="i-brush" viewBox="0 0 24 24"><path d="M9.1 11.9l8-8.1a2.85 2.85 0 0 1 4.05 4.05l-8.1 8.05"/><path d="M7.05 14.95a3 3 0 0 0-3 3c0 1.35-2.5 1.5-2 2 1.1 1.1 2.5 2 4 2a4 4 0 0 0 4-4 3 3 0 0 0-3-3z"/></symbol><symbol id="i-image" viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol><symbol id="i-frame" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16M8 4v16M16 4v16"/></symbol><symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></symbol><symbol id="i-crop" viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></symbol><symbol id="i-swap" viewBox="0 0 24 24"><path d="M16 3l4 4-4 4M20 7H9M8 21l-4-4 4-4M4 17h11"/></symbol></defs></svg>
+    
+    <header class="site-head">
+      <a class="site-brand" href="../">
+        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+        <span translate="no">Paint<em>Studio</em></span>
+      </a>
+      <nav class="site-nav" aria-label="All tools">
+        <a href="../#tools">All tools</a>
+        <span class="langs" role="group" aria-label="Language"><span class="lang is-current" aria-current="true">EN</span><a class="lang" href="../cs/zmenit-velikost-obrazku/" hreflang="cs" lang="cs">CS</a></span>
+        <a class="btn btn-primary" href="../editor/?lang=en&task=resize"><svg class="icon"><use href="#i-brush" /></svg><span>Open editor</span></a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Paint Studio</a><span aria-hidden="true">›</span><span>Resize image</span></nav>
+        <h1>Resize image online</h1>
+        <p class="lead">Set a new width and height in pixels and download the smaller or larger picture. The Image size dialog opens as soon as you drop your photo.</p>
+        
+      <div class="drop" data-drop>
+        <svg class="icon drop-icon"><use href="#i-image" /></svg>
+        <strong class="drop-title">Drop an image here</strong>
+        <label class="btn btn-primary btn-lg"><svg class="icon"><use href="#i-folder" /></svg><span>Choose image</span>
+          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+        <p class="drop-hint">or paste with Ctrl+V · PNG, JPG, WebP, HEIC, PSD…</p>
+        
+        <p class="drop-busy" data-busy hidden>Opening the editor…</p>
+      </div>
+      <script type="application/json" id="dropConfig">{"editor":"../editor/","task":"resize","lang":"en"}</script>
+        <ul class="trust"><li><svg class="icon"><use href="#i-check" /></svg><span>Nothing is uploaded</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No sign-up</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No watermark</span></li></ul>
+      </section>
+
+      <section class="block steps">
+        <h2>How it works</h2>
+        <ol><li>Drop your image — the Image size dialog opens right away.</li><li>Type the new width or height; Keep aspect ratio prevents stretching.</li><li>Click Apply, then Export and download the resized file.</li></ol>
+      </section>
+
+      <section class="block prose">
+        <h2>Pixels, aspect ratio and what size to choose</h2>
+        <p>Width and height are set in pixels, which is what websites, email and social networks care about. With <strong>Keep aspect ratio</strong> checked, changing one value updates the other, so faces and circles don’t get squashed. As a rough guide, 1920 px on the long side is plenty for a full-screen photo or a presentation slide, 1200 px works for most blog images and email attachments, and 400–800 px is enough for a profile picture or product thumbnail. Making a picture smaller is safe; enlarging it adds pixels but not detail, so it looks softer.</p>
+        <h2>Image size versus Canvas size</h2>
+        <p>Image size… scales the whole picture up or down. Canvas size…, also in the Image menu, changes the area around it instead: the picture keeps its size and the canvas is extended or cut. The 9-point anchor decides where the existing picture sits — choose the center to add an even border on all sides, or a corner to add space in one direction only. That is handy for fitting a portrait photo into a square without cropping it, or for making room for a caption.</p>
+        <h2>Resizing while you export</h2>
+        <p>The Export dialog has its own Scale slider from 10 to 400 %. Use it when you want to keep the full-resolution document for further editing but download a smaller copy — 50 % for a quick share, for example. The dialog shows the expected file size before you click Download, so you can check whether the image now fits an upload limit. If the limit is about file size rather than pixels, lowering the JPEG or WebP quality helps as well.</p>
+      </section>
+      
+      <section class="block faq">
+        <h2>Frequently asked questions</h2>
+        <h3>How do I resize an image without stretching it?</h3>
+        <p>Leave Keep aspect ratio checked in the Image size dialog and change only the width or only the height. The other value is calculated for you, so the proportions stay exactly as they were. To change the shape as well, crop to the new ratio first, then resize.</p>
+        <h3>Can I make a small image bigger without losing quality?</h3>
+        <p>You can enlarge it up to 8000 × 8000 pixels, but no editor can recreate detail the original never captured, and Paint Studio has no AI upscaling. Small enlargements usually look fine on screen; large ones look noticeably soft.</p>
+        <h3>What is the difference between resizing and compressing?</h3>
+        <p>Resizing changes the number of pixels. Compressing keeps the pixels but stores them more efficiently, usually as JPEG or WebP with a lower quality setting. Reducing dimensions is the most effective way to cut file size, and the two work well together.</p>
+        <h3>Can I resize many images at once?</h3>
+        <p>Not in one go — Paint Studio edits one image at a time and has no batch processing. For a handful of pictures, open each one, set the size and export; since nothing is uploaded, each file takes only a few seconds.</p>
+      </section>
+
+      <section class="block">
+        <h2>Related tools</h2>
+        <ul class="tool-grid"><li><a class="tool-card" href="../compress-image/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-download" /></svg></span>
+          <span class="tool-text"><strong>Compress image</strong><span>Shrink file size with quality and scale</span></span>
+        </a></li><li><a class="tool-card" href="../crop-image/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-crop" /></svg></span>
+          <span class="tool-text"><strong>Crop image</strong><span>Cut out the part you want, with ratio presets</span></span>
+        </a></li><li><a class="tool-card" href="../image-converter/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-swap" /></svg></span>
+          <span class="tool-text"><strong>Image converter</strong><span>Convert between PNG, JPG, WebP and PSD</span></span>
+        </a></li></ul>
+      </section>
+    </main>
+    <footer class="site-foot">
+      <div class="foot-inner">
+        <div class="foot-about">
+          <a class="site-brand" href="../">
+            <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+            <span translate="no">Paint<em>Studio</em></span>
+          </a>
+          <p>Paint Studio is a free, open-source image editor under the MIT license. It runs entirely in your browser, so your images never leave your device.</p>
+          <p><a href="https://github.com/RobertLib/paint" rel="noopener">Source code on GitHub</a> · <a href="../resize-image/" hreflang="en" lang="en">English</a> · <a href="../cs/zmenit-velikost-obrazku/" hreflang="cs" lang="cs">Čeština</a></p>
+        </div>
+        <nav aria-label="All tools">
+          <h2>All tools</h2>
+          <ul class="foot-links"><li><a href="../crop-image/">Crop image</a></li><li><a href="../resize-image/">Resize image</a></li><li><a href="../rotate-image/">Rotate image</a></li><li><a href="../compress-image/">Compress image</a></li><li><a href="../image-converter/">Image converter</a></li><li><a href="../png-to-jpg/">PNG to JPG</a></li><li><a href="../webp-to-jpg/">WebP to JPG</a></li><li><a href="../heic-to-jpg/">HEIC to JPG</a></li><li><a href="../blur-image/">Blur image</a></li><li><a href="../add-text-to-photo/">Add text</a></li><li><a href="../black-and-white-photo/">Black and white</a></li><li><a href="../invert-colors/">Invert colors</a></li><li><a href="../photo-filters/">Photo filters</a></li><li><a href="../brighten-photo/">Brighten photo</a></li><li><a href="../make-background-transparent/">Transparent background</a></li><li><a href="../color-picker-from-image/">Color picker</a></li><li><a href="../draw-on-image/">Draw on image</a></li><li><a href="../paint-online/">Paint online</a></li><li><a href="../open-psd-online/">Open PSD</a></li><li><a href="../retouch-photo/">Retouch photo</a></li></ul>
+        </nav>
+      </div>
+    </footer>
+    <script type="module" src="../js/site.js"></script>
+  </body>
+</html>

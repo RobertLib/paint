@@ -8,6 +8,7 @@
    ========================================================================== */
 
 import { copyCanvas } from "./doc.js";
+import { t } from "./i18n.js";
 import { emit, markDirty, state } from "./state.js";
 
 const MAX_STEPS = 60;
@@ -92,21 +93,30 @@ export const history = new History();
 /* ------------------------------ pixel edits ------------------------------ */
 
 /**
- * Run `fn` and record the pixel difference of a single layer.
- * Returns whatever `fn` returned.
+ * Find a paint target again by id — layers are replaced wholesale by snapshot
+ * undo, so closures must never hold on to a Layer object.
  */
-export function editPixels(label, fn, layer = state.doc?.active) {
-  const doc = state.doc;
-  if (!doc || !layer) return undefined;
+function resolveTarget(doc, id, isMask) {
+  const layer = doc.layers.find((l) => l.id === id);
+  if (!layer) return null;
+  return isMask ? layer.maskTarget : layer;
+}
 
-  const before = copyCanvas(layer.canvas);
-  const result = fn(layer);
-  const after = copyCanvas(layer.canvas);
-  const id = layer.id;
-  const bytes = (before.width * before.height * 4) * 2;
+/**
+ * A pixel edit turns an editable text layer into plain pixels. The text
+ * parameters travel with the undo entry so undo makes it editable again.
+ */
+function rasterizeText(target) {
+  if (target.isMask || !target.text) return null;
+  const text = target.text;
+  target.text = null;
+  emit("toast", { msg: t("Text layer converted to pixels"), kind: "info" });
+  return text;
+}
 
-  const restore = (source) => {
-    const target = doc.layers.find((l) => l.id === id);
+function restorer(doc, id, isMask) {
+  return (source, text) => {
+    const target = resolveTarget(doc, id, isMask);
     if (!target) return;
     const c = target.ctx;
     c.save();
@@ -114,42 +124,46 @@ export function editPixels(label, fn, layer = state.doc?.active) {
     c.globalCompositeOperation = "copy";
     c.drawImage(source, 0, 0);
     c.restore();
+    if (!isMask) target.text = text ? { ...text, color: { ...text.color } } : null;
     target.touch();
     doc.invalidate();
     emit("layers", doc);
   };
+}
+
+/**
+ * Run `fn` and record the pixel difference of a single paint target (a layer
+ * or a layer mask). Returns whatever `fn` returned.
+ */
+export function editPixels(label, fn, layer = state.doc?.target) {
+  const doc = state.doc;
+  if (!doc || !layer) return undefined;
+
+  const before = copyCanvas(layer.canvas);
+  const text = rasterizeText(layer);
+  const result = fn(layer);
+  const after = copyCanvas(layer.canvas);
+  const bytes = (before.width * before.height * 4) * 2;
+  const restore = restorer(doc, layer.id, !!layer.isMask);
 
   history.push({
     label,
     bytes,
-    undo: () => restore(before),
-    redo: () => restore(after),
+    undo: () => restore(before, text),
+    redo: () => restore(after, null),
   });
   return result;
 }
 
 /**
- * For edits that mutate a layer progressively (drag operations): capture the
- * "before" bitmap up front, then commit once the gesture ends.
+ * For edits that mutate a target progressively (drag operations): capture
+ * the "before" bitmap up front, then commit once the gesture ends.
  */
-export function beginPixelEdit(layer = state.doc?.active) {
+export function beginPixelEdit(layer = state.doc?.target) {
   const doc = state.doc;
   const before = copyCanvas(layer.canvas);
-  const id = layer.id;
-
-  const restore = (source) => {
-    const target = doc.layers.find((l) => l.id === id);
-    if (!target) return;
-    const c = target.ctx;
-    c.save();
-    c.setTransform(1, 0, 0, 1, 0, 0);
-    c.globalCompositeOperation = "copy";
-    c.drawImage(source, 0, 0);
-    c.restore();
-    target.touch();
-    doc.invalidate();
-    emit("layers", doc);
-  };
+  const text = rasterizeText(layer);
+  const restore = restorer(doc, layer.id, !!layer.isMask);
 
   return {
     before,
@@ -158,12 +172,12 @@ export function beginPixelEdit(layer = state.doc?.active) {
       history.push({
         label,
         bytes: before.width * before.height * 8,
-        undo: () => restore(before),
-        redo: () => restore(after),
+        undo: () => restore(before, text),
+        redo: () => restore(after, null),
       });
     },
     rollback() {
-      restore(before);
+      restore(before, text);
     },
   };
 }

@@ -9,6 +9,7 @@ import { cssColor, hsvToRgb, parseColor, rgbToHex, rgbToHsv } from "./color.js";
 import { BLEND_MODES, ctx2d, makeCanvas } from "./doc.js";
 import { ADJUST_GROUPS, EFFECTS } from "./filters.js";
 import { history } from "./history.js";
+import { t } from "./i18n.js";
 import { requestRender } from "./render.js";
 import {
   on,
@@ -42,7 +43,7 @@ function buildRail() {
   rail.innerHTML = TOOL_GROUPS.map(
     (group) => `
     <div class="rail-group">
-      <span class="rail-label">${group.name}</span>
+      <span class="rail-label">${t(group.name)}</span>
       ${group.tools
         .map(
           (t) => `<button class="tool-btn" data-tool="${t.id}" data-tip="${t.label}${
@@ -65,32 +66,36 @@ function buildRail() {
 
 /** Contextual one-liners shown in the status bar per tool. */
 const HINTS = {
-  brush: "Alt-click samples a colour · [ and ] resize the brush",
-  pencil: "Alt-click samples a colour · [ and ] resize the tip",
-  airbrush: "Hold to build up paint · Flow sets the rate",
-  eraser: "[ and ] resize · Hardness softens the edge",
-  bucket: "Raise Tolerance to spread further · Expand tucks under outlines",
-  gradient: "Drag to set direction and length · Shift constrains",
-  blurBrush: "Paint over an area to soften it",
-  sharpenBrush: "Paint over an area to add local contrast",
-  smudge: "Drag to pull pixels along the stroke",
-  clone: "Alt-click to set the source, then paint elsewhere",
-  line: "Shift snaps to 45° steps",
-  arrow: "Drag from tail to head",
-  rect: "Shift for a square · Alt from the centre · Corner rounds it",
-  ellipse: "Shift for a circle · Alt draws from the centre",
-  polygon: "Shift for a regular shape · Sides sets the count",
-  star: "Points sets the number of spikes",
-  text: "Type on the canvas · ⌘/Ctrl + Enter commits · Esc cancels",
-  selectRect: "Shift adds · Alt subtracts · click to deselect",
-  selectEllipse: "Shift adds · Alt subtracts · click to deselect",
-  lasso: "Draw a freehand loop · Shift adds · Alt subtracts",
-  wand: "Click a colour · Tolerance controls the spread",
-  move: "Drags the selected pixels, or the whole layer",
-  crop: "Drag the frame or its handles · Enter applies",
-  eyedropper: "Click to sample · Alt fills the other swatch",
-  hand: "Drag to pan · Space does this with any tool",
-  zoom: "Click to zoom in · Alt-click to zoom out",
+  brush: t("Alt-click samples a colour · [ and ] resize the brush"),
+  pencil: t("Alt-click samples a colour · [ and ] resize the tip"),
+  airbrush: t("Hold to build up paint · Flow sets the rate"),
+  eraser: t("[ and ] resize · Hardness softens the edge"),
+  bucket: t("Raise Tolerance to spread further · Expand tucks under outlines"),
+  gradient: t("Drag to set direction and length · Shift constrains"),
+  blurBrush: t("Paint over an area to soften it"),
+  sharpenBrush: t("Paint over an area to add local contrast"),
+  smudge: t("Drag to pull pixels along the stroke"),
+  clone: t("Alt-click to set the source, then paint elsewhere"),
+  line: t("Shift snaps to 45° steps"),
+  arrow: t("Drag from tail to head"),
+  rect: t("Shift for a square · Alt from the centre · Corner rounds it"),
+  ellipse: t("Shift for a circle · Alt draws from the centre"),
+  polygon: t("Shift for a regular shape · Sides sets the count"),
+  star: t("Points sets the number of spikes"),
+  text: t("Type on the canvas · ⌘/Ctrl + Enter commits · Esc cancels"),
+  selectRect: t("Shift adds · Alt subtracts · click to deselect"),
+  selectEllipse: t("Shift adds · Alt subtracts · click to deselect"),
+  lasso: t("Draw a freehand loop · Shift adds · Alt subtracts"),
+  wand: t("Click a colour · Tolerance controls the spread"),
+  move: t("Drags the selected pixels, or the whole layer"),
+  crop: t("Drag the frame or its handles · Enter applies"),
+  eyedropper: t("Click to sample · Alt fills the other swatch"),
+  hand: t("Drag to pan · Space does this with any tool"),
+  zoom: t("Click to zoom in · Alt-click to zoom out"),
+  transform: t("Drag a handle to scale · outside the box to rotate · Enter applies"),
+  heal: t("Alt-click a clean area, then paint over the flaw"),
+  spotHeal: t("Paint over a blemish — it is repaired when you let go"),
+  dodge: t("Paint to lighten · Alt darkens · Range picks the tones"),
 };
 
 function syncRail() {
@@ -100,7 +105,7 @@ function syncRail() {
   const tool = activeTool();
   $("#statusTool").textContent = tool.label;
   $("#statusHint").textContent =
-    HINTS[tool.id] || "Space + drag to pan · Scroll to zoom";
+    HINTS[tool.id] || t("Space + drag to pan · Scroll to zoom");
 }
 
 /* =============================== options bar ============================== */
@@ -177,9 +182,9 @@ function buildOptions() {
   if (tool.opts?.some((o) => o.key === "size") || tool.group === "Shape") {
     parts.push(
       `<span class="sep"></span>`,
-      `<div class="opt"><label>Color</label>
-         <button class="opt-swatch" data-pick="primary" data-tip="Primary color"><i></i></button>
-         <button class="opt-swatch" data-pick="secondary" data-tip="Secondary color"><i></i></button>
+      `<div class="opt"><label>${t("Color")}</label>
+         <button class="opt-swatch" data-pick="primary" data-tip="${t("Primary color")}"><i></i></button>
+         <button class="opt-swatch" data-pick="secondary" data-tip="${t("Secondary color")}"><i></i></button>
        </div>`
     );
   }
@@ -439,13 +444,29 @@ function layerThumb(layer) {
   return c;
 }
 
+const maskThumbCache = new WeakMap();
+
+/** Mask preview: white = visible, black = hidden. */
+function maskThumb(layer) {
+  const cached = maskThumbCache.get(layer);
+  if (cached && cached.version === layer.version) return cached.canvas;
+  const scale = Math.min(76 / layer.width, 60 / layer.height);
+  const c = makeCanvas(Math.max(1, layer.width * scale), Math.max(1, layer.height * scale));
+  const cc = ctx2d(c);
+  cc.fillStyle = "#000";
+  cc.fillRect(0, 0, c.width, c.height);
+  cc.drawImage(layer.mask, 0, 0, c.width, c.height);
+  maskThumbCache.set(layer, { version: layer.version, canvas: c });
+  return c;
+}
+
 function buildLayersPanel() {
   $("#layerBlend").innerHTML = BLEND_MODES.map(
     ([value, label]) => `<option value="${value}">${label}</option>`
   ).join("");
 
   $("#layerBlend").addEventListener("change", (e) => {
-    A.setLayerProp(state.doc.activeIndex, "blend", e.target.value, "Blend mode");
+    A.setLayerProp(state.doc.activeIndex, "blend", e.target.value, t("Blend mode"));
   });
 
   // dragging previews live; the undo entry is written once the drag settles
@@ -464,13 +485,17 @@ function buildLayersPanel() {
     const value = Number(opacity.value) / 100;
     if (opacityBefore !== null) layer.opacity = opacityBefore;
     opacityBefore = null;
-    A.setLayerProp(state.doc.activeIndex, "opacity", value, "Layer opacity");
+    A.setLayerProp(state.doc.activeIndex, "opacity", value, t("Layer opacity"));
   });
 
   $("#addLayerBtn").addEventListener("click", A.addLayer);
   $("#dupLayerBtn").addEventListener("click", A.duplicateLayer);
   $("#mergeLayerBtn").addEventListener("click", A.mergeDown);
   $("#delLayerBtn").addEventListener("click", () => A.deleteLayer());
+  $("#maskLayerBtn").addEventListener("click", () => {
+    if (state.doc?.active?.mask) A.deleteMask();
+    else A.addMask();
+  });
 
   const list = $("#layerList");
 
@@ -478,6 +503,15 @@ function buildLayersPanel() {
     const item = e.target.closest(".layer-item");
     if (!item) return;
     const index = Number(item.dataset.index);
+    const pick = e.target.closest("[data-pick-target]");
+    if (pick) {
+      if (pick.dataset.pickTarget === "mask" && e.shiftKey) {
+        A.toggleMaskEnabled(index);
+        return;
+      }
+      A.setActiveLayer(index, { mask: pick.dataset.pickTarget === "mask" });
+      return;
+    }
     const toggle = e.target.closest("[data-toggle-layer]");
     if (toggle) {
       const prop = toggle.dataset.toggleLayer;
@@ -486,7 +520,7 @@ function buildLayersPanel() {
         index,
         prop,
         !layer[prop],
-        prop === "visible" ? "Layer visibility" : "Lock layer"
+        prop === "visible" ? t("Layer visibility") : t("Lock layer")
       );
       return;
     }
@@ -556,7 +590,7 @@ function startRename(nameEl, index) {
   input.select();
   const done = (save) => {
     if (save && input.value.trim()) {
-      A.setLayerProp(index, "name", input.value.trim(), "Rename layer");
+      A.setLayerProp(index, "name", input.value.trim(), t("Rename layer"));
     }
     syncLayers();
   };
@@ -579,24 +613,37 @@ function syncLayers() {
   const items = [];
   for (let i = doc.layers.length - 1; i >= 0; i--) {
     const layer = doc.layers[i];
+    const active = i === doc.activeIndex;
+    const editingMask = active && layer.editMask && layer.mask;
     items.push(`
-      <div class="layer-item${i === doc.activeIndex ? " is-active" : ""}${
+      <div class="layer-item${active ? " is-active" : ""}${
       layer.visible ? "" : " is-hidden"
-    }" data-index="${i}" draggable="true" role="listitem">
-        <span class="layer-thumb" data-thumb="${i}"></span>
+    }${editingMask ? " is-editing-mask" : ""}" data-index="${i}" draggable="true" role="listitem">
+        <span class="layer-thumb${active && !editingMask ? " is-target" : ""}" data-thumb="${i}" data-pick-target="layer" data-tip="${t("Edit layer pixels")}">${
+          layer.text ? `<span class="layer-badge" aria-label="${t("Text layer")}">T</span>` : ""
+        }</span>
+        ${
+          layer.mask
+            ? `<span class="layer-thumb mask-thumb${editingMask ? " is-target" : ""}${
+                layer.maskEnabled ? "" : " is-disabled"
+              }" data-mask-thumb="${i}" data-pick-target="mask" data-tip="${t(
+                "Edit mask · Shift-click turns it off"
+              )}"></span>`
+            : ""
+        }
         <span class="layer-info">
           <span class="layer-name">${escapeHtml(layer.name)}</span>
           <span class="layer-sub">${
-            BLEND_MODES.find(([v]) => v === layer.blend)?.[1] || "Normal"
+            BLEND_MODES.find(([v]) => v === layer.blend)?.[1] || t("Normal")
           } · ${Math.round(layer.opacity * 100)}%</span>
         </span>
         <span class="layer-actions">
           <button class="icon-btn xs" data-toggle-layer="visible" data-tip="${
-            layer.visible ? "Hide layer" : "Show layer"
-          }" aria-label="Toggle visibility">${icon(layer.visible ? "i-eye" : "i-eye-off")}</button>
+            layer.visible ? t("Hide layer") : t("Show layer")
+          }" aria-label="${t("Toggle visibility")}">${icon(layer.visible ? "i-eye" : "i-eye-off")}</button>
           <button class="icon-btn xs" data-toggle-layer="locked" data-tip="${
-            layer.locked ? "Unlock layer" : "Lock layer"
-          }" aria-label="Toggle lock">${icon("i-lock")}</button>
+            layer.locked ? t("Unlock layer") : t("Lock layer")
+          }" aria-label="${t("Toggle lock")}">${icon("i-lock")}</button>
         </span>
       </div>`);
   }
@@ -604,7 +651,11 @@ function syncLayers() {
 
   for (const holder of $$("[data-thumb]", list)) {
     const layer = doc.layers[Number(holder.dataset.thumb)];
-    holder.appendChild(layerThumb(layer));
+    holder.prepend(layerThumb(layer));
+  }
+  for (const holder of $$("[data-mask-thumb]", list)) {
+    const layer = doc.layers[Number(holder.dataset.maskThumb)];
+    holder.appendChild(maskThumb(layer));
   }
   $$("[data-toggle-layer='locked']", list).forEach((btn) => {
     const index = Number(btn.closest(".layer-item").dataset.index);
@@ -619,6 +670,9 @@ function syncLayers() {
   }
   $("#mergeLayerBtn").disabled = doc.activeIndex <= 0;
   $("#delLayerBtn").disabled = doc.layers.length <= 1;
+  const maskBtn = $("#maskLayerBtn");
+  maskBtn.classList.toggle("is-active", !!active?.mask);
+  maskBtn.dataset.tip = active?.mask ? t("Delete layer mask") : t("Add layer mask");
 }
 
 const escapeHtml = (s) =>
@@ -693,7 +747,7 @@ function buildFilterPanel() {
   const grid = $("#filterGrid");
   grid.innerHTML = EFFECTS.map(
     (e) => `
-    <button class="filter-card" data-filter="${e.id}" data-tip="Apply ${e.name}">
+    <button class="filter-card" data-filter="${e.id}" data-tip="${t("Apply {name}", { name: e.name })}">
       <span class="filter-preview" data-preview="${e.id}"></span>
       <span class="filter-name">${e.name}</span>
     </button>`
@@ -752,7 +806,7 @@ function buildChrome() {
   );
 
   $("#docTitle").addEventListener("change", (e) => {
-    if (state.doc) state.doc.name = e.target.value.trim() || "Untitled";
+    if (state.doc) state.doc.name = e.target.value.trim() || t("Untitled");
   });
   $("#docTitle").addEventListener("keydown", (e) => {
     e.stopPropagation();
@@ -767,8 +821,8 @@ function buildChrome() {
   // panels toggle for narrow screens
   const toggle = document.createElement("button");
   toggle.className = "panel-toggle";
-  toggle.dataset.tip = "Panels";
-  toggle.setAttribute("aria-label", "Toggle panels");
+  toggle.dataset.tip = t("Panels");
+  toggle.setAttribute("aria-label", t("Toggle panels"));
   toggle.innerHTML = icon("i-panel");
   toggle.addEventListener("click", () => $("#sidebar").classList.toggle("is-open"));
   $(".stage-hud").prepend(toggle);
@@ -778,16 +832,16 @@ function syncHistoryButtons() {
   $("#undoBtn").disabled = !history.canUndo;
   $("#redoBtn").disabled = !history.canRedo;
   $("#undoBtn").dataset.tip = history.undoLabel
-    ? `Undo ${history.undoLabel} · ${MOD}Z`
-    : `Undo · ${MOD}Z`;
+    ? `${t("Undo {label}", { label: history.undoLabel })} · ${MOD}Z`
+    : `${t("Undo")} · ${MOD}Z`;
   $("#redoBtn").dataset.tip = history.redoLabel
-    ? `Redo ${history.redoLabel} · ⇧${MOD}Z`
-    : `Redo · ⇧${MOD}Z`;
+    ? `${t("Redo {label}", { label: history.redoLabel })} · ⇧${MOD}Z`
+    : `${t("Redo")} · ⇧${MOD}Z`;
 }
 
 function syncDocMeta() {
   const doc = state.doc;
-  $("#docTitle").value = doc?.name || "Untitled";
+  $("#docTitle").value = doc?.name || t("Untitled");
   $("#docMeta").textContent = doc ? `${doc.width} × ${doc.height}` : "";
   $("#statusSize").textContent = doc ? `${doc.width} × ${doc.height} px` : "—";
   $("#themeBtn").innerHTML = icon(state.theme === "dark" ? "i-moon" : "i-sun");
@@ -806,7 +860,7 @@ function syncStatus() {
     ? `${Math.floor(p.x)}, ${Math.floor(p.y)}`
     : "—";
   const b = doc?.selection?.bounds;
-  $("#statusSel").textContent = b ? `Selection ${b.w} × ${b.h}` : "";
+  $("#statusSel").textContent = b ? t("Selection {w} × {h}", { w: b.w, h: b.h }) : "";
 }
 
 /* ================================= toasts ================================= */

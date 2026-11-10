@@ -19,6 +19,8 @@ export const overlay = {
   cloneSrc: null,
   /** floating pixels frame: {x,y,w,h} in document space */
   floatFrame: null,
+  /** free-transform box: {corners:[4 doc points], center} */
+  transform: null,
 };
 
 let pending = false;
@@ -178,8 +180,9 @@ function draw(now = 0) {
     ctx.restore();
 
     if (overlay.crop) drawCrop(ctx, overlay.crop);
-    if (doc.selection && !overlay.crop) ants(ctx, selectionPath(doc.selection));
+    if (doc.selection && !overlay.crop && !overlay.transform) ants(ctx, selectionPath(doc.selection));
     if (overlay.floatFrame) drawFloatFrame(ctx, overlay.floatFrame);
+    if (overlay.transform) drawTransform(ctx, overlay.transform);
 
     const mp = marqueePath();
     if (mp) ants(ctx, mp, 4);
@@ -262,6 +265,46 @@ function drawFloatFrame(ctx, rect) {
   const p = new Path2D();
   p.rect(rect.x, rect.y, rect.w, rect.h);
   ants(ctx, p, 4);
+}
+
+function drawTransform(ctx, tr) {
+  const pts = tr.corners.map((p) => view.toScreen(p.x, p.y));
+  ctx.save();
+  ctx.beginPath();
+  pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+  ctx.closePath();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(0,0,0,0.45)";
+  ctx.stroke();
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = "#fff";
+  ctx.stroke();
+
+  const handles = [...pts];
+  for (let i = 0; i < 4; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % 4];
+    handles.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  }
+  ctx.fillStyle = "#fff";
+  ctx.strokeStyle = "rgba(0,0,0,0.55)";
+  ctx.lineWidth = 1;
+  for (const h of handles) {
+    ctx.beginPath();
+    ctx.rect(h.x - 4.5, h.y - 4.5, 9, 9);
+    ctx.fill();
+    ctx.stroke();
+  }
+  const c = view.toScreen(tr.center.x, tr.center.y);
+  ctx.beginPath();
+  ctx.arc(c.x, c.y, 4, 0, Math.PI * 2);
+  ctx.moveTo(c.x - 7, c.y);
+  ctx.lineTo(c.x + 7, c.y);
+  ctx.moveTo(c.x, c.y - 7);
+  ctx.lineTo(c.x, c.y + 7);
+  ctx.strokeStyle = "rgba(255,255,255,0.9)";
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawCloneSrc(ctx, pt) {

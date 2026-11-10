@@ -10,13 +10,20 @@
 
 import { clamp, colorDelta, cssColor } from "./color.js";
 import {
+  LINE_HEIGHT,
   Selection,
+  alphaBounds,
   copyCanvas,
   ctx2d,
+  fontString,
   makeCanvas,
   paintMasked,
+  textBounds,
+  transformMask,
 } from "./doc.js";
-import { unsharp } from "./filters.js";
+import { gaussData, unsharp } from "./filters.js";
+import { addTextLayer, paintText, setActiveLayer, updateTextLayer } from "./actions.js";
+import { t } from "./i18n.js";
 import {
   beginEdit,
   beginPixelEdit,
@@ -24,7 +31,7 @@ import {
   editSelection,
 } from "./history.js";
 import { overlay, requestRender } from "./render.js";
-import { emit, opt, recordRecent, setColor, state } from "./state.js";
+import { emit, on, opt, recordRecent, setColor, setOpt, state } from "./state.js";
 import { view } from "./viewport.js";
 
 const TAU = Math.PI * 2;
@@ -70,7 +77,7 @@ function endFloating(label, { erase = false, opacity = 1, blend = "source-over" 
   stroke.smoothed = null;
   doc.clearFloating();
   if (!buf) return;
-  const layer = doc.active;
+  const layer = doc.target;
   if (!layer || layer.locked) {
     requestRender();
     return;
@@ -189,6 +196,14 @@ function smoothPoint(p, amount) {
     y: stroke.smoothed.y + (p.y - stroke.smoothed.y) * k,
   };
   return stroke.smoothed;
+}
+
+/** Document-space box a stamped segment can touch (for partial updates). */
+function segRect(a, b, size) {
+  const r = size / 2 + 3;
+  const x = Math.min(a.x, b.x) - r;
+  const y = Math.min(a.y, b.y) - r;
+  return { x, y, w: Math.abs(a.x - b.x) + r * 2, h: Math.abs(a.y - b.y) + r * 2 };
 }
 
 /* ----------------------------- region retouch ---------------------------- */
@@ -453,38 +468,38 @@ const RANGE = (key, label, min, max, def, extra = {}) => ({
   ...extra,
 });
 
-const sizeOpt = (def = 24, max = 400) => RANGE("size", "Size", 1, max, def, { unit: "px" });
-const opacityOpt = (def = 100) => RANGE("opacity", "Opacity", 1, 100, def, { unit: "%" });
-const hardnessOpt = (def = 80) => RANGE("hardness", "Hardness", 0, 100, def, { unit: "%" });
-const smoothOpt = (def = 35) => RANGE("smooth", "Smoothing", 0, 90, def, { unit: "%" });
-const pressureOpt = { key: "pressure", type: "toggle", label: "Pen pressure", def: true };
+const sizeOpt = (def = 24, max = 400) => RANGE("size", t("Size"), 1, max, def, { unit: "px" });
+const opacityOpt = (def = 100) => RANGE("opacity", t("Opacity"), 1, 100, def, { unit: "%" });
+const hardnessOpt = (def = 80) => RANGE("hardness", t("Hardness"), 0, 100, def, { unit: "%" });
+const smoothOpt = (def = 35) => RANGE("smooth", t("Smoothing"), 0, 90, def, { unit: "%" });
+const pressureOpt = { key: "pressure", type: "toggle", label: t("Pen pressure"), def: true };
 
 const fillModeOpt = {
   key: "fillMode",
   type: "seg",
-  label: "Style",
+  label: t("Style"),
   def: "stroke",
   options: [
-    ["stroke", "Outline"],
-    ["fill", "Solid"],
-    ["both", "Both"],
+    ["stroke", t("Outline")],
+    ["fill", t("Solid")],
+    ["both", t("Both")],
   ],
 };
 
 const selectModeOpt = {
   key: "mode",
   type: "seg",
-  label: "Mode",
+  label: t("Mode"),
   def: "replace",
   options: [
-    ["replace", "New"],
-    ["add", "Add"],
-    ["subtract", "Subtract"],
-    ["intersect", "Intersect"],
+    ["replace", t("New")],
+    ["add", t("Add")],
+    ["subtract", t("Subtract")],
+    ["intersect", t("Intersect")],
   ],
 };
 
-const featherOpt = RANGE("feather", "Feather", 0, 40, 0, { unit: "px" });
+const featherOpt = RANGE("feather", t("Feather"), 0, 40, 0, { unit: "px" });
 
 /* ------------------------------- paint tools ------------------------------ */
 
@@ -521,7 +536,7 @@ function paintTool({ id, label, icon, shortcut, group, erase = false, defaults =
       stamp(ctx, p.x, p.y, sizeFor(ev, o.size), o.hardness, state.primary);
       stroke.residual = Math.max(0.6, o.size * 0.14);
       stroke.last = p;
-      state.doc.floatingChanged();
+      state.doc.floatingChanged(segRect(p, p, o.size));
       requestRender();
     },
     move(ev) {
@@ -541,8 +556,8 @@ function paintTool({ id, label, icon, shortcut, group, erase = false, defaults =
         state.primary,
         0.14
       );
+      state.doc.floatingChanged(segRect(stroke.last, p, o.size));
       stroke.last = p;
-      state.doc.floatingChanged();
       requestRender();
     },
     up() {
@@ -554,7 +569,7 @@ function paintTool({ id, label, icon, shortcut, group, erase = false, defaults =
 
 const brush = paintTool({
   id: "brush",
-  label: "Brush",
+  label: t("Brush"),
   icon: "i-brush",
   shortcut: "b",
   group: "Paint",
@@ -563,7 +578,7 @@ const brush = paintTool({
 const pencil = {
   ...paintTool({
     id: "pencil",
-    label: "Pencil",
+    label: t("Pencil"),
     icon: "i-pencil",
     shortcut: "n",
     group: "Paint",
@@ -580,21 +595,21 @@ pencil.down = function down(ev) {
   stamp(ctx, p.x, p.y, sizeFor(ev, size), 1, state.primary);
   stroke.residual = Math.max(0.5, size * 0.1);
   stroke.last = p;
-  state.doc.floatingChanged();
+  state.doc.floatingChanged(segRect(p, p, size));
   requestRender();
 };
 pencil.move = function move(ev) {
   if (!stroke.active) return;
   const p = smoothPoint(ev.p, (opt("smooth") / 100) * 0.8);
   stampSegment(stroke.bctx, stroke.last, p, sizeFor(ev, opt("size")), 1, state.primary, 0.1);
+  state.doc.floatingChanged(segRect(stroke.last, p, opt("size")));
   stroke.last = p;
-  state.doc.floatingChanged();
   requestRender();
 };
 
 const eraser = paintTool({
   id: "eraser",
-  label: "Eraser",
+  label: t("Eraser"),
   icon: "i-eraser",
   shortcut: "e",
   group: "Paint",
@@ -604,14 +619,14 @@ const eraser = paintTool({
 
 const airbrush = {
   id: "airbrush",
-  label: "Airbrush",
+  label: t("Airbrush"),
   icon: "i-spray",
   shortcut: "a",
   group: "Paint",
   cursor: "none",
   brushCursor: true,
   needsLayer: true,
-  opts: [sizeOpt(60), opacityOpt(65), RANGE("flow", "Flow", 1, 100, 35, { unit: "%" })],
+  opts: [sizeOpt(60), opacityOpt(65), RANGE("flow", t("Flow"), 1, 100, 35, { unit: "%" })],
   _timer: 0,
   _pos: null,
   down(ev) {
@@ -635,7 +650,7 @@ const airbrush = {
         ctx.arc(x, y, dotR, 0, TAU);
         ctx.fill();
       }
-      state.doc.floatingChanged();
+      state.doc.floatingChanged(segRect(this._pos, this._pos, size));
       requestRender();
     };
     spray();
@@ -648,7 +663,7 @@ const airbrush = {
     clearInterval(this._timer);
     this._timer = 0;
     this._pos = null;
-    endFloating("Airbrush", { opacity: opt("opacity") / 100 });
+    endFloating(t("Airbrush"), { opacity: opt("opacity") / 100 });
   },
   cancel() {
     clearInterval(this._timer);
@@ -661,22 +676,22 @@ const airbrush = {
 
 const bucket = {
   id: "bucket",
-  label: "Fill",
+  label: t("Fill"),
   icon: "i-bucket",
   shortcut: "g",
   group: "Fill",
   cursor: "crosshair",
   needsLayer: true,
   opts: [
-    RANGE("tolerance", "Tolerance", 0, 100, 18, { unit: "%" }),
+    RANGE("tolerance", t("Tolerance"), 0, 100, 18, { unit: "%" }),
     opacityOpt(100),
-    RANGE("grow", "Expand", 0, 3, 1, { unit: "px" }),
-    { key: "contiguous", type: "toggle", label: "Contiguous", def: true },
-    { key: "sampleAll", type: "toggle", label: "Sample all layers", def: false },
+    RANGE("grow", t("Expand"), 0, 3, 1, { unit: "px" }),
+    { key: "contiguous", type: "toggle", label: t("Contiguous"), def: true },
+    { key: "sampleAll", type: "toggle", label: t("Sample all layers"), def: false },
   ],
   down(ev) {
     const doc = state.doc;
-    const layer = doc.active;
+    const layer = doc.target;
     if (!layer || layer.locked) return;
     const x = Math.floor(ev.p.x);
     const y = Math.floor(ev.p.y);
@@ -712,7 +727,7 @@ const bucket = {
     pc.drawImage(maskCanvas, 0, 0);
 
     editPixels(
-      "Fill",
+      t("Fill"),
       () =>
         paintMasked(layer, paint, doc.selection, {
           opacity: opt("opacity") / 100,
@@ -726,7 +741,7 @@ const bucket = {
 
 const gradient = {
   id: "gradient",
-  label: "Gradient",
+  label: t("Gradient"),
   icon: "i-gradient",
   shortcut: "d",
   group: "Fill",
@@ -736,29 +751,29 @@ const gradient = {
     {
       key: "type",
       type: "seg",
-      label: "Type",
+      label: t("Type"),
       def: "linear",
       options: [
-        ["linear", "Linear"],
-        ["radial", "Radial"],
+        ["linear", t("Linear")],
+        ["radial", t("Radial")],
       ],
     },
     {
       key: "colors",
       type: "select",
-      label: "Colors",
+      label: t("Colors"),
       def: "duo",
       options: [
-        ["duo", "Primary → Secondary"],
-        ["fade", "Primary → Transparent"],
-        ["fadeIn", "Transparent → Primary"],
+        ["duo", t("Primary → Secondary")],
+        ["fade", t("Primary → Transparent")],
+        ["fadeIn", t("Transparent → Primary")],
       ],
     },
     opacityOpt(100),
   ],
   _start: null,
   down(ev) {
-    if (!state.doc.active || state.doc.active.locked) return;
+    if (!state.doc.target || state.doc.target.locked) return;
     this._start = ev.p;
     beginFloating({ opacity: opt("opacity") / 100 });
     this.move(ev);
@@ -801,7 +816,7 @@ const gradient = {
   },
   up() {
     this._start = null;
-    endFloating("Gradient", { opacity: opt("opacity") / 100 });
+    endFloating(t("Gradient"), { opacity: opt("opacity") / 100 });
   },
   cancel() {
     this._start = null;
@@ -823,7 +838,7 @@ function retouchTool({ id, label, icon, shortcut, defaults = {}, produce, useSna
     needsLayer: true,
     opts: [
       sizeOpt(defaults.size ?? 60),
-      RANGE("strength", "Strength", 1, 100, defaults.strength ?? 50, { unit: "%" }),
+      RANGE("strength", t("Strength"), 1, 100, defaults.strength ?? 50, { unit: "%" }),
       hardnessOpt(defaults.hardness ?? 50),
     ],
     _edit: null,
@@ -831,7 +846,7 @@ function retouchTool({ id, label, icon, shortcut, defaults = {}, produce, useSna
     _snap: null,
     _stamped: false,
     down(ev) {
-      const layer = state.doc.active;
+      const layer = state.doc.target;
       if (!layer || layer.locked) return;
       this._edit = beginPixelEdit(layer);
       this._snap = useSnapshot ? copyCanvas(layer.canvas) : null;
@@ -841,7 +856,7 @@ function retouchTool({ id, label, icon, shortcut, defaults = {}, produce, useSna
     },
     move(ev) {
       if (!this._edit) return;
-      const layer = state.doc.active;
+      const layer = state.doc.target;
       const size = opt("size");
       const strength = opt("strength") / 100;
       const hardness = opt("hardness") / 100;
@@ -887,7 +902,7 @@ function retouchTool({ id, label, icon, shortcut, defaults = {}, produce, useSna
 
 const blurTool = retouchTool({
   id: "blurBrush",
-  label: "Blur",
+  label: t("Blur"),
   icon: "i-blur",
   shortcut: "u",
   produce: ({ layer, x, y, radius, hardness, strength }) => {
@@ -899,7 +914,7 @@ const blurTool = retouchTool({
 
 const sharpenTool = retouchTool({
   id: "sharpenBrush",
-  label: "Sharpen",
+  label: t("Sharpen"),
   icon: "i-sharpen",
   shortcut: "k",
   defaults: { strength: 40 },
@@ -912,7 +927,7 @@ const sharpenTool = retouchTool({
 
 const smudgeTool = retouchTool({
   id: "smudge",
-  label: "Smudge",
+  label: t("Smudge"),
   icon: "i-smudge",
   shortcut: "s",
   defaults: { strength: 60, hardness: 40 },
@@ -937,10 +952,419 @@ const smudgeTool = retouchTool({
   },
 });
 
-const cloneTool = {
-  ...retouchTool({
+/* ------------------------------ healing tools ----------------------------- */
+
+/**
+ * Healing: keep the texture (high frequencies) of the source but the colour
+ * and light (low frequencies) of the destination, so the repair blends in.
+ */
+function healPatch(src, dst, size, sigma) {
+  const lowS = gaussData(src, size, size, sigma);
+  const lowD = gaussData(dst, size, size, sigma);
+  const out = new Uint8ClampedArray(dst.length);
+  for (let i = 0; i < dst.length; i += 4) {
+    out[i] = src[i] - lowS[i] + lowD[i];
+    out[i + 1] = src[i + 1] - lowS[i + 1] + lowD[i + 1];
+    out[i + 2] = src[i + 2] - lowS[i + 2] + lowD[i + 2];
+    out[i + 3] = dst[i + 3];
+  }
+  return out;
+}
+
+/** Alt-click sets a source; the offset sticks between strokes when aligned. */
+function withSource(tool, setMsg, missingMsg) {
+  const baseDown = tool.down;
+  const baseUp = tool.up;
+  tool._offset = null;
+  tool._source = null;
+  tool.down = function down(ev) {
+    if (ev.alt) {
+      this._source = { x: ev.p.x, y: ev.p.y };
+      this._offset = null;
+      overlay.cloneSrc = this._source;
+      emit("toast", { msg: setMsg, kind: "ok" });
+      requestRender();
+      return;
+    }
+    if (!this._source) {
+      emit("toast", { msg: missingMsg, kind: "err" });
+      return;
+    }
+    if (!this._offset || !opt("aligned")) {
+      this._offset = { dx: this._source.x - ev.p.x, dy: this._source.y - ev.p.y };
+    }
+    baseDown.call(this, ev);
+  };
+  tool.up = function up(ev) {
+    baseUp.call(this, ev);
+  };
+  tool.activate = function activate() {
+    if (this._source) overlay.cloneSrc = this._source;
+  };
+  tool.deactivate = function deactivate() {
+    overlay.cloneSrc = null;
+  };
+  return tool;
+}
+
+const healTool = withSource(
+  retouchTool({
+    id: "heal",
+    label: t("Healing brush"),
+    icon: "i-heal",
+    defaults: { strength: 100, hardness: 50, size: 50 },
+    useSnapshot: true,
+    produce: ({ layer, x, y, radius, hardness, strength, tool, snapshot }) => {
+      if (!tool._offset) return;
+      const { dx, dy } = tool._offset;
+      retouchPatch(layer, x, y, radius, hardness, strength, (patch, pc, { x0, y0, size }) => {
+        const dst = pc.getImageData(0, 0, size, size);
+        const srcCanvas = makeCanvas(size, size);
+        const sc = ctx2d(srcCanvas);
+        sc.drawImage(snapshot || layer.canvas, -x0 + dx, -y0 + dy);
+        const src = sc.getImageData(0, 0, size, size);
+        dst.data.set(healPatch(src.data, dst.data, size, Math.max(2, size / 7)));
+        pc.putImageData(dst, 0, 0);
+        return patch;
+      });
+    },
+  }),
+  t("Healing source set"),
+  t("Alt-click to set the healing source first")
+);
+healTool.opts = [
+  sizeOpt(50),
+  RANGE("strength", t("Strength"), 1, 100, 100, { unit: "%" }),
+  hardnessOpt(50),
+  { key: "aligned", type: "toggle", label: t("Aligned"), def: true },
+];
+
+/* ----------------------------- spot healing ------------------------------ */
+
+/**
+ * Fill holes smoothly from their surroundings ("pull-push"): average known
+ * pixels down a pyramid until everything is covered, then blend back up.
+ * Returns straight RGBA floats for the whole region.
+ */
+function pullPush(data, hole, w, h) {
+  const levels = [];
+  let c = new Float32Array(w * h * 4);
+  let wt = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    if (hole[i]) continue;
+    wt[i] = 1;
+    c[i * 4] = data[i * 4];
+    c[i * 4 + 1] = data[i * 4 + 1];
+    c[i * 4 + 2] = data[i * 4 + 2];
+    c[i * 4 + 3] = data[i * 4 + 3];
+  }
+  levels.push({ w, h, c, wt });
+  let lw = w;
+  let lh = h;
+  while (lw > 1 || lh > 1) {
+    const nw = Math.max(1, Math.ceil(lw / 2));
+    const nh = Math.max(1, Math.ceil(lh / 2));
+    const nc = new Float32Array(nw * nh * 4);
+    const nwt = new Float32Array(nw * nh);
+    const prev = levels[levels.length - 1];
+    for (let y = 0; y < nh; y++) {
+      for (let x = 0; x < nw; x++) {
+        let sw = 0;
+        let r = 0,
+          g = 0,
+          b = 0,
+          a = 0;
+        for (let dy = 0; dy < 2; dy++) {
+          const sy = Math.min(lh - 1, y * 2 + dy);
+          for (let dx = 0; dx < 2; dx++) {
+            const sx = Math.min(lw - 1, x * 2 + dx);
+            const si = sy * lw + sx;
+            const k = prev.wt[si];
+            if (!k) continue;
+            sw += k;
+            r += prev.c[si * 4] * k;
+            g += prev.c[si * 4 + 1] * k;
+            b += prev.c[si * 4 + 2] * k;
+            a += prev.c[si * 4 + 3] * k;
+          }
+        }
+        const ni = y * nw + x;
+        if (sw > 0) {
+          nc[ni * 4] = r / sw;
+          nc[ni * 4 + 1] = g / sw;
+          nc[ni * 4 + 2] = b / sw;
+          nc[ni * 4 + 3] = a / sw;
+          nwt[ni] = Math.min(1, sw);
+        }
+      }
+    }
+    levels.push({ w: nw, h: nh, c: nc, wt: nwt });
+    lw = nw;
+    lh = nh;
+  }
+  for (let L = levels.length - 2; L >= 0; L--) {
+    const fine = levels[L];
+    const coarse = levels[L + 1];
+    for (let y = 0; y < fine.h; y++) {
+      for (let x = 0; x < fine.w; x++) {
+        const i = y * fine.w + x;
+        const k = fine.wt[i];
+        if (k >= 1) continue;
+        // bilinear sample of the coarser level
+        const fx = Math.min(coarse.w - 1, Math.max(0, (x + 0.5) / 2 - 0.5));
+        const fy = Math.min(coarse.h - 1, Math.max(0, (y + 0.5) / 2 - 0.5));
+        const x0 = Math.floor(fx);
+        const y0 = Math.floor(fy);
+        const x1 = Math.min(coarse.w - 1, x0 + 1);
+        const y1 = Math.min(coarse.h - 1, y0 + 1);
+        const tx = fx - x0;
+        const ty = fy - y0;
+        for (let ch = 0; ch < 4; ch++) {
+          const v =
+            (coarse.c[(y0 * coarse.w + x0) * 4 + ch] * (1 - tx) +
+              coarse.c[(y0 * coarse.w + x1) * 4 + ch] * tx) *
+              (1 - ty) +
+            (coarse.c[(y1 * coarse.w + x0) * 4 + ch] * (1 - tx) +
+              coarse.c[(y1 * coarse.w + x1) * 4 + ch] * tx) *
+              ty;
+          fine.c[i * 4 + ch] = fine.c[i * 4 + ch] * k + v * (1 - k);
+        }
+        fine.wt[i] = 1;
+      }
+    }
+  }
+  return levels[0].c;
+}
+
+/** Repair the painted area of `target`: smooth fill plus borrowed texture. */
+function spotHealRegion(target, strokeBuf, bounds, selection, size) {
+  const W = target.width;
+  const H = target.height;
+  const pad = Math.ceil(size * 0.8) + 6;
+  const x = Math.max(0, bounds.x - pad);
+  const y = Math.max(0, bounds.y - pad);
+  const w = Math.min(W, bounds.x + bounds.w + pad) - x;
+  const h = Math.min(H, bounds.y + bounds.h + pad) - y;
+  if (w < 3 || h < 3) return;
+
+  const ctx = target.ctx;
+  const img = ctx.getImageData(x, y, w, h);
+  const D = img.data;
+  const strokeA = strokeBuf.getContext("2d").getImageData(x, y, w, h).data;
+  const selA = selection ? selection.ctx.getImageData(x, y, w, h).data : null;
+
+  // hole = painted pixels (slightly grown), limited to the selection
+  const raw = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    raw[i] = strokeA[i * 4 + 3] > 24 && (!selA || selA[i * 4 + 3] > 127) ? 1 : 0;
+  }
+  const hole = new Uint8Array(w * h);
+  const grow = 2;
+  for (let yy = 0; yy < h; yy++) {
+    for (let xx = 0; xx < w; xx++) {
+      let on = 0;
+      for (let dy = -grow; dy <= grow && !on; dy++) {
+        const sy = yy + dy;
+        if (sy < 0 || sy >= h) continue;
+        for (let dx = -grow; dx <= grow; dx++) {
+          const sx = xx + dx;
+          if (sx >= 0 && sx < w && raw[sy * w + sx]) {
+            on = 1;
+            break;
+          }
+        }
+      }
+      hole[yy * w + xx] = on;
+    }
+  }
+
+  const fill = pullPush(D, hole, w, h);
+
+  // borrow texture from the neighbouring patch that best matches the border
+  const hb = { x: bounds.x - x, y: bounds.y - y, w: bounds.w, h: bounds.h };
+  let best = null;
+  const span = Math.max(hb.w, hb.h);
+  for (const dist of [1.1, 1.6, 2.3]) {
+    for (let k = 0; k < 8; k++) {
+      const ang = (k / 8) * TAU;
+      const ox = Math.round(Math.cos(ang) * span * dist);
+      const oy = Math.round(Math.sin(ang) * span * dist);
+      if (x + ox < 0 || y + oy < 0 || x + ox + w > W || y + oy + h > H) continue;
+      const src = ctx.getImageData(x + ox, y + oy, w, h).data;
+      let score = 0;
+      let n = 0;
+      for (let i = 0; i < w * h; i += 3) {
+        if (hole[i]) continue;
+        const p = i * 4;
+        score += Math.abs(D[p] - src[p]) + Math.abs(D[p + 1] - src[p + 1]) + Math.abs(D[p + 2] - src[p + 2]);
+        n++;
+      }
+      // a source full of holes itself would copy the defect
+      const overlap =
+        Math.abs(ox) < hb.w && Math.abs(oy) < hb.h ? 1e9 : 0;
+      const s = (n ? score / n : 1e9) + overlap;
+      if (!best || s < best.score) best = { score: s, src };
+    }
+  }
+
+  // feathered blend factor so the repair has no hard seam
+  const soft = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < w * h; i++) soft[i * 4 + 3] = hole[i] * 255;
+  const feather = gaussData(soft, w, h, 1.6);
+
+  let tex = null;
+  if (best) {
+    const low = gaussData(best.src, w, h, Math.max(2, size / 6));
+    tex = new Float32Array(w * h * 3);
+    for (let i = 0; i < w * h; i++) {
+      tex[i * 3] = best.src[i * 4] - low[i * 4];
+      tex[i * 3 + 1] = best.src[i * 4 + 1] - low[i * 4 + 1];
+      tex[i * 3 + 2] = best.src[i * 4 + 2] - low[i * 4 + 2];
+    }
+  }
+
+  for (let i = 0; i < w * h; i++) {
+    const f = Math.max(hole[i], feather[i * 4 + 3] / 255);
+    if (f <= 0) continue;
+    const p = i * 4;
+    for (let ch = 0; ch < 3; ch++) {
+      const v = fill[p + ch] + (tex ? tex[i * 3 + ch] * 0.9 : 0);
+      D[p + ch] = D[p + ch] * (1 - f) + v * f;
+    }
+    D[p + 3] = D[p + 3] * (1 - f) + fill[p + 3] * f;
+  }
+  ctx.putImageData(img, x, y);
+  target.touch();
+}
+
+const spotHeal = {
+  id: "spotHeal",
+  label: t("Spot healing"),
+  icon: "i-spot",
+  group: "Retouch",
+  cursor: "none",
+  brushCursor: true,
+  needsLayer: true,
+  opts: [sizeOpt(30, 300)],
+  _color: { r: 255, g: 64, b: 96 },
+  down(ev) {
+    const target = state.doc.target;
+    if (!target || target.locked) return;
+    if (target.isMask) {
+      emit("toast", { msg: t("Spot healing works on layer pixels — click the layer thumbnail first"), kind: "info" });
+      return;
+    }
+    const ctx = beginFloating({ opacity: 0.5 });
+    const size = opt("size");
+    stroke.smoothed = null;
+    stamp(ctx, ev.p.x, ev.p.y, size, 0.85, this._color);
+    stroke.residual = Math.max(0.6, size * 0.12);
+    stroke.last = ev.p;
+    state.doc.floatingChanged(segRect(ev.p, ev.p, size));
+    requestRender();
+  },
+  move(ev) {
+    if (!stroke.active) return;
+    const size = opt("size");
+    stampSegment(stroke.bctx, stroke.last, ev.p, size, 0.85, this._color, 0.12);
+    state.doc.floatingChanged(segRect(stroke.last, ev.p, size));
+    stroke.last = ev.p;
+    requestRender();
+  },
+  up() {
+    const doc = state.doc;
+    const buf = stroke.buf;
+    stroke.active = false;
+    stroke.buf = null;
+    stroke.bctx = null;
+    stroke.last = null;
+    doc.clearFloating();
+    const target = doc.target;
+    if (!buf || !target || target.locked || target.isMask) {
+      requestRender();
+      return;
+    }
+    const b = alphaBounds(buf, 24);
+    if (!b) {
+      requestRender();
+      return;
+    }
+    const size = opt("size");
+    editPixels(t("Spot healing"), () => spotHealRegion(target, buf, b, doc.selection, size), target);
+    emit("layers", doc);
+    requestRender();
+  },
+  cancel: abortFloating,
+};
+
+/* ------------------------------ dodge / burn ----------------------------- */
+
+const dodgeTool = retouchTool({
+  id: "dodge",
+  label: t("Dodge / Burn"),
+  icon: "i-dodge",
+  defaults: { strength: 30, hardness: 30, size: 80 },
+  produce: ({ layer, x, y, radius, hardness, strength, tool }) => {
+    const burn = (opt("mode", "dodge") === "burn") !== !!tool._alt;
+    const range = opt("range", "dodge");
+    retouchPatch(layer, x, y, radius, hardness, 1, (patch, pc, { size }) => {
+      const img = pc.getImageData(0, 0, size, size);
+      const d = img.data;
+      const k = strength * 0.22;
+      for (let i = 0; i < d.length; i += 4) {
+        if (!d[i + 3]) continue;
+        const l = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255;
+        const wgt =
+          range === "shadows" ? (1 - l) * (1 - l) : range === "highlights" ? l * l : 1 - (2 * l - 1) ** 2;
+        const f = k * wgt;
+        for (let ch = 0; ch < 3; ch++) {
+          d[i + ch] = burn ? d[i + ch] - d[i + ch] * f : d[i + ch] + (255 - d[i + ch]) * f;
+        }
+      }
+      pc.putImageData(img, 0, 0);
+      return patch;
+    });
+  },
+});
+dodgeTool.opts = [
+  sizeOpt(80),
+  RANGE("strength", t("Exposure"), 1, 100, 30, { unit: "%" }),
+  hardnessOpt(30),
+  {
+    key: "mode",
+    type: "seg",
+    label: t("Mode"),
+    def: "dodge",
+    options: [
+      ["dodge", t("Lighten")],
+      ["burn", t("Darken")],
+    ],
+  },
+  {
+    key: "range",
+    type: "select",
+    label: t("Range"),
+    def: "midtones",
+    options: [
+      ["shadows", t("Shadows")],
+      ["midtones", t("Midtones")],
+      ["highlights", t("Highlights")],
+    ],
+  },
+];
+{
+  const baseDown = dodgeTool.down;
+  // holding Alt flips between lightening and darkening, as in other editors
+  dodgeTool.down = function down(ev) {
+    this._alt = ev.alt;
+    baseDown.call(this, ev);
+  };
+}
+
+const cloneTool = withSource(
+  retouchTool({
     id: "clone",
-    label: "Clone stamp",
+    label: t("Clone stamp"),
     icon: "i-clone",
     shortcut: "j",
     defaults: { strength: 100, hardness: 70 },
@@ -948,58 +1372,22 @@ const cloneTool = {
     produce: ({ layer, x, y, radius, hardness, strength, tool, snapshot }) => {
       if (!tool._offset) return;
       const { dx, dy } = tool._offset;
-      retouchPatch(
-        layer,
-        x,
-        y,
-        radius,
-        hardness,
-        strength,
-        (patch, pc, { x0, y0, size }) => {
-          pc.clearRect(0, 0, size, size);
-          pc.drawImage(snapshot || layer.canvas, -x0 + dx, -y0 + dy);
-          return patch;
-        }
-      );
+      retouchPatch(layer, x, y, radius, hardness, strength, (patch, pc, { x0, y0, size }) => {
+        pc.clearRect(0, 0, size, size);
+        pc.drawImage(snapshot || layer.canvas, -x0 + dx, -y0 + dy);
+        return patch;
+      });
     },
   }),
-  _offset: null,
-  _source: null,
-};
+  t("Clone source set"),
+  t("Alt-click to set the clone source first")
+);
 cloneTool.opts = [
   sizeOpt(70),
-  RANGE("strength", "Strength", 1, 100, 100, { unit: "%" }),
+  RANGE("strength", t("Strength"), 1, 100, 100, { unit: "%" }),
   hardnessOpt(70),
-  { key: "aligned", type: "toggle", label: "Aligned", def: true },
+  { key: "aligned", type: "toggle", label: t("Aligned"), def: true },
 ];
-const cloneBaseDown = cloneTool.down;
-cloneTool.down = function down(ev) {
-  if (ev.alt) {
-    this._source = { x: ev.p.x, y: ev.p.y };
-    this._offset = null;
-    overlay.cloneSrc = this._source;
-    emit("toast", { msg: "Clone source set", kind: "ok" });
-    requestRender();
-    return;
-  }
-  if (!this._source) {
-    emit("toast", { msg: "Alt-click to set the clone source first", kind: "err" });
-    return;
-  }
-  this._offset = { dx: this._source.x - ev.p.x, dy: this._source.y - ev.p.y };
-  cloneBaseDown.call(this, ev);
-};
-const cloneBaseUp = cloneTool.up;
-cloneTool.up = function up(ev) {
-  cloneBaseUp.call(this, ev);
-  if (!opt("aligned") && this._source) this._offset = null;
-};
-cloneTool.activate = function activate() {
-  if (this._source) overlay.cloneSrc = this._source;
-};
-cloneTool.deactivate = function deactivate() {
-  overlay.cloneSrc = null;
-};
 
 /* ------------------------------- shape tools ------------------------------ */
 
@@ -1014,13 +1402,13 @@ function shapeTool({ id, label, icon, shortcut, extraOpts = [], draw }) {
     needsLayer: true,
     opts: [
       fillModeOpt,
-      RANGE("width", "Stroke", 1, 120, 4, { unit: "px" }),
+      RANGE("width", t("Stroke"), 1, 120, 4, { unit: "px" }),
       opacityOpt(100),
       ...extraOpts,
     ],
     _start: null,
     down(ev) {
-      if (!state.doc.active || state.doc.active.locked) return;
+      if (!state.doc.target || state.doc.target.locked) return;
       this._start = ev.p;
       beginFloating({ opacity: opt("opacity") / 100 });
       this.move(ev);
@@ -1062,7 +1450,7 @@ function shapeTool({ id, label, icon, shortcut, extraOpts = [], draw }) {
 
 const lineShape = shapeTool({
   id: "line",
-  label: "Line",
+  label: t("Line"),
   icon: "i-line",
   shortcut: "l",
   draw(ctx, { a, b, o, ev }) {
@@ -1086,11 +1474,11 @@ const lineShape = shapeTool({
     ctx.restore();
   },
 });
-lineShape.opts = [RANGE("width", "Stroke", 1, 120, 4, { unit: "px" }), opacityOpt(100)];
+lineShape.opts = [RANGE("width", t("Stroke"), 1, 120, 4, { unit: "px" }), opacityOpt(100)];
 
 const arrowShape = shapeTool({
   id: "arrow",
-  label: "Arrow",
+  label: t("Arrow"),
   icon: "i-arrow",
   draw(ctx, { a, b, o }) {
     const head = Math.max(8, o.width * 3.4);
@@ -1120,14 +1508,14 @@ const arrowShape = shapeTool({
     ctx.restore();
   },
 });
-arrowShape.opts = [RANGE("width", "Stroke", 1, 80, 5, { unit: "px" }), opacityOpt(100)];
+arrowShape.opts = [RANGE("width", t("Stroke"), 1, 80, 5, { unit: "px" }), opacityOpt(100)];
 
 const rectShape = shapeTool({
   id: "rect",
-  label: "Rectangle",
+  label: t("Rectangle"),
   icon: "i-rect",
   shortcut: "r",
-  extraOpts: [RANGE("radius", "Corner", 0, 200, 0, { unit: "px" })],
+  extraOpts: [RANGE("radius", t("Corner"), 0, 200, 0, { unit: "px" })],
   draw(ctx, { rect, o }) {
     paintShape(ctx, (c) => roundRectPath(c, rect, o.radius), o);
   },
@@ -1135,7 +1523,7 @@ const rectShape = shapeTool({
 
 const ellipseShape = shapeTool({
   id: "ellipse",
-  label: "Ellipse",
+  label: t("Ellipse"),
   icon: "i-ellipse",
   shortcut: "o",
   draw(ctx, { rect, o }) {
@@ -1160,10 +1548,10 @@ const ellipseShape = shapeTool({
 
 const polygonShape = shapeTool({
   id: "polygon",
-  label: "Polygon",
+  label: t("Polygon"),
   icon: "i-polygon",
   shortcut: "p",
-  extraOpts: [RANGE("sides", "Sides", 3, 16, 6)],
+  extraOpts: [RANGE("sides", t("Sides"), 3, 16, 6)],
   draw(ctx, { rect, o }) {
     paintShape(ctx, (c) => polygonPath(c, rect, o.sides, false), o);
   },
@@ -1171,9 +1559,9 @@ const polygonShape = shapeTool({
 
 const starShape = shapeTool({
   id: "star",
-  label: "Star",
+  label: t("Star"),
   icon: "i-star",
-  extraOpts: [RANGE("sides", "Points", 3, 16, 5)],
+  extraOpts: [RANGE("sides", t("Points"), 3, 16, 5)],
   draw(ctx, { rect, o }) {
     paintShape(ctx, (c) => polygonPath(c, rect, o.sides, true), o);
   },
@@ -1182,65 +1570,134 @@ const starShape = shapeTool({
 /* -------------------------------- text tool ------------------------------- */
 
 const FONTS = [
-  ["system-ui, -apple-system, 'Segoe UI', sans-serif", "System sans"],
-  ["Georgia, 'Times New Roman', serif", "Serif"],
-  ["'Courier New', ui-monospace, monospace", "Monospace"],
+  ["system-ui, -apple-system, 'Segoe UI', sans-serif", t("System sans")],
+  ["Georgia, 'Times New Roman', serif", t("Serif")],
+  ["'Courier New', ui-monospace, monospace", t("Monospace")],
   ["Impact, 'Arial Black', sans-serif", "Impact"],
-  ["'Comic Sans MS', 'Chalkboard SE', cursive", "Handwritten"],
+  ["'Comic Sans MS', 'Chalkboard SE', cursive", t("Handwritten")],
   ["'Trebuchet MS', Verdana, sans-serif", "Trebuchet"],
 ];
 
+/**
+ * Text is typed into a DOM textarea laid over the canvas in the final font,
+ * then becomes its own text layer. Clicking an existing text layer with this
+ * tool opens it again — it stays editable until something paints on it.
+ */
 const text = {
   id: "text",
-  label: "Text",
+  label: t("Text"),
   icon: "i-text",
   shortcut: "t",
   group: "Type",
   cursor: "text",
   needsLayer: true,
   opts: [
-    { key: "font", type: "select", label: "Font", def: FONTS[0][0], options: FONTS },
-    RANGE("size", "Size", 6, 400, 48, { unit: "px" }),
+    { key: "font", type: "select", label: t("Font"), def: FONTS[0][0], options: FONTS },
+    RANGE("size", t("Size"), 6, 400, 48, { unit: "px" }),
     {
       key: "align",
       type: "seg",
-      label: "Align",
+      label: t("Align"),
       def: "left",
       options: [
-        ["left", "Left"],
-        ["center", "Center"],
-        ["right", "Right"],
+        ["left", t("Left")],
+        ["center", t("Center")],
+        ["right", t("Right")],
       ],
     },
-    { key: "bold", type: "toggle", label: "Bold", def: false },
-    { key: "italic", type: "toggle", label: "Italic", def: false },
+    { key: "bold", type: "toggle", label: t("Bold"), def: false },
+    { key: "italic", type: "toggle", label: t("Italic"), def: false },
     opacityOpt(100),
   ],
   _editor: null,
   _anchor: null,
   _style: null,
   _color: null,
+  /** id of the text layer being edited, or null for new text */
+  _editing: null,
+  _hiddenLayer: null,
+  hover(ev) {
+    return this._hitText(ev.p) ? "pointer" : null;
+  },
   down(ev) {
+    // stop the browser from moving focus away from the editor we open
+    ev.e?.preventDefault?.();
     if (this._editor) {
       this.commit();
       return;
     }
-    const layer = state.doc.active;
-    if (!layer || layer.locked) {
-      emit("toast", { msg: "This layer is locked", kind: "err" });
+    const doc = state.doc;
+    const hit = doc.target?.isMask ? null : this._hitText(ev.p);
+    if (hit) {
+      this._edit(hit);
       return;
     }
-    this._anchor = { x: ev.p.x, y: ev.p.y };
+    const target = doc.target;
+    if (!target || target.locked) {
+      emit("toast", { msg: t("This layer is locked"), kind: "err" });
+      return;
+    }
+    this._open({ x: ev.p.x, y: ev.p.y }, "");
+  },
+  move() {},
+  up() {},
+  /** Topmost visible text layer under a point — the active one wins ties. */
+  _hitText(p) {
+    const doc = state.doc;
+    if (!doc) return null;
+    const inside = (l) => {
+      if (!l?.text || !l.visible) return false;
+      const b = textBounds(l.text);
+      return p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+    };
+    if (inside(doc.active)) return doc.active;
+    for (let i = doc.layers.length - 1; i >= 0; i--) {
+      if (inside(doc.layers[i])) return doc.layers[i];
+    }
+    return null;
+  },
+  _edit(layer) {
+    const doc = state.doc;
+    if (layer.locked) {
+      emit("toast", { msg: t("This layer is locked"), kind: "err" });
+      return;
+    }
+    setActiveLayer(doc.layers.indexOf(layer), { mask: false });
+    const tx = layer.text;
+    // the options bar and colour chip show the text being edited
+    for (const key of ["font", "size", "align", "bold", "italic"]) setOpt(key, tx[key], "text");
+    setOpt("opacity", Math.round((tx.opacity ?? 1) * 100), "text");
+    setColor(tx.color, "primary");
+    emit("tool", { tool: "text" });
+    this._editing = layer.id;
+    // hide the rendered pixels while the live editor shows the same text
+    layer.visible = false;
+    this._hiddenLayer = layer;
+    doc.invalidate();
+    this._open({ x: tx.x, y: tx.y }, tx.value);
+  },
+  _open(anchor, value) {
+    this._anchor = anchor;
     const host = document.getElementById("stageLayer");
     const el = document.createElement("textarea");
     el.className = "text-editor";
     el.rows = 1;
     el.spellcheck = false;
-    el.setAttribute("aria-label", "Text");
+    el.value = value;
+    el.setAttribute("aria-label", t("Text"));
     host.appendChild(el);
     this._editor = el;
     this._sync();
-    el.focus();
+    // the pointer gesture that opened the editor would move focus back to the
+    // page once it finishes, so take it again after the click has settled
+    const grab = () => {
+      if (this._editor !== el) return;
+      el.focus();
+      if (value) el.select();
+    };
+    grab();
+    setTimeout(grab, 0);
+    window.addEventListener("pointerup", () => setTimeout(grab, 0), { once: true });
 
     el.addEventListener("input", () => this._sync());
     el.addEventListener("keydown", (e) => {
@@ -1255,10 +1712,8 @@ const text = {
     });
     requestRender();
   },
-  move() {},
-  up() {},
   _fontString(style = this._style) {
-    return `${style.italic ? "italic " : ""}${style.bold ? "700" : "400"} ${style.size}px ${style.font}`;
+    return fontString(style);
   },
   /** Mirror tool options + viewport transform onto the DOM editor. */
   _sync() {
@@ -1278,7 +1733,7 @@ const text = {
     const font = this._fontString();
     this._color = { ...state.primary };
     el.style.font = font;
-    el.style.lineHeight = "1.25";
+    el.style.lineHeight = String(LINE_HEIGHT);
     el.style.color = cssColor(state.primary);
     el.style.opacity = String(this._style.opacity);
     el.style.textAlign = this._style.align;
@@ -1298,7 +1753,7 @@ const text = {
     let widest = 0;
     for (const line of lines) widest = Math.max(widest, m.measureText(line || " ").width);
     el.style.width = `${Math.ceil(widest + size * 0.35 + 6)}px`;
-    el.style.height = `${Math.ceil(lines.length * size * 1.25 + 4)}px`;
+    el.style.height = `${Math.ceil(lines.length * size * LINE_HEIGHT + 4)}px`;
   },
   commit() {
     const el = this._editor;
@@ -1307,42 +1762,29 @@ const text = {
     const anchor = this._anchor;
     const style = this._style;
     const color = this._color || state.primary;
+    const editing = this._editing;
     this.discard();
-    if (!value.trim() || !anchor || !style) return;
-
-    const doc = state.doc;
-    const layer = doc.active;
-    if (!layer || layer.locked) return;
-    const size = style.size;
-    const lines = value.split("\n");
-    const lineHeight = size * 1.25;
-
-    const buf = makeCanvas(doc.width, doc.height);
-    const bc = ctx2d(buf);
-    bc.font = this._fontString(style);
-    bc.textAlign = style.align;
-    bc.textBaseline = "top";
-    bc.fillStyle = cssColor({ ...color, a: 1 });
-    // match the editor box: 1px border + half-leading of line-height 1.25
-    const dx = style.align === "left" ? 3 : style.align === "right" ? -3 : 0;
-    const dy = 1 + size * 0.125;
-    lines.forEach((line, i) => {
-      bc.fillText(line, anchor.x + dx, anchor.y + dy + i * lineHeight);
-    });
-
-    editPixels(
-      "Text",
-      () => paintMasked(layer, buf, doc.selection, { opacity: style.opacity }),
-      layer
-    );
-    emit("layers", doc);
-    requestRender();
+    if (!anchor || !style) return;
+    const params = { value, x: anchor.x, y: anchor.y, ...style, color: { r: color.r, g: color.g, b: color.b } };
+    if (editing) {
+      updateTextLayer(editing, params);
+      return;
+    }
+    if (!value.trim()) return;
+    if (state.doc.target?.isMask) paintText(params);
+    else addTextLayer(params);
   },
   discard() {
     this._editor?.remove();
     this._editor = null;
     this._anchor = null;
     this._style = null;
+    this._editing = null;
+    if (this._hiddenLayer) {
+      this._hiddenLayer.visible = true;
+      this._hiddenLayer = null;
+      state.doc?.invalidate();
+    }
     requestRender();
   },
   cancel() {
@@ -1408,7 +1850,7 @@ function marqueeTool({ id, label, icon, shortcut, kind }) {
       if (!rect || rect.w < 1 || rect.h < 1) {
         // a plain click clears the selection
         if (doc.selection && mode === "replace") {
-          editSelection("Deselect", () => doc.setSelection(null));
+          editSelection(t("Deselect"), () => doc.setSelection(null));
         }
         requestRender();
         return;
@@ -1429,7 +1871,7 @@ function marqueeTool({ id, label, icon, shortcut, kind }) {
 
 const selectRect = marqueeTool({
   id: "selectRect",
-  label: "Rectangle select",
+  label: t("Rectangle select"),
   icon: "i-select-rect",
   shortcut: "m",
   kind: "rect",
@@ -1437,7 +1879,7 @@ const selectRect = marqueeTool({
 
 const selectEllipse = marqueeTool({
   id: "selectEllipse",
-  label: "Ellipse select",
+  label: t("Ellipse select"),
   icon: "i-select-ellipse",
   shortcut: "q",
   kind: "ellipse",
@@ -1445,7 +1887,7 @@ const selectEllipse = marqueeTool({
 
 const lasso = {
   id: "lasso",
-  label: "Lasso",
+  label: t("Lasso"),
   icon: "i-lasso",
   shortcut: "f",
   group: "Select",
@@ -1470,14 +1912,14 @@ const lasso = {
     overlay.marquee = null;
     const doc = state.doc;
     if (!points || points.length < 3) {
-      if (doc.selection) editSelection("Deselect", () => doc.setSelection(null));
+      if (doc.selection) editSelection(t("Deselect"), () => doc.setSelection(null));
       requestRender();
       return;
     }
     applySelection(
       Selection.fromPath(doc.width, doc.height, points),
       selectionModeFrom(ev),
-      "Lasso select"
+      t("Lasso select")
     );
   },
   cancel() {
@@ -1489,17 +1931,17 @@ const lasso = {
 
 const wand = {
   id: "wand",
-  label: "Magic wand",
+  label: t("Magic wand"),
   icon: "i-wand",
   shortcut: "w",
   group: "Select",
   cursor: "crosshair",
   opts: [
     selectModeOpt,
-    RANGE("tolerance", "Tolerance", 0, 100, 22, { unit: "%" }),
+    RANGE("tolerance", t("Tolerance"), 0, 100, 22, { unit: "%" }),
     featherOpt,
-    { key: "contiguous", type: "toggle", label: "Contiguous", def: true },
-    { key: "sampleAll", type: "toggle", label: "Sample all layers", def: true },
+    { key: "contiguous", type: "toggle", label: t("Contiguous"), def: true },
+    { key: "sampleAll", type: "toggle", label: t("Sample all layers"), def: true },
   ],
   down(ev) {
     const doc = state.doc;
@@ -1515,7 +1957,7 @@ const wand = {
       doc.height,
       maskToCanvas(mask, doc.width, doc.height)
     );
-    applySelection(sel, selectionModeFrom(ev), "Magic wand");
+    applySelection(sel, selectionModeFrom(ev), t("Magic wand"));
   },
   move() {},
   up() {},
@@ -1523,9 +1965,14 @@ const wand = {
 
 /* ------------------------------- move / crop ------------------------------ */
 
+/** A mask moved by (dx, dy); the strip it uncovers is revealed. */
+function shiftedMask(orig, dx, dy) {
+  return transformMask(orig, orig.width, orig.height, (c, src) => c.drawImage(src, dx, dy));
+}
+
 const move = {
   id: "move",
-  label: "Move",
+  label: t("Move"),
   icon: "i-move",
   shortcut: "v",
   group: "Edit",
@@ -1535,11 +1982,11 @@ const move = {
     {
       key: "target",
       type: "seg",
-      label: "Move",
+      label: t("Move"),
       def: "auto",
       options: [
-        ["auto", "Selection"],
-        ["layer", "Whole layer"],
+        ["auto", t("Selection")],
+        ["layer", t("Whole layer")],
       ],
     },
   ],
@@ -1551,8 +1998,9 @@ const move = {
   down(ev) {
     const doc = state.doc;
     const layer = doc.active;
-    if (!layer || layer.locked) {
-      emit("toast", { msg: "This layer is locked", kind: "err" });
+    const target = doc.target;
+    if (!target || target.locked) {
+      emit("toast", { msg: t("This layer is locked"), kind: "err" });
       return;
     }
     this._edit = beginEdit();
@@ -1560,7 +2008,16 @@ const move = {
     this._delta = { x: 0, y: 0 };
 
     const sel = opt("target") === "layer" ? null : doc.selection;
-    const orig = copyCanvas(layer.canvas);
+    // moving the whole layer keeps text editable and carries the mask along
+    this._text = !sel && !target.isMask && layer.text ? layer : null;
+    this._mask = !sel && !target.isMask && layer.mask ? copyCanvas(layer.mask) : null;
+    if (sel && !target.isMask && layer.text) {
+      layer.text = null;
+      emit("toast", { msg: t("Text layer converted to pixels"), kind: "info" });
+    }
+    this._target = target;
+
+    const orig = copyCanvas(target.canvas);
     if (sel) {
       const cut = makeCanvas(doc.width, doc.height);
       const cc = ctx2d(cut);
@@ -1583,7 +2040,7 @@ const move = {
   move(ev) {
     if (!this._edit) return;
     const doc = state.doc;
-    const layer = doc.active;
+    const target = this._target;
     let dx = ev.p.x - this._start.x;
     let dy = ev.p.y - this._start.y;
     if (ev.shift) {
@@ -1592,19 +2049,35 @@ const move = {
     }
     dx = Math.round(dx);
     dy = Math.round(dy);
+    if (dx === this._delta.x && dy === this._delta.y) return;
     this._delta = { x: dx, y: dy };
 
-    const c = layer.ctx;
+    const c = target.ctx;
     c.save();
     c.setTransform(1, 0, 0, 1, 0, 0);
-    c.globalCompositeOperation = "copy";
     if (this._base) {
+      c.globalCompositeOperation = "copy";
       c.drawImage(this._base, 0, 0);
       c.globalCompositeOperation = "source-over";
+      c.drawImage(this._cut, dx, dy);
+    } else if (target.isMask) {
+      // an empty strip of a mask means "revealed", not "hidden"
+      c.globalCompositeOperation = "copy";
+      c.drawImage(shiftedMask(this._cut, dx, dy), 0, 0);
+    } else {
+      c.globalCompositeOperation = "copy";
+      c.drawImage(this._cut, dx, dy);
     }
-    c.drawImage(this._cut, dx, dy);
     c.restore();
-    layer.touch();
+    if (this._mask) {
+      const layer = doc.active;
+      const mc = layer.maskCtx;
+      mc.save();
+      mc.globalCompositeOperation = "copy";
+      mc.drawImage(shiftedMask(this._mask, dx, dy), 0, 0);
+      mc.restore();
+    }
+    target.touch();
 
     if (this._sel) {
       overlay.floatFrame = null;
@@ -1624,25 +2097,367 @@ const move = {
       doc.setSelection(moved);
       emit("selection", doc);
     }
+    if (this._text && (dx || dy)) {
+      this._text.text.x += dx;
+      this._text.text.y += dy;
+    }
     overlay.floatFrame = null;
-    if (dx || dy) this._edit.commit("Move");
+    if (dx || dy) this._edit.commit(t("Move"));
     this._edit = null;
-    this._cut = this._base = this._sel = null;
+    this._cut = this._base = this._sel = this._mask = this._text = this._target = null;
     emit("layers", doc);
     requestRender();
   },
   cancel() {
     if (this._edit) this._edit.rollback();
     this._edit = null;
-    this._cut = this._base = this._sel = null;
+    this._cut = this._base = this._sel = this._mask = this._text = this._target = null;
     overlay.floatFrame = null;
     requestRender();
   },
 };
 
+/* -------------------------------- transform ------------------------------- */
+
+const HANDLES = [
+  [-1, -1], [0, -1], [1, -1],
+  [-1, 0], [1, 0],
+  [-1, 1], [0, 1], [1, 1],
+];
+
+/**
+ * Free transform: scale, rotate and move the selected pixels (or the whole
+ * layer) with handles. The layer shows the live result; Enter applies, Esc
+ * restores. Corners keep the aspect ratio unless Shift is held; Alt scales
+ * from the centre; dragging outside the box rotates (Shift snaps to 15°).
+ */
+const transform = {
+  id: "transform",
+  label: t("Transform"),
+  icon: "i-transform",
+  group: "Edit",
+  cursor: "default",
+  needsLayer: true,
+  opts: [
+    { type: "button", label: t("Apply"), icon: "i-check", primary: true, onClick: () => transform.apply() },
+    { type: "button", label: t("Cancel"), icon: "i-close", onClick: () => transform.cancel() },
+    { type: "button", label: t("Flip horizontal"), icon: "i-flip-h", onClick: () => transform.flip("h") },
+    { type: "button", label: t("Flip vertical"), icon: "i-flip-v", onClick: () => transform.flip("v") },
+  ],
+  _s: null,
+  _drag: null,
+  applyOnLeave: true,
+  activate() {
+    this._begin();
+  },
+  /** A gesture was interrupted (pinch, window blur): keep the session. */
+  abortGesture() {
+    this._drag = null;
+  },
+  deactivate() {
+    this.apply();
+  },
+  get active() {
+    return !!this._s;
+  },
+  _begin() {
+    const doc = state.doc;
+    if (!doc || this._s) return;
+    const target = doc.target;
+    const layer = doc.active;
+    if (!target || target.locked) return;
+    const sel = doc.selection;
+    // a mask's "content" is all of it — its hidden parts matter as much
+    let b = sel
+      ? sel.bounds
+      : target.isMask
+      ? { x: 0, y: 0, w: target.width, h: target.height }
+      : alphaBounds(target.canvas, 0);
+    if (sel && b) {
+      // shrink to the pixels actually inside the selection
+      const probe = makeCanvas(b.w, b.h);
+      const pc = ctx2d(probe);
+      pc.drawImage(target.canvas, -b.x, -b.y);
+      pc.globalCompositeOperation = "destination-in";
+      pc.drawImage(sel.canvas, -b.x, -b.y);
+      const inner = alphaBounds(probe, 0);
+      b = inner ? { x: b.x + inner.x, y: b.y + inner.y, w: inner.w, h: inner.h } : null;
+    }
+    if (!b) {
+      emit("toast", { msg: t("Nothing to transform on this layer"), kind: "info" });
+      return;
+    }
+    const edit = beginEdit();
+    if (!target.isMask && layer.text) {
+      layer.text = null;
+      emit("toast", { msg: t("Text layer converted to pixels"), kind: "info" });
+    }
+    const patch = makeCanvas(b.w, b.h);
+    const pc = ctx2d(patch);
+    pc.drawImage(target.canvas, -b.x, -b.y);
+    if (sel) {
+      pc.globalCompositeOperation = "destination-in";
+      pc.drawImage(sel.canvas, -b.x, -b.y);
+    }
+    let base = null;
+    if (sel) {
+      base = copyCanvas(target.canvas);
+      const bc = ctx2d(base);
+      bc.globalCompositeOperation = "destination-out";
+      bc.drawImage(sel.canvas, 0, 0);
+    }
+    let selPatch = null;
+    if (sel) {
+      selPatch = makeCanvas(b.w, b.h);
+      ctx2d(selPatch).drawImage(sel.canvas, -b.x, -b.y);
+    }
+    this._s = {
+      edit,
+      target,
+      layerId: layer.id,
+      patch,
+      base,
+      selPatch,
+      mask: !sel && !target.isMask && layer.mask ? copyCanvas(layer.mask) : null,
+      origin: { x: b.x, y: b.y },
+      w: b.w,
+      h: b.h,
+      cx: b.x + b.w / 2,
+      cy: b.y + b.h / 2,
+      sx: 1,
+      sy: 1,
+      angle: 0,
+    };
+    this._render();
+  },
+  /** Patch space → document space. */
+  _matrix(s = this._s) {
+    return new DOMMatrix()
+      .translateSelf(s.cx, s.cy)
+      .rotateSelf((s.angle * 180) / Math.PI)
+      .scaleSelf(s.sx, s.sy)
+      .translateSelf(-s.w / 2, -s.h / 2);
+  },
+  _corners(s = this._s) {
+    const m = this._matrix(s);
+    return [
+      [0, 0],
+      [s.w, 0],
+      [s.w, s.h],
+      [0, s.h],
+    ].map(([x, y]) => {
+      const p = m.transformPoint({ x, y });
+      return { x: p.x, y: p.y };
+    });
+  },
+  _render() {
+    const s = this._s;
+    if (!s) return;
+    const m = this._matrix();
+    const c = s.target.ctx;
+    c.save();
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    if (s.target.isMask && !s.base) {
+      // the area a transformed mask no longer covers is revealed
+      const moved = transformMask(s.patch, s.target.width, s.target.height, (cc, src) => {
+        cc.setTransform(m);
+        cc.drawImage(src, 0, 0);
+      });
+      c.globalCompositeOperation = "copy";
+      c.drawImage(moved, 0, 0);
+    } else {
+      c.globalCompositeOperation = "copy";
+      if (s.base) c.drawImage(s.base, 0, 0);
+      else c.clearRect(0, 0, s.target.width, s.target.height);
+      c.globalCompositeOperation = "source-over";
+      c.imageSmoothingEnabled = true;
+      c.imageSmoothingQuality = "high";
+      c.setTransform(m);
+      c.drawImage(s.patch, 0, 0);
+    }
+    c.restore();
+    if (s.mask) {
+      const layer = state.doc.layers.find((l) => l.id === s.layerId);
+      if (layer?.maskCtx) {
+        // the mask lives in document space: map it with the same transform
+        const mm = m.multiply(new DOMMatrix().translateSelf(-s.origin.x, -s.origin.y));
+        const moved = transformMask(s.mask, s.mask.width, s.mask.height, (cc, src) => {
+          cc.setTransform(mm);
+          cc.drawImage(src, 0, 0);
+        });
+        layer.maskCtx.save();
+        layer.maskCtx.globalCompositeOperation = "copy";
+        layer.maskCtx.drawImage(moved, 0, 0);
+        layer.maskCtx.restore();
+      }
+    }
+    s.target.touch();
+    overlay.transform = { corners: this._corners(), center: { x: s.cx, y: s.cy } };
+    requestRender();
+  },
+  _hit(ev) {
+    const s = this._s;
+    if (!s) return null;
+    const corners = this._corners().map((p) => view.toScreen(p.x, p.y));
+    const tol = ev.e?.pointerType === "touch" ? 18 : 9;
+    const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+    const pts = {
+      "-1,-1": corners[0],
+      "1,-1": corners[1],
+      "1,1": corners[2],
+      "-1,1": corners[3],
+      "0,-1": mid(corners[0], corners[1]),
+      "1,0": mid(corners[1], corners[2]),
+      "0,1": mid(corners[2], corners[3]),
+      "-1,0": mid(corners[3], corners[0]),
+    };
+    for (const [hx, hy] of HANDLES) {
+      const p = pts[`${hx},${hy}`];
+      if (Math.hypot(ev.screen.x - p.x, ev.screen.y - p.y) <= tol) return { kind: "scale", hx, hy };
+    }
+    // inside the (possibly rotated) box → move, anywhere else → rotate
+    const inv = this._matrix().inverse();
+    const local = inv.transformPoint({ x: ev.p.x, y: ev.p.y });
+    if (local.x >= 0 && local.x <= s.w && local.y >= 0 && local.y <= s.h) return { kind: "move" };
+    return { kind: "rotate" };
+  },
+  hover(ev) {
+    const hit = this._hit(ev);
+    if (!hit) return null;
+    if (hit.kind === "move") return "move";
+    if (hit.kind === "rotate") return "alias";
+    const a = (Math.atan2(hit.hy, hit.hx) + this._s.angle) * (180 / Math.PI);
+    const n = ((Math.round(a / 45) % 4) + 4) % 4;
+    return ["ew-resize", "nwse-resize", "ns-resize", "nesw-resize"][n];
+  },
+  down(ev) {
+    if (!this._s) this._begin();
+    if (!this._s) return;
+    const hit = this._hit(ev);
+    this._drag = { hit, start: ev.p, s0: { ...this._s } };
+  },
+  move(ev) {
+    const d = this._drag;
+    const s = this._s;
+    if (!d || !s) return;
+    const s0 = d.s0;
+    if (d.hit.kind === "move") {
+      let dx = ev.p.x - d.start.x;
+      let dy = ev.p.y - d.start.y;
+      if (ev.shift) {
+        if (Math.abs(dx) > Math.abs(dy)) dy = 0;
+        else dx = 0;
+      }
+      s.cx = s0.cx + dx;
+      s.cy = s0.cy + dy;
+    } else if (d.hit.kind === "rotate") {
+      const a0 = Math.atan2(d.start.y - s0.cy, d.start.x - s0.cx);
+      const a1 = Math.atan2(ev.p.y - s0.cy, ev.p.x - s0.cx);
+      let angle = s0.angle + (a1 - a0);
+      if (ev.shift) angle = Math.round(angle / (Math.PI / 12)) * (Math.PI / 12);
+      s.angle = angle;
+    } else {
+      const { hx, hy } = d.hit;
+      const W = s0.w * s0.sx;
+      const H = s0.h * s0.sy;
+      const cos = Math.cos(s0.angle);
+      const sin = Math.sin(s0.angle);
+      const toDoc = (u, v) => ({ x: s0.cx + u * cos - v * sin, y: s0.cy + u * sin + v * cos });
+      const fromCenter = ev.alt;
+      const anchor = fromCenter ? { x: s0.cx, y: s0.cy } : toDoc((-hx * W) / 2, (-hy * H) / 2);
+      // pointer relative to the anchor, in the box's rotated frame
+      const rx = ev.p.x - anchor.x;
+      const ry = ev.p.y - anchor.y;
+      const u = rx * cos + ry * sin;
+      const v = -rx * sin + ry * cos;
+      const k = fromCenter ? 2 : 1;
+      let nW = hx ? (u * k) / hx : W;
+      let nH = hy ? (v * k) / hy : H;
+      const corner = hx !== 0 && hy !== 0;
+      if (corner && !ev.shift) {
+        // keep the proportions: project onto the diagonal
+        const ratio = ((nW * W + nH * H) / (W * W + H * H)) || 0;
+        nW = W * ratio;
+        nH = H * ratio;
+      }
+      if (Math.abs(nW) < 1) nW = nW < 0 ? -1 : 1;
+      if (Math.abs(nH) < 1) nH = nH < 0 ? -1 : 1;
+      s.sx = nW / s0.w;
+      s.sy = nH / s0.h;
+      if (fromCenter) {
+        s.cx = s0.cx;
+        s.cy = s0.cy;
+      } else {
+        const c = { u: (hx * nW) / 2, v: (hy * nH) / 2 };
+        s.cx = anchor.x + c.u * cos - c.v * sin;
+        s.cy = anchor.y + c.u * sin + c.v * cos;
+      }
+    }
+    this._render();
+  },
+  up() {
+    this._drag = null;
+  },
+  flip(axis) {
+    if (!this._s) this._begin();
+    if (!this._s) return;
+    if (axis === "h") this._s.sx *= -1;
+    else this._s.sy *= -1;
+    this._render();
+  },
+  _identity(s) {
+    return (
+      Math.abs(s.sx - 1) < 1e-6 &&
+      Math.abs(s.sy - 1) < 1e-6 &&
+      Math.abs(s.angle) < 1e-6 &&
+      Math.abs(s.cx - (s.origin.x + s.w / 2)) < 1e-6 &&
+      Math.abs(s.cy - (s.origin.y + s.h / 2)) < 1e-6
+    );
+  },
+  apply() {
+    const s = this._s;
+    if (!s) return;
+    const doc = state.doc;
+    this._s = null;
+    this._drag = null;
+    overlay.transform = null;
+    if (this._identity(s)) {
+      s.edit.rollback();
+      requestRender();
+      return;
+    }
+    if (s.selPatch) {
+      const moved = new Selection(doc.width, doc.height);
+      moved.ctx.setTransform(this._matrix(s));
+      moved.ctx.drawImage(s.selPatch, 0, 0);
+      moved.ctx.setTransform(1, 0, 0, 1, 0, 0);
+      doc.setSelection(moved);
+      emit("selection", doc);
+    }
+    s.edit.commit(t("Transform"));
+    emit("layers", doc);
+    requestRender();
+  },
+  cancel() {
+    const s = this._s;
+    if (!s) return;
+    this._s = null;
+    this._drag = null;
+    overlay.transform = null;
+    s.edit.rollback();
+    requestRender();
+  },
+  /** The document was replaced: forget the session without touching pixels. */
+  drop() {
+    this._s = null;
+    this._drag = null;
+    overlay.transform = null;
+  },
+};
+
 const crop = {
   id: "crop",
-  label: "Crop",
+  label: t("Crop"),
   icon: "i-crop",
   shortcut: "c",
   group: "Edit",
@@ -1651,28 +2466,28 @@ const crop = {
     {
       key: "ratio",
       type: "select",
-      label: "Ratio",
+      label: t("Ratio"),
       def: "free",
       options: [
-        ["free", "Freeform"],
-        ["1", "Square 1:1"],
-        ["1.3333", "4:3"],
-        ["0.75", "3:4"],
-        ["1.7778", "16:9"],
-        ["0.5625", "9:16"],
-        ["1.5", "3:2"],
+        ["free", t("Freeform")],
+        ["1", t("Square 1:1")],
+        ["1.3333", t("4:3")],
+        ["0.75", t("3:4")],
+        ["1.7778", t("16:9")],
+        ["0.5625", t("9:16")],
+        ["1.5", t("3:2")],
       ],
     },
     {
       type: "button",
-      label: "Apply",
+      label: t("Apply"),
       icon: "i-check",
       primary: true,
       onClick: () => crop.apply(),
     },
     {
       type: "button",
-      label: "Reset",
+      label: t("Reset"),
       icon: "i-reset",
       onClick: () => {
         overlay.crop = null;
@@ -1804,7 +2619,7 @@ const crop = {
 
 const eyedropper = {
   id: "eyedropper",
-  label: "Eyedropper",
+  label: t("Eyedropper"),
   icon: "i-eyedropper",
   shortcut: "i",
   group: "View",
@@ -1813,11 +2628,11 @@ const eyedropper = {
     {
       key: "source",
       type: "seg",
-      label: "Sample",
+      label: t("Sample"),
       def: "composite",
       options: [
-        ["composite", "All layers"],
-        ["layer", "Active layer"],
+        ["composite", t("All layers")],
+        ["layer", t("Active layer")],
       ],
     },
   ],
@@ -1864,7 +2679,7 @@ export function sampleColor(p, which = "primary", layerOnly = false, record = fa
 
 const hand = {
   id: "hand",
-  label: "Pan",
+  label: t("Pan"),
   icon: "i-hand",
   shortcut: "h",
   group: "View",
@@ -1888,7 +2703,7 @@ const hand = {
 
 const zoomTool = {
   id: "zoom",
-  label: "Zoom",
+  label: t("Zoom"),
   icon: "i-zoom",
   shortcut: "z",
   group: "View",
@@ -1915,6 +2730,9 @@ export const TOOL_LIST = [
   sharpenTool,
   smudgeTool,
   cloneTool,
+  healTool,
+  spotHeal,
+  dodgeTool,
   lineShape,
   arrowShape,
   rectShape,
@@ -1927,6 +2745,7 @@ export const TOOL_LIST = [
   lasso,
   wand,
   move,
+  transform,
   crop,
   eyedropper,
   hand,
@@ -1964,6 +2783,7 @@ export const PAINT_TOOLS = new Set([
   "sharpenBrush",
   "smudge",
   "clone",
+  "spotHeal",
   "line",
   "arrow",
   "rect",
@@ -2023,7 +2843,8 @@ export function initInput(canvas) {
     if (pointers.size === 2) {
       // two fingers: pinch-zoom instead of drawing
       const [a, b] = [...pointers.values()];
-      activeTool().cancel?.();
+      const tool = activeTool();
+      (tool.abortGesture || tool.cancel)?.call(tool);
       drag = null;
       pinch = {
         dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
@@ -2051,8 +2872,8 @@ export function initInput(canvas) {
       sampleColor(ev.p, state.activeChip, false, true);
       return;
     }
-    if (tool.needsLayer && (!state.doc.active || state.doc.active.locked)) {
-      emit("toast", { msg: "This layer is locked", kind: "err" });
+    if (tool.needsLayer && (!state.doc.target || state.doc.target.locked)) {
+      emit("toast", { msg: t("This layer is locked"), kind: "err" });
       return;
     }
 
@@ -2079,6 +2900,11 @@ export function initInput(canvas) {
       return;
     }
     if (drag?.kind === "tool") drag.tool.move?.(ev);
+    else if (!spaceHeld) {
+      // tools with on-canvas handles describe the cursor under the pointer
+      const tool = activeTool();
+      if (tool.hover) canvas.style.cursor = tool.hover(ev) || tool.cursor || "default";
+    }
     updateCursorOverlay(ev);
   });
 
@@ -2097,7 +2923,7 @@ export function initInput(canvas) {
   canvas.addEventListener("pointercancel", (e) => {
     pointers.delete(e.pointerId);
     pinch = null;
-    if (drag?.kind === "tool") drag.tool.cancel?.();
+    if (drag?.kind === "tool") (drag.tool.abortGesture || drag.tool.cancel)?.call(drag.tool);
     drag = null;
     applyCursor();
   });
@@ -2147,7 +2973,7 @@ export function initInput(canvas) {
     spaceHeld = false;
     pointers.clear();
     pinch = null;
-    if (drag?.kind === "tool") drag.tool.cancel?.();
+    if (drag?.kind === "tool") (drag.tool.abortGesture || drag.tool.cancel)?.call(drag.tool);
     drag = null;
   });
 
@@ -2174,9 +3000,18 @@ export function isTypingTarget(el) {
 export function switchTool(next, prev) {
   const from = TOOLS[prev];
   const to = TOOLS[next];
+  // leaving the transform tool keeps the result, like every other editor
+  if (from?.applyOnLeave) from.apply();
   from?.cancel?.();
   from?.deactivate?.();
   to?.activate?.();
   overlay.cursor = null;
   requestRender();
 }
+
+/* a transform in progress holds bitmaps of the current state — keep it honest */
+on("before-history", () => transform.cancel());
+on("before-target-change", () => transform.apply());
+on("doc", ({ reason }) => {
+  if (reason === "open") transform.drop();
+});

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Color Picker from Image – HEX &amp; RGB | Paint Studio</title>
+    <meta name="description" content="Pick a color from any image online and get its HEX and RGB code in one click. Zoom in to single pixels, copy the value and reuse it. Free, no upload." />
+    <link rel="canonical" href="https://robertlib.github.io/paint/color-picker-from-image/" />
+    <link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/color-picker-from-image/" />
+    <link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/zjistit-barvu-z-obrazku/" />
+    <link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/color-picker-from-image/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Paint Studio" />
+    <meta property="og:title" content="Color Picker from Image – HEX &amp; RGB | Paint Studio" />
+    <meta property="og:description" content="Pick a color from any image online and get its HEX and RGB code in one click. Zoom in to single pixels, copy the value and reuse it. Free, no upload." />
+    <meta property="og:url" content="https://robertlib.github.io/paint/color-picker-from-image/" />
+    <meta property="og:image" content="https://robertlib.github.io/paint/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="cs_CZ" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+    <link rel="manifest" href="../manifest.json" />
+    <meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+
+    <script>
+      // the editor's theme choice applies here too; otherwise follow the system
+      try {
+        var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
+        document.documentElement.dataset.theme =
+          (t && t.theme) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      } catch (e) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    </script>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/site.css" />
+    <link rel="modulepreload" href="../js/site.js" />
+    <link rel="modulepreload" href="../js/store.js" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/"},{"@type":"ListItem","position":2,"name":"Color picker from image","item":"https://robertlib.github.io/paint/color-picker-from-image/"}]},{"@type":"WebApplication","name":"Color picker — Paint Studio","url":"https://robertlib.github.io/paint/color-picker-from-image/","description":"Pick a color from any image online and get its HEX and RGB code in one click. Zoom in to single pixels, copy the value and reuse it. Free, no upload.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (modern web browser)","inLanguage":"en","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@id":"https://robertlib.github.io/paint/#website"}}]}</script>
+    
+  </head>
+  <body class="site">
+    <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true"><defs><symbol id="i-brush" viewBox="0 0 24 24"><path d="M9.1 11.9l8-8.1a2.85 2.85 0 0 1 4.05 4.05l-8.1 8.05"/><path d="M7.05 14.95a3 3 0 0 0-3 3c0 1.35-2.5 1.5-2 2 1.1 1.1 2.5 2 4 2a4 4 0 0 0 4-4 3 3 0 0 0-3-3z"/></symbol><symbol id="i-image" viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol><symbol id="i-eyedropper" viewBox="0 0 24 24"><path d="M11 7l6 6"/><path d="M20.4 3.6a2.3 2.3 0 0 1 0 3.25l-1.7 1.7-3.25-3.25 1.7-1.7a2.3 2.3 0 0 1 3.25 0z"/><path d="M15.5 8.5L7 17v4h4l8.5-8.5"/></symbol><symbol id="i-swap" viewBox="0 0 24 24"><path d="M16 3l4 4-4 4M20 7H9M8 21l-4-4 4-4M4 17h11"/></symbol><symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M11 3l1.8 4.7L17.5 9.5l-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8z"/><path d="M18.5 14.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/></symbol></defs></svg>
+    
+    <header class="site-head">
+      <a class="site-brand" href="../">
+        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+        <span translate="no">Paint<em>Studio</em></span>
+      </a>
+      <nav class="site-nav" aria-label="All tools">
+        <a href="../#tools">All tools</a>
+        <span class="langs" role="group" aria-label="Language"><span class="lang is-current" aria-current="true">EN</span><a class="lang" href="../cs/zjistit-barvu-z-obrazku/" hreflang="cs" lang="cs">CS</a></span>
+        <a class="btn btn-primary" href="../editor/?lang=en&task=eyedropper"><svg class="icon"><use href="#i-brush" /></svg><span>Open editor</span></a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Paint Studio</a><span aria-hidden="true">›</span><span>Color picker</span></nav>
+        <h1>Color picker from image</h1>
+        <p class="lead">Find the exact color of any pixel in a photo, logo or screenshot. Click it with the Eyedropper and copy its HEX or RGB code.</p>
+        
+      <div class="drop" data-drop>
+        <svg class="icon drop-icon"><use href="#i-image" /></svg>
+        <strong class="drop-title">Drop an image here</strong>
+        <label class="btn btn-primary btn-lg"><svg class="icon"><use href="#i-folder" /></svg><span>Choose image</span>
+          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+        <p class="drop-hint">or paste with Ctrl+V · PNG, JPG, WebP, HEIC, PSD…</p>
+        
+        <p class="drop-busy" data-busy hidden>Opening the editor…</p>
+      </div>
+      <script type="application/json" id="dropConfig">{"editor":"../editor/","task":"eyedropper","lang":"en"}</script>
+        <ul class="trust"><li><svg class="icon"><use href="#i-check" /></svg><span>Nothing is uploaded</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No sign-up</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No watermark</span></li></ul>
+      </section>
+
+      <section class="block steps">
+        <h2>How it works</h2>
+        <ol><li>Drop an image or paste a screenshot — the Eyedropper is ready.</li><li>Click or drag over the image to sample a color.</li><li>Read the HEX and RGB value in the task bar and click Copy.</li></ol>
+      </section>
+
+      <section class="block prose">
+        <h2>Getting the exact color</h2>
+        <p>Click anywhere to sample a pixel, or press and drag to watch the value change as you move across the image. The task bar shows the color as a HEX code (such as #1E88E5) and as RGB, with a Copy button that puts the value on your clipboard; the Color panel shows it as well. To hit a single pixel — a thin line, a small icon, one letter — zoom in with the scroll wheel or a pinch gesture. At up to 3200 % every pixel becomes a large square.</p>
+        <h2>Photos, logos and screenshots</h2>
+        <p>In a photograph, neighboring pixels rarely have exactly the same color, and JPEG compression adds small variations on top. Sample a few points and pick the one that represents the area best. For brand colors, use the cleanest source you have, such as an original PNG or SVG logo rather than a compressed screenshot. To pick a color from a website or app, take a screenshot and paste it with <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd>. Paint Studio reads the stored RGB values without color management, so results can differ slightly from tools that convert color profiles.</p>
+        <h2>Layers and recent colors</h2>
+        <p>In a document with several layers, choose whether to sample from all layers — the color you actually see — or only from the active layer, which helps when a semi-transparent layer sits on top. Every picked color is added to the Recent row in the Color panel, so you can collect a small palette from one image and reuse it later while painting, drawing shapes or adding text in the same session.</p>
+      </section>
+      
+      <section class="block faq">
+        <h2>Frequently asked questions</h2>
+        <h3>How do I get the HEX code of a color in an image?</h3>
+        <p>Open the image, click the color with the Eyedropper and read the HEX value in the task bar. Click Copy to put it on your clipboard, then paste it into your design tool, CSS file or document.</p>
+        <h3>Can I pick a color from a screenshot?</h3>
+        <p>Yes. Take a screenshot as usual and paste it straight into the page with Ctrl/⌘+V, or save it and drop the file. Zoom in to the exact spot and click it with the Eyedropper.</p>
+        <h3>Why do I get slightly different values in the same area?</h3>
+        <p>Photos contain noise and gradients, and JPEG compression adds small variations, so neighboring pixels often differ by a few units. Zoom in, sample several points and choose a representative one, or use an uncompressed original if you have it.</p>
+      </section>
+
+      <section class="block">
+        <h2>Related tools</h2>
+        <ul class="tool-grid"><li><a class="tool-card" href="../image-converter/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-swap" /></svg></span>
+          <span class="tool-text"><strong>Image converter</strong><span>Convert between PNG, JPG, WebP and PSD</span></span>
+        </a></li><li><a class="tool-card" href="../photo-filters/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-sparkles" /></svg></span>
+          <span class="tool-text"><strong>Photo filters</strong><span>21 effects previewed on your own photo</span></span>
+        </a></li><li><a class="tool-card" href="../draw-on-image/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-brush" /></svg></span>
+          <span class="tool-text"><strong>Draw on image</strong><span>Arrows, shapes and freehand notes on photos</span></span>
+        </a></li></ul>
+      </section>
+    </main>
+    <footer class="site-foot">
+      <div class="foot-inner">
+        <div class="foot-about">
+          <a class="site-brand" href="../">
+            <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+            <span translate="no">Paint<em>Studio</em></span>
+          </a>
+          <p>Paint Studio is a free, open-source image editor under the MIT license. It runs entirely in your browser, so your images never leave your device.</p>
+          <p><a href="https://github.com/RobertLib/paint" rel="noopener">Source code on GitHub</a> · <a href="../color-picker-from-image/" hreflang="en" lang="en">English</a> · <a href="../cs/zjistit-barvu-z-obrazku/" hreflang="cs" lang="cs">Čeština</a></p>
+        </div>
+        <nav aria-label="All tools">
+          <h2>All tools</h2>
+          <ul class="foot-links"><li><a href="../crop-image/">Crop image</a></li><li><a href="../resize-image/">Resize image</a></li><li><a href="../rotate-image/">Rotate image</a></li><li><a href="../compress-image/">Compress image</a></li><li><a href="../image-converter/">Image converter</a></li><li><a href="../png-to-jpg/">PNG to JPG</a></li><li><a href="../webp-to-jpg/">WebP to JPG</a></li><li><a href="../heic-to-jpg/">HEIC to JPG</a></li><li><a href="../blur-image/">Blur image</a></li><li><a href="../add-text-to-photo/">Add text</a></li><li><a href="../black-and-white-photo/">Black and white</a></li><li><a href="../invert-colors/">Invert colors</a></li><li><a href="../photo-filters/">Photo filters</a></li><li><a href="../brighten-photo/">Brighten photo</a></li><li><a href="../make-background-transparent/">Transparent background</a></li><li><a href="../color-picker-from-image/">Color picker</a></li><li><a href="../draw-on-image/">Draw on image</a></li><li><a href="../paint-online/">Paint online</a></li><li><a href="../open-psd-online/">Open PSD</a></li><li><a href="../retouch-photo/">Retouch photo</a></li></ul>
+        </nav>
+      </div>
+    </footer>
+    <script type="module" src="../js/site.js"></script>
+  </body>
+</html>

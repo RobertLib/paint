@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Image Converter – PNG, JPG, WebP, HEIC | Paint Studio</title>
+    <meta name="description" content="Free online image converter: open PNG, JPG, WebP, HEIC, AVIF, GIF, SVG, BMP or PSD and save as PNG, JPG, WebP or layered PSD. Runs in your browser." />
+    <link rel="canonical" href="https://robertlib.github.io/paint/image-converter/" />
+    <link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/image-converter/" />
+    <link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/prevod-obrazku/" />
+    <link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/image-converter/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Paint Studio" />
+    <meta property="og:title" content="Image Converter – PNG, JPG, WebP, HEIC | Paint Studio" />
+    <meta property="og:description" content="Free online image converter: open PNG, JPG, WebP, HEIC, AVIF, GIF, SVG, BMP or PSD and save as PNG, JPG, WebP or layered PSD. Runs in your browser." />
+    <meta property="og:url" content="https://robertlib.github.io/paint/image-converter/" />
+    <meta property="og:image" content="https://robertlib.github.io/paint/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="cs_CZ" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+    <link rel="manifest" href="../manifest.json" />
+    <meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+
+    <script>
+      // the editor's theme choice applies here too; otherwise follow the system
+      try {
+        var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
+        document.documentElement.dataset.theme =
+          (t && t.theme) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      } catch (e) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    </script>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/site.css" />
+    <link rel="modulepreload" href="../js/site.js" />
+    <link rel="modulepreload" href="../js/store.js" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/"},{"@type":"ListItem","position":2,"name":"Online image converter","item":"https://robertlib.github.io/paint/image-converter/"}]},{"@type":"WebApplication","name":"Image converter — Paint Studio","url":"https://robertlib.github.io/paint/image-converter/","description":"Free online image converter: open PNG, JPG, WebP, HEIC, AVIF, GIF, SVG, BMP or PSD and save as PNG, JPG, WebP or layered PSD. Runs in your browser.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (modern web browser)","inLanguage":"en","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@id":"https://robertlib.github.io/paint/#website"}}]}</script>
+    
+  </head>
+  <body class="site">
+    <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true"><defs><symbol id="i-brush" viewBox="0 0 24 24"><path d="M9.1 11.9l8-8.1a2.85 2.85 0 0 1 4.05 4.05l-8.1 8.05"/><path d="M7.05 14.95a3 3 0 0 0-3 3c0 1.35-2.5 1.5-2 2 1.1 1.1 2.5 2 4 2a4 4 0 0 0 4-4 3 3 0 0 0-3-3z"/></symbol><symbol id="i-image" viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol><symbol id="i-swap" viewBox="0 0 24 24"><path d="M16 3l4 4-4 4M20 7H9M8 21l-4-4 4-4M4 17h11"/></symbol></defs></svg>
+    
+    <header class="site-head">
+      <a class="site-brand" href="../">
+        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+        <span translate="no">Paint<em>Studio</em></span>
+      </a>
+      <nav class="site-nav" aria-label="All tools">
+        <a href="../#tools">All tools</a>
+        <span class="langs" role="group" aria-label="Language"><span class="lang is-current" aria-current="true">EN</span><a class="lang" href="../cs/prevod-obrazku/" hreflang="cs" lang="cs">CS</a></span>
+        <a class="btn btn-primary" href="../editor/?lang=en&task=convert"><svg class="icon"><use href="#i-brush" /></svg><span>Open editor</span></a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Paint Studio</a><span aria-hidden="true">›</span><span>Image converter</span></nav>
+        <h1>Online image converter</h1>
+        <p class="lead">Open an image in almost any common format and save it as PNG, JPEG, WebP or a layered PSD. The Export dialog appears as soon as the file is loaded, so a conversion takes only a few clicks.</p>
+        
+      <div class="drop" data-drop>
+        <svg class="icon drop-icon"><use href="#i-image" /></svg>
+        <strong class="drop-title">Drop an image here</strong>
+        <label class="btn btn-primary btn-lg"><svg class="icon"><use href="#i-folder" /></svg><span>Choose image</span>
+          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+        <p class="drop-hint">or paste with Ctrl+V · PNG, JPG, WebP, HEIC, PSD…</p>
+        
+        <p class="drop-busy" data-busy hidden>Opening the editor…</p>
+      </div>
+      <script type="application/json" id="dropConfig">{"editor":"../editor/","task":"convert","lang":"en"}</script>
+        <ul class="trust"><li><svg class="icon"><use href="#i-check" /></svg><span>Nothing is uploaded</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No sign-up</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No watermark</span></li></ul>
+      </section>
+
+      <section class="block steps">
+        <h2>How it works</h2>
+        <ol><li>Drop an image in any supported format.</li><li>Choose the output format in the Export dialog and set the quality if needed.</li><li>Click Download to save the converted file.</li></ol>
+      </section>
+
+      <section class="block prose">
+        <h2>Which format to convert to</h2>
+        <p><strong>JPEG</strong> is the universal choice for photos: small files that open on every device, but no transparency. <strong>PNG</strong> is lossless and keeps transparency, which makes it ideal for screenshots, logos, diagrams and anything with sharp edges or text; photos saved as PNG are large. <strong>WebP</strong> supports both quality-based compression and transparency and usually gives the smallest files, though some older software can’t open it. A layered <strong>PSD</strong> is the right choice when someone will keep editing the file in Photoshop or another editor that reads PSD.</p>
+        <h2>Formats you can open</h2>
+        <p>Paint Studio reads PNG, JPEG, WebP, BMP and SVG, the first frame of a GIF, AVIF if your browser can decode it, iPhone HEIC/HEIF photos and 8-bit Photoshop PSD files with their layers. Drag the file onto the page, use the file picker, or paste an image copied from another app with <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd>. SVG drawings are turned into pixels when they open, so the result is a regular bitmap; there is no SVG export or vector editing. Animated GIFs come in as a single still image.</p>
+        <h2>What changes during conversion</h2>
+        <p>Converting re-encodes the pixels rather than just renaming the file. Transparent areas become white when you save as JPEG, so pick PNG or WebP for logos and cut-outs. JPEG and WebP use the quality slider (10–100): around 85–92 keeps photos visually unchanged, lower values save space. Converting a JPEG to PNG won’t restore detail that JPEG compression already removed — it only prevents further loss. Each file is converted on its own; there is no batch conversion of whole folders.</p>
+      </section>
+      
+      <section class="block faq">
+        <h2>Frequently asked questions</h2>
+        <h3>Can I convert images to AVIF or HEIC?</h3>
+        <p>No. Paint Studio can open AVIF and HEIC files, but saves only PNG, JPEG, WebP, layered PSD and its own .paint project format. If you want a modern, compact format with wide support, WebP is a good alternative.</p>
+        <h3>Does converting to JPG lose transparency?</h3>
+        <p>Yes. JPEG has no transparency, so transparent pixels are filled with white during export. If you need to keep a see-through background, convert to PNG, or to WebP if you also want a small file.</p>
+        <h3>Can I convert several images at once?</h3>
+        <p>No, there is no batch conversion. Each image is opened, converted and downloaded on its own. For a few files that still goes quickly, since nothing has to be uploaded to a server or downloaded back from one.</p>
+        <h3>Which format should I choose for a website?</h3>
+        <p>Use WebP for photos and graphics whenever your site or platform accepts it, since it is usually the smallest. Use JPEG for photos when you need maximum compatibility, and PNG for logos, icons and screenshots that need crisp edges or transparency.</p>
+      </section>
+
+      <section class="block">
+        <h2>Related tools</h2>
+        <ul class="tool-grid"><li><a class="tool-card" href="../png-to-jpg/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-image" /></svg></span>
+          <span class="tool-text"><strong>PNG to JPG</strong><span>Turn PNGs into compact, compatible JPGs</span></span>
+        </a></li><li><a class="tool-card" href="../webp-to-jpg/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-image" /></svg></span>
+          <span class="tool-text"><strong>WebP to JPG</strong><span>Make web images open in any app</span></span>
+        </a></li><li><a class="tool-card" href="../heic-to-jpg/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-image" /></svg></span>
+          <span class="tool-text"><strong>HEIC to JPG</strong><span>Open iPhone photos anywhere as JPG</span></span>
+        </a></li></ul>
+      </section>
+    </main>
+    <footer class="site-foot">
+      <div class="foot-inner">
+        <div class="foot-about">
+          <a class="site-brand" href="../">
+            <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+            <span translate="no">Paint<em>Studio</em></span>
+          </a>
+          <p>Paint Studio is a free, open-source image editor under the MIT license. It runs entirely in your browser, so your images never leave your device.</p>
+          <p><a href="https://github.com/RobertLib/paint" rel="noopener">Source code on GitHub</a> · <a href="../image-converter/" hreflang="en" lang="en">English</a> · <a href="../cs/prevod-obrazku/" hreflang="cs" lang="cs">Čeština</a></p>
+        </div>
+        <nav aria-label="All tools">
+          <h2>All tools</h2>
+          <ul class="foot-links"><li><a href="../crop-image/">Crop image</a></li><li><a href="../resize-image/">Resize image</a></li><li><a href="../rotate-image/">Rotate image</a></li><li><a href="../compress-image/">Compress image</a></li><li><a href="../image-converter/">Image converter</a></li><li><a href="../png-to-jpg/">PNG to JPG</a></li><li><a href="../webp-to-jpg/">WebP to JPG</a></li><li><a href="../heic-to-jpg/">HEIC to JPG</a></li><li><a href="../blur-image/">Blur image</a></li><li><a href="../add-text-to-photo/">Add text</a></li><li><a href="../black-and-white-photo/">Black and white</a></li><li><a href="../invert-colors/">Invert colors</a></li><li><a href="../photo-filters/">Photo filters</a></li><li><a href="../brighten-photo/">Brighten photo</a></li><li><a href="../make-background-transparent/">Transparent background</a></li><li><a href="../color-picker-from-image/">Color picker</a></li><li><a href="../draw-on-image/">Draw on image</a></li><li><a href="../paint-online/">Paint online</a></li><li><a href="../open-psd-online/">Open PSD</a></li><li><a href="../retouch-photo/">Retouch photo</a></li></ul>
+        </nav>
+      </div>
+    </footer>
+    <script type="module" src="../js/site.js"></script>
+  </body>
+</html>

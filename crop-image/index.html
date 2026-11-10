@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Crop Image Online – Free, No Upload | Paint Studio</title>
+    <meta name="description" content="Crop an image online for free: drag the frame, pick a ratio such as 1:1, 4:3 or 16:9 and line it up with rule-of-thirds guides. Nothing is uploaded." />
+    <link rel="canonical" href="https://robertlib.github.io/paint/crop-image/" />
+    <link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/crop-image/" />
+    <link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/oriznout-obrazek/" />
+    <link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/crop-image/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Paint Studio" />
+    <meta property="og:title" content="Crop Image Online – Free, No Upload | Paint Studio" />
+    <meta property="og:description" content="Crop an image online for free: drag the frame, pick a ratio such as 1:1, 4:3 or 16:9 and line it up with rule-of-thirds guides. Nothing is uploaded." />
+    <meta property="og:url" content="https://robertlib.github.io/paint/crop-image/" />
+    <meta property="og:image" content="https://robertlib.github.io/paint/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="cs_CZ" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+    <link rel="manifest" href="../manifest.json" />
+    <meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+
+    <script>
+      // the editor's theme choice applies here too; otherwise follow the system
+      try {
+        var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
+        document.documentElement.dataset.theme =
+          (t && t.theme) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      } catch (e) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    </script>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/site.css" />
+    <link rel="modulepreload" href="../js/site.js" />
+    <link rel="modulepreload" href="../js/store.js" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/"},{"@type":"ListItem","position":2,"name":"Crop image online","item":"https://robertlib.github.io/paint/crop-image/"}]},{"@type":"WebApplication","name":"Crop image — Paint Studio","url":"https://robertlib.github.io/paint/crop-image/","description":"Crop an image online for free: drag the frame, pick a ratio such as 1:1, 4:3 or 16:9 and line it up with rule-of-thirds guides. Nothing is uploaded.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (modern web browser)","inLanguage":"en","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@id":"https://robertlib.github.io/paint/#website"}}]}</script>
+    
+  </head>
+  <body class="site">
+    <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true"><defs><symbol id="i-brush" viewBox="0 0 24 24"><path d="M9.1 11.9l8-8.1a2.85 2.85 0 0 1 4.05 4.05l-8.1 8.05"/><path d="M7.05 14.95a3 3 0 0 0-3 3c0 1.35-2.5 1.5-2 2 1.1 1.1 2.5 2 4 2a4 4 0 0 0 4-4 3 3 0 0 0-3-3z"/></symbol><symbol id="i-image" viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol><symbol id="i-crop" viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></symbol><symbol id="i-frame" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16M8 4v16M16 4v16"/></symbol><symbol id="i-rotate-cw" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v5h-5"/></symbol><symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></symbol></defs></svg>
+    
+    <header class="site-head">
+      <a class="site-brand" href="../">
+        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+        <span translate="no">Paint<em>Studio</em></span>
+      </a>
+      <nav class="site-nav" aria-label="All tools">
+        <a href="../#tools">All tools</a>
+        <span class="langs" role="group" aria-label="Language"><span class="lang is-current" aria-current="true">EN</span><a class="lang" href="../cs/oriznout-obrazek/" hreflang="cs" lang="cs">CS</a></span>
+        <a class="btn btn-primary" href="../editor/?lang=en&task=crop"><svg class="icon"><use href="#i-brush" /></svg><span>Open editor</span></a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Paint Studio</a><span aria-hidden="true">›</span><span>Crop image</span></nav>
+        <h1>Crop image online</h1>
+        <p class="lead">Drop a photo and the crop frame is already there. Drag it over the part you want to keep, lock an aspect ratio if you need one, and download the result.</p>
+        
+      <div class="drop" data-drop>
+        <svg class="icon drop-icon"><use href="#i-image" /></svg>
+        <strong class="drop-title">Drop an image here</strong>
+        <label class="btn btn-primary btn-lg"><svg class="icon"><use href="#i-folder" /></svg><span>Choose image</span>
+          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+        <p class="drop-hint">or paste with Ctrl+V · PNG, JPG, WebP, HEIC, PSD…</p>
+        
+        <p class="drop-busy" data-busy hidden>Opening the editor…</p>
+      </div>
+      <script type="application/json" id="dropConfig">{"editor":"../editor/","task":"crop","lang":"en"}</script>
+        <ul class="trust"><li><svg class="icon"><use href="#i-check" /></svg><span>Nothing is uploaded</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No sign-up</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No watermark</span></li></ul>
+      </section>
+
+      <section class="block steps">
+        <h2>How it works</h2>
+        <ol><li>Drop your image — the Crop tool opens with a frame over most of the picture.</li><li>Drag the edges, corners or the whole frame, or choose a ratio such as 1:1 or 16:9.</li><li>Press <kbd>Enter</kbd> or Apply crop, then click Export to download.</li></ol>
+      </section>
+
+      <section class="block prose">
+        <h2>Choosing the right aspect ratio</h2>
+        <p>Freeform lets you crop to any shape, which is fine for tidying up a snapshot. When the picture has a destination, lock a ratio instead. 1:1 suits profile pictures and square posts, 16:9 fits video thumbnails, slides and desktop wallpapers, and 9:16 is the vertical format of stories and phone screens. 3:2 matches most camera sensors and standard photo prints, while 4:3 and 3:4 fit tablets and many phone photos. The frame keeps its ratio while you resize it, so all you decide is what goes in.</p>
+        <h2>Composing with the rule-of-thirds guides</h2>
+        <p>The crop frame shows two horizontal and two vertical lines that split it into nine parts. Placing the main subject — an eye, a person, the horizon — on one of those lines or where two of them cross usually looks more balanced than putting it dead center. Leave a little space in the direction a person is looking or moving. If the horizon is tilted, rotate the photo a few degrees with the Transform tool first, then crop, so the same frame also cuts away the empty corners.</p>
+        <h2>Cropping to an exact area</h2>
+        <p>If you already know exactly which part you need — one product from a group shot, a single face from a crowd, a paragraph from a screenshot — draw a box around it with Rectangle select and choose Crop to selection in the Image menu. Cropping in the editor can always be undone, so experiment freely; the cut only becomes permanent in the file you export. Save photos as JPEG, and screenshots or graphics with sharp edges and text as PNG.</p>
+      </section>
+      
+      <section class="block faq">
+        <h2>Frequently asked questions</h2>
+        <h3>Does cropping reduce image quality?</h3>
+        <p>Cropping itself only removes pixels; the ones you keep are unchanged. Quality can drop slightly when you save, because JPEG and WebP are lossy formats. Export photos at a quality of 85–92, or choose PNG when you need a lossless copy.</p>
+        <h3>How do I crop a picture to a square?</h3>
+        <p>Choose 1:1 in the ratio presets of the Crop tool. The frame becomes a square that stays square while you resize it; drag it over the area you want and press Enter. Export, and the image is ready for a profile picture or a square post.</p>
+        <h3>Can I crop a photo on my phone?</h3>
+        <p>Yes. The editor works in mobile browsers: drag the corners of the frame with your finger and pinch to zoom for precise placement. The photo is processed on the phone itself and is not sent to any server.</p>
+        <h3>Can I undo a crop?</h3>
+        <p>Yes, as long as you are still in the editor. Press <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Z</kbd> to step back; the history keeps up to 60 steps. The exported file contains only the cropped area, while the original file on your device stays exactly as it was.</p>
+      </section>
+
+      <section class="block">
+        <h2>Related tools</h2>
+        <ul class="tool-grid"><li><a class="tool-card" href="../resize-image/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-frame" /></svg></span>
+          <span class="tool-text"><strong>Resize image</strong><span>Change width and height in pixels</span></span>
+        </a></li><li><a class="tool-card" href="../rotate-image/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-rotate-cw" /></svg></span>
+          <span class="tool-text"><strong>Rotate image</strong><span>Rotate 90°, flip or straighten at any angle</span></span>
+        </a></li><li><a class="tool-card" href="../compress-image/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-download" /></svg></span>
+          <span class="tool-text"><strong>Compress image</strong><span>Shrink file size with quality and scale</span></span>
+        </a></li></ul>
+      </section>
+    </main>
+    <footer class="site-foot">
+      <div class="foot-inner">
+        <div class="foot-about">
+          <a class="site-brand" href="../">
+            <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+            <span translate="no">Paint<em>Studio</em></span>
+          </a>
+          <p>Paint Studio is a free, open-source image editor under the MIT license. It runs entirely in your browser, so your images never leave your device.</p>
+          <p><a href="https://github.com/RobertLib/paint" rel="noopener">Source code on GitHub</a> · <a href="../crop-image/" hreflang="en" lang="en">English</a> · <a href="../cs/oriznout-obrazek/" hreflang="cs" lang="cs">Čeština</a></p>
+        </div>
+        <nav aria-label="All tools">
+          <h2>All tools</h2>
+          <ul class="foot-links"><li><a href="../crop-image/">Crop image</a></li><li><a href="../resize-image/">Resize image</a></li><li><a href="../rotate-image/">Rotate image</a></li><li><a href="../compress-image/">Compress image</a></li><li><a href="../image-converter/">Image converter</a></li><li><a href="../png-to-jpg/">PNG to JPG</a></li><li><a href="../webp-to-jpg/">WebP to JPG</a></li><li><a href="../heic-to-jpg/">HEIC to JPG</a></li><li><a href="../blur-image/">Blur image</a></li><li><a href="../add-text-to-photo/">Add text</a></li><li><a href="../black-and-white-photo/">Black and white</a></li><li><a href="../invert-colors/">Invert colors</a></li><li><a href="../photo-filters/">Photo filters</a></li><li><a href="../brighten-photo/">Brighten photo</a></li><li><a href="../make-background-transparent/">Transparent background</a></li><li><a href="../color-picker-from-image/">Color picker</a></li><li><a href="../draw-on-image/">Draw on image</a></li><li><a href="../paint-online/">Paint online</a></li><li><a href="../open-psd-online/">Open PSD</a></li><li><a href="../retouch-photo/">Retouch photo</a></li></ul>
+        </nav>
+      </div>
+    </footer>
+    <script type="module" src="../js/site.js"></script>
+  </body>
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Paint Online – Free Drawing App | Paint Studio</title>
+    <meta name="description" content="Paint online for free on a blank canvas: pressure-sensitive brushes, layers, shapes, gradients and text. Works on Chromebooks, tablets and phones." />
+    <link rel="canonical" href="https://robertlib.github.io/paint/paint-online/" />
+    <link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/paint-online/" />
+    <link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/malovani-online/" />
+    <link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/paint-online/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Paint Studio" />
+    <meta property="og:title" content="Paint Online – Free Drawing App | Paint Studio" />
+    <meta property="og:description" content="Paint online for free on a blank canvas: pressure-sensitive brushes, layers, shapes, gradients and text. Works on Chromebooks, tablets and phones." />
+    <meta property="og:url" content="https://robertlib.github.io/paint/paint-online/" />
+    <meta property="og:image" content="https://robertlib.github.io/paint/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="cs_CZ" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+    <link rel="manifest" href="../manifest.json" />
+    <meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+
+    <script>
+      // the editor's theme choice applies here too; otherwise follow the system
+      try {
+        var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
+        document.documentElement.dataset.theme =
+          (t && t.theme) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      } catch (e) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    </script>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/site.css" />
+    <link rel="modulepreload" href="../js/site.js" />
+    <link rel="modulepreload" href="../js/store.js" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/"},{"@type":"ListItem","position":2,"name":"Paint online","item":"https://robertlib.github.io/paint/paint-online/"}]},{"@type":"WebApplication","name":"Paint online — Paint Studio","url":"https://robertlib.github.io/paint/paint-online/","description":"Paint online for free on a blank canvas: pressure-sensitive brushes, layers, shapes, gradients and text. Works on Chromebooks, tablets and phones.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (modern web browser)","inLanguage":"en","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@id":"https://robertlib.github.io/paint/#website"}}]}</script>
+    
+  </head>
+  <body class="site">
+    <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true"><defs><symbol id="i-brush" viewBox="0 0 24 24"><path d="M9.1 11.9l8-8.1a2.85 2.85 0 0 1 4.05 4.05l-8.1 8.05"/><path d="M7.05 14.95a3 3 0 0 0-3 3c0 1.35-2.5 1.5-2 2 1.1 1.1 2.5 2 4 2a4 4 0 0 0 4-4 3 3 0 0 0-3-3z"/></symbol><symbol id="i-image" viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol><symbol id="i-text" viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><path d="M12 4v16M8.5 20h7"/></symbol><symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M11 3l1.8 4.7L17.5 9.5l-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8z"/><path d="M18.5 14.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/></symbol></defs></svg>
+    
+    <header class="site-head">
+      <a class="site-brand" href="../">
+        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+        <span translate="no">Paint<em>Studio</em></span>
+      </a>
+      <nav class="site-nav" aria-label="All tools">
+        <a href="../#tools">All tools</a>
+        <span class="langs" role="group" aria-label="Language"><span class="lang is-current" aria-current="true">EN</span><a class="lang" href="../cs/malovani-online/" hreflang="cs" lang="cs">CS</a></span>
+        <a class="btn btn-primary" href="../editor/?lang=en&task=paint"><svg class="icon"><use href="#i-brush" /></svg><span>Open editor</span></a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Paint Studio</a><span aria-hidden="true">›</span><span>Paint online</span></nav>
+        <h1>Paint online</h1>
+        <p class="lead">Open a blank canvas and start painting — no file, no account, no download. Brushes, layers, shapes and text work with a mouse, a finger or a stylus.</p>
+        
+      <div class="drop drop-blank">
+        <a class="btn btn-primary btn-lg" href="../editor/?lang=en&task=paint"><svg class="icon"><use href="#i-brush" /></svg><span>Start with a blank canvas</span></a>
+        <p class="drop-hint">or paste with Ctrl+V · PNG, JPG, WebP, HEIC, PSD…</p>
+        <label class="btn btn-ghost"><svg class="icon"><use href="#i-image" /></svg><span>Choose image</span>
+          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+      </div>
+      <script type="application/json" id="dropConfig">{"editor":"../editor/","task":"draw","lang":"en"}</script>
+        <ul class="trust"><li><svg class="icon"><use href="#i-check" /></svg><span>Nothing is uploaded</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No sign-up</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No watermark</span></li></ul>
+      </section>
+
+      <section class="block steps">
+        <h2>How it works</h2>
+        <ol><li>Open a blank white 1600 × 1000 canvas — the Brush is already selected.</li><li>Paint with brushes, Fill, Gradient and shapes; add layers as you go.</li><li>Save a .paint project to continue later, or Export as PNG.</li></ol>
+      </section>
+
+      <section class="block prose">
+        <h2>Tools for drawing and painting</h2>
+        <p>The Brush is the main tool: set its size, opacity, hardness and smoothing, and with a stylus it responds to pen pressure. The Pencil draws hard pixel lines for pixel art and outlines, the Airbrush sprays soft color that builds up, and the Eraser removes. Fill pours color into an area, with tolerance and expand settings so fills tuck neatly under anti-aliased line art. Gradient paints linear or radial blends for skies and backgrounds. Line, Rectangle, Ellipse, Polygon and Star draw clean shapes, and the Text tool adds lettering.</p>
+        <h2>Layers for cleaner artwork</h2>
+        <p>Work the way digital artists do: sketch on one layer, ink on a second and color on a third below the line art, so you can fix the colors without damaging the outlines. There is no limit on the number of layers, and 16 blend modes, such as Multiply for shading or Screen for light effects, help you build up a painting. Lock a finished layer to protect it, hide one to compare, and merge or flatten when you are done. Undo goes back up to 60 steps.</p>
+        <h2>Painting on a tablet, Chromebook or phone</h2>
+        <p>Everything runs in the browser, so Paint Studio works on school Chromebooks, iPads, Android tablets and phones as well as on computers. Pinch to zoom on a touch screen, and go up to 3200 % for detail work. Apple Pencil and other styluses give pressure-sensitive strokes where the browser supports them. It is simple enough for kids to doodle with and complete enough for adults to sketch and paint. Your work is autosaved in the browser, so an accidentally closed tab isn’t a disaster.</p>
+      </section>
+      
+      <section class="block faq">
+        <h2>Frequently asked questions</h2>
+        <h3>Do I need to download or install anything?</h3>
+        <p>No. The painting app runs in your browser as soon as the page loads. If you like, you can install it as an app from the browser menu for quick access and offline use, but that is entirely optional.</p>
+        <h3>How do I save my painting?</h3>
+        <p>Use Save project in the File menu to keep a .paint file with all layers, so you can continue later. To share the picture, click Export and choose PNG, JPEG or WebP; you can also save a layered PSD. Unsaved work is autosaved in your browser too.</p>
+        <h3>Is it suitable for kids?</h3>
+        <p>Yes. There are no ads, no accounts and no chat or sharing features, so children can draw freely. The Brush, Fill and shapes are easy to understand, and Undo fixes any mistake. On a tablet, painting with a finger or stylus feels natural.</p>
+        <h3>Can I change the canvas size?</h3>
+        <p>Yes. Choose Canvas size… in the Image menu to make the canvas bigger or smaller, with an anchor that decides where your painting sits. You can also start a new document from the File menu with your own dimensions, up to 8000 × 8000 pixels.</p>
+      </section>
+
+      <section class="block">
+        <h2>Related tools</h2>
+        <ul class="tool-grid"><li><a class="tool-card" href="../draw-on-image/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-brush" /></svg></span>
+          <span class="tool-text"><strong>Draw on image</strong><span>Arrows, shapes and freehand notes on photos</span></span>
+        </a></li><li><a class="tool-card" href="../add-text-to-photo/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-text" /></svg></span>
+          <span class="tool-text"><strong>Add text</strong><span>Captions, memes and watermarks on photos</span></span>
+        </a></li><li><a class="tool-card" href="../photo-filters/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-sparkles" /></svg></span>
+          <span class="tool-text"><strong>Photo filters</strong><span>21 effects previewed on your own photo</span></span>
+        </a></li></ul>
+      </section>
+    </main>
+    <footer class="site-foot">
+      <div class="foot-inner">
+        <div class="foot-about">
+          <a class="site-brand" href="../">
+            <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+            <span translate="no">Paint<em>Studio</em></span>
+          </a>
+          <p>Paint Studio is a free, open-source image editor under the MIT license. It runs entirely in your browser, so your images never leave your device.</p>
+          <p><a href="https://github.com/RobertLib/paint" rel="noopener">Source code on GitHub</a> · <a href="../paint-online/" hreflang="en" lang="en">English</a> · <a href="../cs/malovani-online/" hreflang="cs" lang="cs">Čeština</a></p>
+        </div>
+        <nav aria-label="All tools">
+          <h2>All tools</h2>
+          <ul class="foot-links"><li><a href="../crop-image/">Crop image</a></li><li><a href="../resize-image/">Resize image</a></li><li><a href="../rotate-image/">Rotate image</a></li><li><a href="../compress-image/">Compress image</a></li><li><a href="../image-converter/">Image converter</a></li><li><a href="../png-to-jpg/">PNG to JPG</a></li><li><a href="../webp-to-jpg/">WebP to JPG</a></li><li><a href="../heic-to-jpg/">HEIC to JPG</a></li><li><a href="../blur-image/">Blur image</a></li><li><a href="../add-text-to-photo/">Add text</a></li><li><a href="../black-and-white-photo/">Black and white</a></li><li><a href="../invert-colors/">Invert colors</a></li><li><a href="../photo-filters/">Photo filters</a></li><li><a href="../brighten-photo/">Brighten photo</a></li><li><a href="../make-background-transparent/">Transparent background</a></li><li><a href="../color-picker-from-image/">Color picker</a></li><li><a href="../draw-on-image/">Draw on image</a></li><li><a href="../paint-online/">Paint online</a></li><li><a href="../open-psd-online/">Open PSD</a></li><li><a href="../retouch-photo/">Retouch photo</a></li></ul>
+        </nav>
+      </div>
+    </footer>
+    <script type="module" src="../js/site.js"></script>
+  </body>
+</html>

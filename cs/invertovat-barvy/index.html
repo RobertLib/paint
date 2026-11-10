@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="cs">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Invertovat barvy obrázku – negativ online | Paint Studio</title>
+    <meta name="description" content="Invertujte barvy fotky či obrázku a vytvořte negativ jedním kliknutím. Hodí se na naskenované negativy, tmavé snímky obrazovky i efekt rentgenu. Zdarma." />
+    <link rel="canonical" href="https://robertlib.github.io/paint/cs/invertovat-barvy/" />
+    <link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/invert-colors/" />
+    <link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/invertovat-barvy/" />
+    <link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/invert-colors/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Paint Studio" />
+    <meta property="og:title" content="Invertovat barvy obrázku – negativ online | Paint Studio" />
+    <meta property="og:description" content="Invertujte barvy fotky či obrázku a vytvořte negativ jedním kliknutím. Hodí se na naskenované negativy, tmavé snímky obrazovky i efekt rentgenu. Zdarma." />
+    <meta property="og:url" content="https://robertlib.github.io/paint/cs/invertovat-barvy/" />
+    <meta property="og:image" content="https://robertlib.github.io/paint/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="cs_CZ" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" type="image/svg+xml" href="../../favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="../../favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../../apple-touch-icon.png" />
+    <link rel="manifest" href="../../manifest.json" />
+    <meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+
+    <script>
+      // the editor's theme choice applies here too; otherwise follow the system
+      try {
+        var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
+        document.documentElement.dataset.theme =
+          (t && t.theme) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      } catch (e) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    </script>
+    <link rel="stylesheet" href="../../css/tokens.css" />
+    <link rel="stylesheet" href="../../css/site.css" />
+    <link rel="modulepreload" href="../../js/site.js" />
+    <link rel="modulepreload" href="../../js/store.js" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/cs/"},{"@type":"ListItem","position":2,"name":"Invertovat barvy obrázku","item":"https://robertlib.github.io/paint/cs/invertovat-barvy/"}]},{"@type":"WebApplication","name":"Invertovat barvy — Paint Studio","url":"https://robertlib.github.io/paint/cs/invertovat-barvy/","description":"Invertujte barvy fotky či obrázku a vytvořte negativ jedním kliknutím. Hodí se na naskenované negativy, tmavé snímky obrazovky i efekt rentgenu. Zdarma.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (modern web browser)","inLanguage":"cs","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@id":"https://robertlib.github.io/paint/#website"}}]}</script>
+    
+  </head>
+  <body class="site">
+    <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true"><defs><symbol id="i-brush" viewBox="0 0 24 24"><path d="M9.1 11.9l8-8.1a2.85 2.85 0 0 1 4.05 4.05l-8.1 8.05"/><path d="M7.05 14.95a3 3 0 0 0-3 3c0 1.35-2.5 1.5-2 2 1.1 1.1 2.5 2 4 2a4 4 0 0 0 4-4 3 3 0 0 0-3-3z"/></symbol><symbol id="i-image" viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol><symbol id="i-swap" viewBox="0 0 24 24"><path d="M16 3l4 4-4 4M20 7H9M8 21l-4-4 4-4M4 17h11"/></symbol><symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M11 3l1.8 4.7L17.5 9.5l-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8z"/><path d="M18.5 14.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/></symbol></defs></svg>
+    
+    <header class="site-head">
+      <a class="site-brand" href="../../cs/">
+        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+        <span translate="no">Paint<em>Studio</em></span>
+      </a>
+      <nav class="site-nav" aria-label="Všechny nástroje">
+        <a href="../../cs/#tools">Všechny nástroje</a>
+        <span class="langs" role="group" aria-label="Jazyk"><a class="lang" href="../../invert-colors/" hreflang="en" lang="en">EN</a><span class="lang is-current" aria-current="true">CS</span></span>
+        <a class="btn btn-primary" href="../../editor/?lang=cs&task=invert"><svg class="icon"><use href="#i-brush" /></svg><span>Otevřít editor</span></a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../../cs/">Paint Studio</a><span aria-hidden="true">›</span><span>Invertovat barvy</span></nav>
+        <h1>Invertovat barvy obrázku</h1>
+        <p class="lead">Po otevření se na obrázek rovnou použije filtr Inverze: světlá místa ztmavnou, tmavá zesvětlí a každá barva se změní na doplňkovou. Průhlednost zůstává zachovaná.</p>
+        
+      <div class="drop" data-drop>
+        <svg class="icon drop-icon"><use href="#i-image" /></svg>
+        <strong class="drop-title">Přetáhněte sem obrázek</strong>
+        <label class="btn btn-primary btn-lg"><svg class="icon"><use href="#i-folder" /></svg><span>Vybrat obrázek</span>
+          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+        <p class="drop-hint">nebo ho vložte ze schránky (Ctrl+V) · PNG, JPG, WebP, HEIC, PSD…</p>
+        
+        <p class="drop-busy" data-busy hidden>Editor se otevírá…</p>
+      </div>
+      <script type="application/json" id="dropConfig">{"editor":"../../editor/","task":"invert","lang":"cs"}</script>
+        <ul class="trust"><li><svg class="icon"><use href="#i-check" /></svg><span>Nic se nenahrává</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>Bez registrace</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>Bez vodoznaku</span></li></ul>
+      </section>
+
+      <section class="block steps">
+        <h2>Jak na to</h2>
+        <ol><li>Přetáhněte obrázek sem, nebo ho vyberte z disku.</li><li>Filtr Inverze se použije automaticky, s doladěním pomůže dialog Úrovně… v nabídce Korekce.</li><li>Klikněte na Exportovat a invertovaný obrázek stáhněte.</li></ol>
+      </section>
+
+      <section class="block prose">
+        <h2>Naskenovaný negativ zpět na fotku</h2>
+        <p>Máte-li naskenované nebo vyfocené černobílé negativy, inverze z nich udělá pozitiv. U barevných negativů je situace složitější: oranžový podklad filmu se po inverzi změní v modrý nádech. Ten zmírníte v dialogu Úrovně…, kde pro každý kanál RGB zvlášť posunete černý a bílý bod k okrajům histogramu, případně posuvníkem teploty v panelu Korekce. Výsledek nebude jako z fotolaboratoře, na digitalizaci rodinného archivu ale často stačí.</p>
+        <h2>Tmavé snímky obrazovky a efekt rentgenu</h2>
+        <p>Inverze se hodí i k rychlému převedení snímku obrazovky z tmavého režimu na světlý, třeba když ho chcete vytisknout a nespotřebovat přitom celý toner. Barevné prvky se ale změní na doplňkové barvy, takže logo nebo zvýraznění budou mít jiný odstín. Na portrétu nebo květině vytvoří inverze tajemný efekt připomínající rentgenový snímek; zkombinujte ji s filtrem Odstíny šedi a dostanete klasický černobílý negativ jako ze staré filmové role.</p>
+        <h2>Inverze jen části obrázku</h2>
+        <p>Filtr pracuje uvnitř výběru, pokud nějaký existuje. Automatickou inverzi po otevření tedy vraťte krokem zpět, označte oblast nástrojem Obdélníkový výběr nebo Laso a v panelu Filtry klikněte na filtr Inverze. Takto převedete třeba jen tmavý panel ve snímku obrazovky nebo jedno okno aplikace a zbytek necháte, jak je. Pro jemný přechod mezi invertovanou a původní částí změkčete okraj výběru ještě před použitím filtru.</p>
+      </section>
+      
+      <section class="block faq">
+        <h2>Časté dotazy</h2>
+        <h3>Co přesně dělá inverze barev?</h3>
+        <p>Každou barvu nahradí jejím protějškem: černou bílou, bílou černou, červenou azurovou, modrou žlutou a zelenou purpurovou. Vznikne tak negativ obrázku. Druhá inverze vrátí obraz přesně do původní podoby.</p>
+        <h3>Zůstane průhledné pozadí zachované?</h3>
+        <p>Ano. Inverze mění jen barvy, průhlednost pixelů nechává beze změny. Logo s průhledným pozadím proto po inverzi zůstane bez pozadí, pokud ho uložíte jako PNG nebo WebP. JPEG by průhledná místa vyplnil bílou.</p>
+        <h3>Jak z negativu udělat fotku?</h3>
+        <p>Negativ naskenujte, nebo ho vyfoťte na rovnoměrně prosvětlené ploše, třeba na displeji tabletu s bílou obrazovkou, a přetáhněte sem. Inverze proběhne automaticky. Barevný nádech dorovnejte v dialogu Úrovně… po jednotlivých kanálech a okraje filmu odstraňte nástrojem Oříznutí.</p>
+      </section>
+
+      <section class="block">
+        <h2>Související nástroje</h2>
+        <ul class="tool-grid"><li><a class="tool-card" href="../../cs/cernobila-fotka/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-image" /></svg></span>
+          <span class="tool-text"><strong>Černobílá fotka</strong><span>Odstíny šedi, Noir a Sépie jedním kliknutím</span></span>
+        </a></li><li><a class="tool-card" href="../../cs/filtry-na-fotky/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-sparkles" /></svg></span>
+          <span class="tool-text"><strong>Filtry na fotky</strong><span>21 filtrů s náhledem přímo z vaší fotky</span></span>
+        </a></li><li><a class="tool-card" href="../../cs/prevod-obrazku/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-swap" /></svg></span>
+          <span class="tool-text"><strong>Převod formátů</strong><span>PNG, JPG, WebP a PSD z HEIC, AVIF, GIF, SVG i BMP</span></span>
+        </a></li></ul>
+      </section>
+    </main>
+    <footer class="site-foot">
+      <div class="foot-inner">
+        <div class="foot-about">
+          <a class="site-brand" href="../../cs/">
+            <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+            <span translate="no">Paint<em>Studio</em></span>
+          </a>
+          <p>Paint Studio je zdarma a má otevřený zdrojový kód pod licencí MIT. Všechno běží přímo ve vašem prohlížeči, obrázky nikam neodcházejí.</p>
+          <p><a href="https://github.com/RobertLib/paint" rel="noopener">Zdrojový kód na GitHubu</a> · <a href="../../invert-colors/" hreflang="en" lang="en">English</a> · <a href="../../cs/invertovat-barvy/" hreflang="cs" lang="cs">Čeština</a></p>
+        </div>
+        <nav aria-label="Všechny nástroje">
+          <h2>Všechny nástroje</h2>
+          <ul class="foot-links"><li><a href="../../cs/oriznout-obrazek/">Oříznout fotku</a></li><li><a href="../../cs/zmenit-velikost-obrazku/">Změnit velikost</a></li><li><a href="../../cs/otocit-obrazek/">Otočit obrázek</a></li><li><a href="../../cs/zmensit-velikost-fotky/">Zmenšit velikost fotky</a></li><li><a href="../../cs/prevod-obrazku/">Převod formátů</a></li><li><a href="../../cs/png-na-jpg/">PNG na JPG</a></li><li><a href="../../cs/webp-na-jpg/">WebP na JPG</a></li><li><a href="../../cs/heic-na-jpg/">HEIC na JPG</a></li><li><a href="../../cs/rozmazat-fotku/">Rozmazat fotku</a></li><li><a href="../../cs/pridat-text-do-fotky/">Text do fotky</a></li><li><a href="../../cs/cernobila-fotka/">Černobílá fotka</a></li><li><a href="../../cs/invertovat-barvy/">Invertovat barvy</a></li><li><a href="../../cs/filtry-na-fotky/">Filtry na fotky</a></li><li><a href="../../cs/zesvetlit-fotku/">Zesvětlit fotku</a></li><li><a href="../../cs/pruhledne-pozadi/">Průhledné pozadí</a></li><li><a href="../../cs/zjistit-barvu-z-obrazku/">Barva z obrázku</a></li><li><a href="../../cs/kresleni-do-fotky/">Kreslení do fotky</a></li><li><a href="../../cs/malovani-online/">Malování online</a></li><li><a href="../../cs/otevrit-psd/">Otevřít PSD</a></li><li><a href="../../cs/retus-fotky/">Retuš fotky</a></li></ul>
+        </nav>
+      </div>
+    </footer>
+    <script type="module" src="../../js/site.js"></script>
+  </body>
+</html>

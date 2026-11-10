@@ -1,15 +1,18 @@
 /* Paint Studio service worker — network-first with an offline fallback cache.
    Bump CACHE when the app shell changes so old entries are dropped. */
 
-const CACHE = "paint-studio-v2";
+const CACHE = "paint-studio-v3";
 
 const SHELL = [
   "./",
-  "./index.html",
+  "./editor/",
   "./css/tokens.css",
   "./css/layout.css",
   "./css/components.css",
+  "./css/site.css",
   "./js/main.js",
+  "./js/i18n.js",
+  "./js/lang/cs.js",
   "./js/state.js",
   "./js/doc.js",
   "./js/color.js",
@@ -21,6 +24,14 @@ const SHELL = [
   "./js/actions.js",
   "./js/ui.js",
   "./js/menus.js",
+  "./js/tone.js",
+  "./js/tasks.js",
+  "./js/store.js",
+  "./js/autosave.js",
+  "./js/track.js",
+  "./js/psd.js",
+  "./js/heic.js",
+  "./js/site.js",
   "./manifest.json",
   "./favicon.svg",
 ];
@@ -54,18 +65,21 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(request)
       .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
+        }
         return response;
       })
       .catch(() =>
-        caches
-          .match(request)
-          .then(
-            (hit) =>
-              hit ||
-              (request.mode === "navigate" ? caches.match("./index.html") : undefined)
-          )
+        // query strings (?task=…, ?lang=…) must not stop the shell loading offline
+        caches.match(request, { ignoreSearch: request.mode === "navigate" }).then(
+          (hit) =>
+            hit ||
+            (request.mode === "navigate"
+              ? caches.match(new URL("./editor/", self.registration.scope).href)
+              : undefined)
+        )
       )
   );
 });

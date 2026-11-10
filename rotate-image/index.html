@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Rotate Image Online – Flip or Straighten | Paint Studio</title>
+    <meta name="description" content="Rotate an image online by 90° or 180°, flip it horizontally or vertically, or straighten a crooked horizon by any angle. Free, in your browser, no upload." />
+    <link rel="canonical" href="https://robertlib.github.io/paint/rotate-image/" />
+    <link rel="alternate" hreflang="en" href="https://robertlib.github.io/paint/rotate-image/" />
+    <link rel="alternate" hreflang="cs" href="https://robertlib.github.io/paint/cs/otocit-obrazek/" />
+    <link rel="alternate" hreflang="x-default" href="https://robertlib.github.io/paint/rotate-image/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Paint Studio" />
+    <meta property="og:title" content="Rotate Image Online – Flip or Straighten | Paint Studio" />
+    <meta property="og:description" content="Rotate an image online by 90° or 180°, flip it horizontally or vertically, or straighten a crooked horizon by any angle. Free, in your browser, no upload." />
+    <meta property="og:url" content="https://robertlib.github.io/paint/rotate-image/" />
+    <meta property="og:image" content="https://robertlib.github.io/paint/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="cs_CZ" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+    <link rel="manifest" href="../manifest.json" />
+    <meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+
+    <script>
+      // the editor's theme choice applies here too; otherwise follow the system
+      try {
+        var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
+        document.documentElement.dataset.theme =
+          (t && t.theme) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      } catch (e) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    </script>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/site.css" />
+    <link rel="modulepreload" href="../js/site.js" />
+    <link rel="modulepreload" href="../js/store.js" />
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Paint Studio","item":"https://robertlib.github.io/paint/"},{"@type":"ListItem","position":2,"name":"Rotate image online","item":"https://robertlib.github.io/paint/rotate-image/"}]},{"@type":"WebApplication","name":"Rotate image — Paint Studio","url":"https://robertlib.github.io/paint/rotate-image/","description":"Rotate an image online by 90° or 180°, flip it horizontally or vertically, or straighten a crooked horizon by any angle. Free, in your browser, no upload.","applicationCategory":"MultimediaApplication","operatingSystem":"Any (modern web browser)","inLanguage":"en","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"isPartOf":{"@id":"https://robertlib.github.io/paint/#website"}}]}</script>
+    
+  </head>
+  <body class="site">
+    <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true"><defs><symbol id="i-brush" viewBox="0 0 24 24"><path d="M9.1 11.9l8-8.1a2.85 2.85 0 0 1 4.05 4.05l-8.1 8.05"/><path d="M7.05 14.95a3 3 0 0 0-3 3c0 1.35-2.5 1.5-2 2 1.1 1.1 2.5 2 4 2a4 4 0 0 0 4-4 3 3 0 0 0-3-3z"/></symbol><symbol id="i-image" viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol><symbol id="i-rotate-cw" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v5h-5"/></symbol><symbol id="i-crop" viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></symbol><symbol id="i-frame" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16M8 4v16M16 4v16"/></symbol><symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M11 3l1.8 4.7L17.5 9.5l-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8z"/><path d="M18.5 14.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/></symbol></defs></svg>
+    
+    <header class="site-head">
+      <a class="site-brand" href="../">
+        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+        <span translate="no">Paint<em>Studio</em></span>
+      </a>
+      <nav class="site-nav" aria-label="All tools">
+        <a href="../#tools">All tools</a>
+        <span class="langs" role="group" aria-label="Language"><span class="lang is-current" aria-current="true">EN</span><a class="lang" href="../cs/otocit-obrazek/" hreflang="cs" lang="cs">CS</a></span>
+        <a class="btn btn-primary" href="../editor/?lang=en&task=rotate"><svg class="icon"><use href="#i-brush" /></svg><span>Open editor</span></a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Paint Studio</a><span aria-hidden="true">›</span><span>Rotate image</span></nav>
+        <h1>Rotate image online</h1>
+        <p class="lead">Turn a sideways photo upright, mirror a selfie or straighten a tilted horizon. The buttons for all of it are waiting in the task bar when your picture opens.</p>
+        
+      <div class="drop" data-drop>
+        <svg class="icon drop-icon"><use href="#i-image" /></svg>
+        <strong class="drop-title">Drop an image here</strong>
+        <label class="btn btn-primary btn-lg"><svg class="icon"><use href="#i-folder" /></svg><span>Choose image</span>
+          <input type="file" accept="image/*,.heic,.heif,.psd" hidden data-file /></label>
+        <p class="drop-hint">or paste with Ctrl+V · PNG, JPG, WebP, HEIC, PSD…</p>
+        
+        <p class="drop-busy" data-busy hidden>Opening the editor…</p>
+      </div>
+      <script type="application/json" id="dropConfig">{"editor":"../editor/","task":"rotate","lang":"en"}</script>
+        <ul class="trust"><li><svg class="icon"><use href="#i-check" /></svg><span>Nothing is uploaded</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No sign-up</span></li><li><svg class="icon"><use href="#i-check" /></svg><span>No watermark</span></li></ul>
+      </section>
+
+      <section class="block steps">
+        <h2>How it works</h2>
+        <ol><li>Drop your image — rotate and flip buttons appear in the task bar.</li><li>Rotate 90° left or right, flip it, or use Free rotate for any angle.</li><li>Press <kbd>Enter</kbd> to apply a free rotation, then Export the result.</li></ol>
+      </section>
+
+      <section class="block prose">
+        <h2>Rotating by 90° and flipping</h2>
+        <p>Rotate 90° left and rotate 90° right turn the whole image, so a portrait photo becomes landscape and its width and height swap. Click twice for 180°, which fixes pictures taken upside down. Flip horizontal mirrors the image left to right — useful when a selfie comes out mirrored or text in a photo reads backwards. Flip vertical turns it upside down as a reflection. Right-angle rotations and flips only move pixels without recalculating them, and the same commands are also in the Image menu.</p>
+        <h2>Straightening a crooked horizon</h2>
+        <p>Click Free rotate to switch to the Transform tool. Drag outside the box to rotate by any angle, and watch a line that should be straight — the horizon, a doorframe, the edge of a building — until it is level. Hold <kbd>Shift</kbd> to snap to 15° steps when you need exactly 15°, 30° or 45°. Press Enter to apply. Rotating by an odd angle leaves empty corners, so finish with the Crop tool and place the frame inside them.</p>
+        <h2>Saving the rotated picture</h2>
+        <p>Export in the format you started with: JPEG for photos, PNG for screenshots, scans and graphics. If you straightened a photo and some corners are still empty, JPEG fills them with white, so crop them away first, or export as PNG to keep them transparent. The Export dialog shows the expected file size before you click Download, and the quality slider lets you balance size against sharpness for JPEG and WebP files.</p>
+      </section>
+      
+      <section class="block faq">
+        <h2>Frequently asked questions</h2>
+        <h3>Why does my photo appear sideways?</h3>
+        <p>Phones and cameras often store a photo in one orientation and add a note saying how it should be turned. Some apps ignore that note, so the picture shows up sideways. If it looks wrong in Paint Studio too, rotate it 90° in the right direction and export — the saved file is upright everywhere.</p>
+        <h3>Can I rotate an image by a custom angle, like 5°?</h3>
+        <p>Yes. Use Free rotate and drag outside the transform box until the picture looks right; any angle works. Hold Shift to snap to 15° steps. After pressing Enter, crop away the empty corners that appear around a tilted image.</p>
+        <h3>What is the difference between rotating and flipping?</h3>
+        <p>Rotating turns the picture around its center, like turning a printed photo on a table. Flipping mirrors it, as if you held it up to a mirror: left and right (or top and bottom) swap, and any text in it reads backwards.</p>
+        <h3>Does rotating reduce image quality?</h3>
+        <p>Rotating by 90° or 180° and flipping move pixels without changing them. Any other angle has to recalculate pixels, which softens very fine detail slightly, so rotate once to the final angle instead of in several small steps.</p>
+      </section>
+
+      <section class="block">
+        <h2>Related tools</h2>
+        <ul class="tool-grid"><li><a class="tool-card" href="../crop-image/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-crop" /></svg></span>
+          <span class="tool-text"><strong>Crop image</strong><span>Cut out the part you want, with ratio presets</span></span>
+        </a></li><li><a class="tool-card" href="../resize-image/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-frame" /></svg></span>
+          <span class="tool-text"><strong>Resize image</strong><span>Change width and height in pixels</span></span>
+        </a></li><li><a class="tool-card" href="../photo-filters/">
+          <span class="tool-icon"><svg class="icon"><use href="#i-sparkles" /></svg></span>
+          <span class="tool-text"><strong>Photo filters</strong><span>21 effects previewed on your own photo</span></span>
+        </a></li></ul>
+      </section>
+    </main>
+    <footer class="site-foot">
+      <div class="foot-inner">
+        <div class="foot-about">
+          <a class="site-brand" href="../">
+            <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-brush" /></svg></span>
+            <span translate="no">Paint<em>Studio</em></span>
+          </a>
+          <p>Paint Studio is a free, open-source image editor under the MIT license. It runs entirely in your browser, so your images never leave your device.</p>
+          <p><a href="https://github.com/RobertLib/paint" rel="noopener">Source code on GitHub</a> · <a href="../rotate-image/" hreflang="en" lang="en">English</a> · <a href="../cs/otocit-obrazek/" hreflang="cs" lang="cs">Čeština</a></p>
+        </div>
+        <nav aria-label="All tools">
+          <h2>All tools</h2>
+          <ul class="foot-links"><li><a href="../crop-image/">Crop image</a></li><li><a href="../resize-image/">Resize image</a></li><li><a href="../rotate-image/">Rotate image</a></li><li><a href="../compress-image/">Compress image</a></li><li><a href="../image-converter/">Image converter</a></li><li><a href="../png-to-jpg/">PNG to JPG</a></li><li><a href="../webp-to-jpg/">WebP to JPG</a></li><li><a href="../heic-to-jpg/">HEIC to JPG</a></li><li><a href="../blur-image/">Blur image</a></li><li><a href="../add-text-to-photo/">Add text</a></li><li><a href="../black-and-white-photo/">Black and white</a></li><li><a href="../invert-colors/">Invert colors</a></li><li><a href="../photo-filters/">Photo filters</a></li><li><a href="../brighten-photo/">Brighten photo</a></li><li><a href="../make-background-transparent/">Transparent background</a></li><li><a href="../color-picker-from-image/">Color picker</a></li><li><a href="../draw-on-image/">Draw on image</a></li><li><a href="../paint-online/">Paint online</a></li><li><a href="../open-psd-online/">Open PSD</a></li><li><a href="../retouch-photo/">Retouch photo</a></li></ul>
+        </nav>
+      </div>
+    </footer>
+    <script type="module" src="../js/site.js"></script>
+  </body>
+</html>
