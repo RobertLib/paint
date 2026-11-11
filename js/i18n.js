@@ -73,6 +73,41 @@ export function tn(n, one, other, vars) {
   return fill(n === 1 ? one : other, vars);
 }
 
+/* --------------------------------- numbers -------------------------------- */
+
+const numberFormats = new Map();
+
+/**
+ * A number written the way the UI language writes it: "1.5" in English,
+ * "1,5" in Czech. `options` are Intl.NumberFormat options. Pixel sizes and
+ * other plain integers need no formatting (and must not get grouping).
+ */
+export function formatNumber(n, options = {}) {
+  const key = JSON.stringify(options);
+  let format = numberFormats.get(key);
+  if (!format) {
+    try {
+      format = new Intl.NumberFormat(lang, options);
+    } catch {
+      format = new Intl.NumberFormat("en", options);
+    }
+    numberFormats.set(key, format);
+  }
+  return format.format(n);
+}
+
+/**
+ * A fraction (0.5) as a percentage in the UI language: "50%" in English,
+ * "50 %" in Czech — the same style the dictionary uses. `digits` decimals.
+ */
+export function formatPercent(fraction, digits = 0) {
+  return formatNumber(fraction, {
+    style: "percent",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
 /** Remember a language choice; the caller reloads so every table rebuilds. */
 export function saveLang(code) {
   try {

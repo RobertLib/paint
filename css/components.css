@@ -182,7 +182,12 @@
   font-size: 8px;
   font-weight: 700;
   line-height: 1;
-  opacity: 0.5;
+  opacity: 0.8;
+}
+
+/* white on the accent fill keeps 4.5:1 only at full strength */
+.tool-btn.is-active kbd {
+  opacity: 1;
 }
 
 /* ------------------------- inputs, sliders, selects ---------------------- */
@@ -480,11 +485,35 @@ input[type="radio"]:checked::after {
 
 /* ------------------------------ color panel ------------------------------ */
 
+/* scrolls inside when the column is short (layout.css .color-panel); the
+   top padding keeps the chips' focus ring inside the scroller */
 .color-body {
   display: flex;
   flex-direction: column;
+  flex: 0 1 auto;
   gap: 9px;
-  padding: 0 12px 12px;
+  min-height: 0;
+  padding: 4px 12px 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.color-body > * {
+  flex: none;
+}
+
+/* collapsed: only the two colour chips (and swap / reset) stay */
+.color-panel.is-collapsed .color-body > :not(.color-chips) {
+  display: none;
+}
+
+.color-collapse .icon {
+  transition: transform var(--t-fast);
+}
+
+.color-panel.is-collapsed .color-collapse .icon {
+  transform: rotate(-90deg);
 }
 
 .color-chips {
@@ -832,14 +861,22 @@ input[type="radio"]:checked::after {
 .layer-info {
   flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
+}
+
+/* two lines that end in an ellipsis: a long name must not run under the
+   eye and lock buttons (inline spans ignore text-overflow) */
+.layer-name,
+.layer-sub {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .layer-name {
   font-size: 12px;
   font-weight: 550;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .layer-name-input {
@@ -853,6 +890,11 @@ input[type="radio"]:checked::after {
   font-size: 10px;
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
+}
+
+/* on the accent-tinted active row --text-3 drops under 4.5:1 */
+.layer-item.is-active .layer-sub {
+  color: var(--text-2);
 }
 
 .layer-actions {
@@ -1369,6 +1411,12 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
+/* white on the accent fill: the dimmed keys would drop under 4.5:1 */
+.menu-item:hover:not(:disabled) .keys,
+.menu-item:focus-visible .keys {
+  opacity: 1;
+}
+
 .menu-divider {
   height: 1px;
   margin: 4px 6px;
@@ -1561,6 +1609,12 @@ kbd {
   resize: none;
 }
 
+/* the generic textarea:focus well would cover the picture being typed on */
+.text-editor:focus {
+  background: transparent;
+  border-radius: 0;
+}
+
 /* transform / crop handles */
 .handle {
   position: absolute;
@@ -1714,9 +1768,15 @@ kbd {
     display: none;
   }
 
+  /* the readout (swatch, HEX and RGB) takes the first line beside the close
+     button, the actions scroll along the second */
+  .taskbar.is-live {
+    flex-wrap: wrap;
+  }
+
   .taskbar.is-live .taskbar-text {
     display: block;
-    flex: 0 1 auto;
+    flex: 1 1 calc(100% - 40px);
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1724,18 +1784,22 @@ kbd {
     font-size: 12px;
   }
 
-  .taskbar.is-live .taskbar-text.is-readout {
-    flex: none;
+  .taskbar.is-live [data-task-close] {
+    order: 1;
   }
 
-  .taskbar-rgb {
-    display: none;
+  .taskbar.is-live .taskbar-actions {
+    order: 2;
+    flex-basis: 100%;
   }
 
+  /* room for the buttons' focus ring inside the scroller */
   .taskbar-actions {
     flex: 1 1 auto;
     flex-wrap: nowrap;
     min-width: 0;
+    margin: -4px;
+    padding: 4px;
     overflow-x: auto;
     scrollbar-width: none;
   }
@@ -1919,4 +1983,50 @@ kbd {
   .select {
     background-position: calc(100% - 13px) 15px, calc(100% - 9px) 15px;
   }
+}
+
+/* ============================ short windows ============================== */
+/* A 1366 × 768 laptop, a phone held sideways: a smaller colour field and
+   tighter layer rows leave the Layers / Adjust / Filters panel its room
+   (layout.css lets the colour panel shrink and scroll). */
+
+@media (max-height: 820px) {
+  .sv-field {
+    height: 96px;
+  }
+
+  .color-body {
+    gap: 7px;
+  }
+}
+
+@media (max-height: 600px) {
+  .sv-field {
+    height: 72px;
+  }
+
+  .layer-props {
+    gap: 4px;
+    padding: 6px 12px;
+  }
+
+  .layer-list {
+    min-height: 52px;
+  }
+
+  .layer-toolbar {
+    padding: 3px 8px;
+  }
+
+  /* the hints under Adjust and Filters give way to the controls */
+  .tab-panel .panel-hint {
+    display: none;
+  }
+}
+
+/* ============================ form validation ============================ */
+
+input[aria-invalid="true"],
+input[aria-invalid="true"]:focus {
+  border-color: var(--danger);
 }

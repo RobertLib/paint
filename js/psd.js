@@ -5,17 +5,18 @@
    grayscale; raw, RLE (PackBits) and ZIP channels (with or without
    prediction); pixel layers with names (including Unicode), opacity and fill
    opacity, visibility, blend modes, user masks (including "hide all" masks,
-   density and feather) and clipping masks, which are baked into the clipped
-   layers' pixels. Groups are flattened into a plain stack (a hidden group
-   hides its children; a group's opacity and mask carry over to them). Text,
-   shape and smart-object layers arrive as the pixels Photoshop stored for
-   them; adjustment layers have no pixels and are left out (`doc.psdSkipped`
-   counts them). 32-bit documents (linear light) are converted to 8-bit
-   sRGB. A document larger than `maxDim` is scaled down while it is decoded,
-   a band of rows at a time, so the full-size image is never held in memory.
-   When the layer data cannot be used (damaged, or more canvases than the
-   browser grants), the flattened composite is used instead
-   (`doc.psdFlattened`).
+   density and feather), vector masks as Photoshop rendered them, and
+   clipping masks, which are baked into the clipped layers' pixels. Groups
+   are flattened into a plain stack (a hidden group hides its children; a
+   group's opacity and mask carry over to them). Text, shape and
+   smart-object layers arrive as the pixels Photoshop stored for them;
+   adjustment layers have no pixels and are left out (`doc.psdSkipped`
+   counts them — with nothing else, the composite shows their effect).
+   32-bit documents (linear light) are converted to 8-bit sRGB. A document
+   larger than `maxDim` is scaled down while it is decoded, a band of rows
+   at a time, so the full-size image is never held in memory. When the
+   layer data cannot be used (damaged, or more canvases than the browser
+   grants), the flattened composite is used instead (`doc.psdFlattened`).
 
    Writing produces an 8-bit RGB PSD with one RLE-compressed layer per layer,
    masks included, plus a flattened composite for apps that only read that.
@@ -89,8 +90,12 @@ const ADJUSTMENT_KEYS = new Set([
   "brit", "levl", "curv", "expA", "vibA", "hue ", "hue2", "blnc", "blwh",
   "phfl", "mixr", "clrL", "nvrt", "post", "thrs", "grdm", "selc", "CgEd",
 ]);
-/** Fill layers: Photoshop usually stores their pixels, but not always. */
-const FILL_KEYS = new Set(["SoCo", "GdFl", "PtFl"]);
+/**
+ * Fill and shape layers (solid colour, gradient, pattern, and the content of
+ * a shape with a stroke): Photoshop usually stores their pixels, but not
+ * always. Their stored pixels already have the shape of their vector mask.
+ */
+const FILL_KEYS = new Set(["SoCo", "GdFl", "PtFl", "vscg"]);
 
 /** Rows decoded and handed to the canvas at a time (bounds memory use). */
 const BAND_PIXELS = 1 << 22;
@@ -214,6 +219,79 @@ function decodeLatin(s) {
 
 /* ------------------------------ structure ------------------------------ */
 
+/** A mask rectangle with sane values (not bytes of something else). */
+const saneRect = (m) =>
+  m.bottom >= m.top &&
+  m.right >= m.left &&
+  m.bottom - m.top <= MAX_LAYER_EDGE &&
+  m.right - m.left <= MAX_LAYER_EDGE &&
+  Math.abs(m.top) <= MAX_LAYER_EDGE * 4 &&
+  Math.abs(m.left) <= MAX_LAYER_EDGE * 4;
+
+/**
+ * The rest of a layer's mask record after its flags: the "real" mask (only
+ * with a channel −3 for it) and then the mask parameters (with flag bit 4) —
+ * the order Photoshop writes, which ag-psd and psd-tools read; the
+ * specification lists the parameters first. Should the real mask not make
+ * sense in that order, the specification's order is tried, so a misread
+ * record never yields a mask from stray bytes (or makes every layer
+ * unreadable).
+ */
+function readMaskExtras(r, mask, maskEnd, hasReal) {
+  const afterFlags = r.pos;
+  const readParams = () => {
+    const out = { density: 1, feather: 0 };
+    if (!(mask.flags & 16) || r.pos >= maskEnd) return out;
+    const params = r.u8();
+    const size = (params & 1) + (params & 2 ? 8 : 0) + (params & 4 ? 1 : 0) + (params & 8 ? 8 : 0);
+    if (r.pos + size > maskEnd) return null;
+    let user = null;
+    let vector = null;
+    if (params & 1) user = r.u8() / 255;
+    if (params & 2) {
+      const feather = r.f64();
+      out.feather = feather > 0 ? Math.min(feather, 1000) : 0; // NaN → 0
+    }
+    if (params & 4) vector = r.u8() / 255;
+    if (params & 8) r.f64(); // the vector mask's feather: part of its rendering
+    // (as psd-tools: the vector mask's density when there is no user one)
+    out.density = user ?? vector ?? 1;
+    return out;
+  };
+  const readReal = () => {
+    if (r.pos + 18 > maskEnd) return null;
+    const real = {
+      flags: r.u8(),
+      defaultColor: r.u8(),
+      top: r.i32(),
+      left: r.i32(),
+      bottom: r.i32(),
+      right: r.i32(),
+    };
+    const sane = !(real.flags & ~31) && (real.defaultColor === 0 || real.defaultColor === 255) && saneRect(real);
+    return sane ? real : null;
+  };
+  let params;
+  let real = null;
+  if (hasReal && maskEnd - r.pos >= 18) {
+    real = readReal();
+    params = readParams();
+    if (!real) {
+      r.pos = afterFlags;
+      params = readParams();
+      real = readReal();
+      if (!real) params = null;
+    }
+  } else {
+    params = readParams();
+  }
+  mask.real = real;
+  if (params) {
+    mask.density = params.density;
+    mask.feather = params.feather;
+  }
+}
+
 function readLayerRecord(r, end) {
   const top = r.i32();
   const left = r.i32();
@@ -231,9 +309,9 @@ function readLayerRecord(r, end) {
   r.u8(); // filler
   const extraEnd = r.block(end);
 
-  // Layer mask data. With both a user mask and a vector mask, the first
-  // rectangle describes the combined (rendered) mask in channel −2 and the
-  // "real" fields the user's own pixel mask in channel −3.
+  // Layer mask data: the rectangle, default colour and flags of the mask in
+  // channel −2; with both a pixel mask and a vector mask, also those of the
+  // "real" mask in channel −3, the two combined (see buildMask).
   let mask = null;
   const maskEnd = r.block(extraEnd);
   const maskStart = r.pos;
@@ -246,32 +324,10 @@ function readLayerRecord(r, end) {
       defaultColor: r.u8(),
       flags: r.u8(),
       real: null,
+      density: 1,
+      feather: 0,
     };
-    if (maskEnd - maskStart >= 36) {
-      mask.real = {
-        flags: r.u8(),
-        defaultColor: r.u8(),
-        top: r.i32(),
-        left: r.i32(),
-        bottom: r.i32(),
-        right: r.i32(),
-      };
-    }
-    // the user mask's density and feather, which Photoshop applies when it
-    // renders the mask (stored after the real mask, whatever the spec says)
-    mask.density = 1;
-    mask.feather = 0;
-    if (mask.flags & 16 && r.pos < maskEnd) {
-      const params = r.u8();
-      const size = (params & 1) + (params & 2 ? 8 : 0) + (params & 4 ? 1 : 0) + (params & 8 ? 8 : 0);
-      if (r.pos + size <= maskEnd) {
-        if (params & 1) mask.density = r.u8() / 255;
-        if (params & 2) {
-          const feather = r.f64();
-          mask.feather = feather > 0 ? Math.min(feather, 1000) : 0; // NaN → 0
-        }
-      }
-    }
+    readMaskExtras(r, mask, maskEnd, channels.some((ch) => ch.id === -3));
   }
   r.pos = maskEnd;
   r.pos = r.block(extraEnd); // blending ranges
@@ -731,20 +787,41 @@ function featherMask(canvas, radius) {
 }
 
 /**
+ * Whether a fill or shape layer's mask (channel −2) is its own transparency
+ * channel over again, as Photoshop stores the mask rendered from a shape's
+ * path: applying it would square the shape's edge coverage. Compared as
+ * stored bytes, which is exact when both were written alike.
+ */
+function repeatsShape(rec, m, bytes) {
+  if (m.top !== rec.top || m.left !== rec.left || m.bottom !== rec.bottom || m.right !== rec.right) return false;
+  if ((m.density ?? 1) < 1) return false;
+  const a = rec.channels.find((c) => c.id === -1);
+  const b = rec.channels.find((c) => c.id === -2);
+  if (!a || !b || a.end - a.start !== b.end - b.start) return false;
+  for (let i = a.start, j = b.start; i < a.end; i++, j++) if (bytes[i] !== bytes[j]) return false;
+  return true;
+}
+
+/**
  * A layer's (or group's) mask as a target-size canvas: filled with its
  * default colour, so a "hide all" mask without any pixel data still hides,
- * then its data at its rectangle. On a layer, a mask rendered from a vector
- * mask is already part of the layer's alpha (shape layers) and is skipped;
- * when there is also a user mask, that one is in channel −3. The user mask's
- * density and feather are applied.
+ * then its data at its rectangle.
+ *
+ * As psd-tools reads it (checked against Photoshop's own rendering): with a
+ * pixel mask and a vector mask, the "real" mask in channel −3 is the two
+ * combined, with its own rectangle and default colour. Otherwise channel −2
+ * holds the mask — a pixel mask, or the vector mask as Photoshop rendered it
+ * (flag bit 3), which is all that is known of a vector mask here. A fill or
+ * shape layer whose mask merely repeats its transparency gets none. The
+ * user mask's density and feather are applied.
  */
 async function buildMask(rec, src, isGroup = false) {
   const m = rec.mask;
   if (!m) return null;
-  const realData = !isGroup && m.real && rec.channels.find((ch) => ch.id === -3);
-  if (!realData && !isGroup && m.flags & 8) return null;
-  const info = realData ? m.real : m;
-  const ch = realData || rec.channels.find((c) => c.id === -2);
+  const real = m.real && m.real.flags & 16 ? rec.channels.find((c) => c.id === -3) : null;
+  if (!real && !isGroup && rec.fillLayer && repeatsShape(rec, m, src.bytes)) return null;
+  const info = real ? m.real : m;
+  const ch = real || rec.channels.find((c) => c.id === -2);
   // density lightens what the mask hides: visibility = 1 − density × (1 − mask)
   const density = m.density ?? 1;
   const dense = density < 1 ? Uint8Array.from({ length: 256 }, (_, v) => 255 - density * (255 - v) + 0.5) : null;
@@ -782,7 +859,7 @@ async function buildMask(rec, src, isGroup = false) {
     releaseCanvas(canvas);
     throw err;
   }
-  return { canvas, enabled: !(info.flags & 2) };
+  return { canvas, enabled: !(m.flags & 2) };
 }
 
 /**
@@ -821,9 +898,10 @@ function releaseLayer(layer) {
 }
 
 /**
- * Build the layers. Returns null when the composite shows the document
- * better (only adjustment or fill layers without stored pixels). On any
- * error the canvases created so far are released before it is rethrown.
+ * Build the layers. Returns no layers (but the count of skipped ones) when
+ * the composite shows the document better: only adjustment or fill layers
+ * without stored pixels. On any error the canvases created so far are
+ * released before it is rethrown.
  */
 async function importLayers(src, records) {
   const layers = [];
@@ -880,7 +958,7 @@ async function importLayers(src, records) {
     }
     if (!pixels && skipped) {
       for (const layer of layers.splice(0)) releaseLayer(layer);
-      return null;
+      return { layers, skipped };
     }
     bakeClipping(records);
     for (const rec of records) {
@@ -997,20 +1075,24 @@ export async function readPSD(buffer, { maxDim = 8000, maxPixels = Infinity, max
   let records = info?.records || [];
 
   // a file that cannot even hold its composite image is not what it claims
-  // to be — refuse it before allocating a document of the claimed size. ZIP
-  // data must hold every channel the reader inflates (the colours, and the
-  // transparency when there is one) at no more than deflate's expansion
+  // to be — unless its layers are what is used: without any, it is refused
+  // before a document of the claimed size is allocated. ZIP data must hold
+  // every channel the reader inflates (the colours, and the transparency
+  // when there is one) at no more than deflate's expansion
   const compression = sectionEnd + 2 <= r.bytes.length ? r.view.getUint16(sectionEnd) : -1;
   const colors = mode === 1 ? 1 : 3;
   const planes = compression > 1 && info?.mergedAlpha && channelCount > colors ? colors + 1 : colors;
   const decoded = planes * height * width * (depth >> 3);
   const ratio = compression === 0 ? 2 : compression === 1 ? 128 : compression > 1 ? MAX_DEFLATE_RATIO : Infinity;
   const table = compression === 1 ? channelCount * height * 2 : 0;
-  if (r.bytes.length - sectionEnd - 2 < table + decoded / ratio) throw damaged();
+  const compositeFits = r.bytes.length - sectionEnd - 2 >= table + decoded / ratio;
+  if (!compositeFits && !records.some((rec) => rec.section === 0 && !rec.adjustment)) throw damaged();
 
+  // rounded down, as everywhere a size is fitted to the device: rounding up
+  // could step over the canvas area limit (16.7 MP in iOS Safari)
   const k = Math.min(1, maxDim / Math.max(width, height), Math.sqrt(maxPixels / (width * height)));
-  const tw = Math.max(1, Math.round(width * k));
-  const th = Math.max(1, Math.round(height * k));
+  const tw = Math.max(1, Math.floor(width * k + 1e-9));
+  const th = Math.max(1, Math.floor(height * k + 1e-9));
   const src = {
     bytes: r.bytes,
     width,
@@ -1032,7 +1114,13 @@ export async function readPSD(buffer, { maxDim = 8000, maxPixels = Infinity, max
   // budget, open the flattened image rather than exhaust the device
   const canvases = records.filter((rec) => rec.section === 0 && !rec.adjustment).length +
     records.filter((rec) => rec.mask).length;
-  if (canvases * tw * th * 4 > maxLayerBytes) records = [];
+  // the layers could not be used: their data is damaged, or they need more
+  // canvas memory than allowed (or than the browser grants)
+  let unusable = layersDamaged;
+  if (canvases * tw * th * 4 > maxLayerBytes) {
+    records = [];
+    unusable = true;
+  }
 
   let imported = null;
   if (records.length) {
@@ -1043,17 +1131,20 @@ export async function readPSD(buffer, { maxDim = 8000, maxPixels = Infinity, max
       // Safari caps their total memory): the composite needs only one
       if (!(err instanceof PsdError || err instanceof CanvasTooLargeError)) throw err;
       imported = null;
+      unusable = true;
     }
   }
+  doc.psdSkipped = imported?.skipped || 0;
   if (imported?.layers.length) {
     doc.layers.push(...imported.layers);
-    doc.psdSkipped = imported.skipped;
   } else {
+    if (!compositeFits) throw damaged();
     const layer = new Layer(tw, th, { name: t("Background") });
     const ok = await paintComposite(layer.ctx, src, sectionEnd, channelCount, !!info?.mergedAlpha);
     if (!ok) throw new Error("This PSD uses compression that cannot be read here");
     doc.layers.push(layer);
-    doc.psdFlattened = layersDamaged || (info?.records || []).some((rec) => rec.section === 0);
+    // (only adjustment layers, or none at all, is not a failure)
+    doc.psdFlattened = unusable;
   }
   doc.setActive(doc.layers.length - 1);
   return doc;
@@ -1113,6 +1204,12 @@ class Writer {
     this.flush();
     this.chunks.push(arr);
     this.total += arr.length;
+  }
+  /** Append a Blob as it is (never copied into memory again). */
+  blobPart(blob) {
+    this.flush();
+    this.chunks.push(blob);
+    this.total += blob.size;
   }
   get length() {
     return this.total + this.pos;
@@ -1192,6 +1289,15 @@ function pascalName(name) {
   return { ascii, pad };
 }
 
+/** A PSD (not PSB) file cannot be larger than 2 GB: its lengths are 32-bit. */
+const MAX_PSD_BYTES = 2 ** 31 - 1;
+const tooLarge = () => new Error("This document is too large for a PSD file");
+
+/**
+ * Write the document as a layered 8-bit RGB PSD Blob. Throws an Error with
+ * the message "This document is too large for a PSD file" when the file
+ * would pass the format's 2 GB limit.
+ */
 export async function writePSD(doc) {
   const w = new Writer();
   const W = doc.width;
@@ -1294,11 +1400,12 @@ export async function writePSD(doc) {
   }
   if (info.length % 2) info.u8(0);
   const infoBlob = info.blob();
-  const infoBytes = new Uint8Array(await infoBlob.arrayBuffer());
+  // (checked before the 32-bit lengths below could wrap around)
+  if (w.length + infoBlob.size + 12 > MAX_PSD_BYTES) throw tooLarge();
 
-  w.u32(4 + infoBytes.length + 4); // layer and mask section
-  w.u32(infoBytes.length); // layer info
-  w.bytes(infoBytes);
+  w.u32(4 + infoBlob.size + 4); // layer and mask section
+  w.u32(infoBlob.size); // layer info
+  w.blobPart(infoBlob);
   w.u32(0); // global layer mask info
 
   // flattened composite on white, for viewers that ignore layers
@@ -1309,5 +1416,6 @@ export async function writePSD(doc) {
   // all row counts first, then all data
   for (const p of packed) w.bytes(p.subarray(0, H * 2));
   for (const p of packed) w.bytes(p.subarray(H * 2));
+  if (w.length > MAX_PSD_BYTES) throw tooLarge();
   return w.blob();
 }

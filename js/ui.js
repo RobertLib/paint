@@ -9,7 +9,7 @@ import { cssColor, hsvToRgb, parseColor, rgbToHex, rgbToHsv } from "./color.js";
 import { BLEND_MODES, ctx2d, makeCanvas } from "./doc.js";
 import { ADJUST_GROUPS, EFFECTS } from "./filters.js";
 import { history } from "./history.js";
-import { platformKeys, t } from "./i18n.js";
+import { formatNumber, formatPercent, platformKeys, t } from "./i18n.js";
 import { requestRender } from "./render.js";
 import {
   emit,
@@ -440,6 +440,7 @@ function buildColorPanel() {
     setColor("#ffffff", "secondary");
   });
   $("#pickFromCanvas").addEventListener("click", () => setTool("eyedropper"));
+  wireColorCollapse();
 
   $("#swatchGrid").innerHTML = state.swatches
     .map(
@@ -460,6 +461,38 @@ function buildColorPanel() {
 
   drawSV(canvas);
   syncColorPanel();
+}
+
+/** The colour panel folds down to its two chips (and stays so next time). */
+const COLLAPSE_KEY = "paint-studio:color-collapsed";
+
+function wireColorCollapse() {
+  const panel = $(".color-panel");
+  const btn = $("#colorCollapse");
+  if (!panel || !btn) return;
+  const apply = (collapsed) => {
+    panel.classList.toggle("is-collapsed", collapsed);
+    btn.setAttribute("aria-expanded", String(!collapsed));
+    const label = collapsed ? t("Expand color panel") : t("Collapse color panel");
+    btn.setAttribute("aria-label", label);
+    btn.dataset.tip = label;
+  };
+  let collapsed = false;
+  try {
+    collapsed = localStorage.getItem(COLLAPSE_KEY) === "1";
+  } catch {
+    /* storage blocked: start expanded */
+  }
+  apply(collapsed);
+  btn.addEventListener("click", () => {
+    collapsed = !panel.classList.contains("is-collapsed");
+    apply(collapsed);
+    try {
+      localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
+    } catch {
+      /* not remembered */
+    }
+  });
 }
 
 function drawSV(canvas) {
@@ -511,7 +544,7 @@ function syncColorPanel() {
   field.setAttribute("aria-valuenow", String(Math.round(picker.s * 100)));
   field.setAttribute(
     "aria-valuetext",
-    `${t("Saturation")} ${Math.round(picker.s * 100)} %, ${t("Brightness")} ${Math.round(picker.v * 100)} %`
+    `${t("Saturation")} ${formatPercent(picker.s)}, ${t("Brightness")} ${formatPercent(picker.v)}`
   );
 
   $("#hueSlider").value = String(Math.round(picker.h));
@@ -519,7 +552,7 @@ function syncColorPanel() {
   $("#alphaTrack").style.setProperty("--alpha-color", rgbToHex(color));
   $("#hexInput").value = rgbToHex(color, color.a < 1);
   $("#rgbReadout").textContent = `${color.r}, ${color.g}, ${color.b}${
-    color.a < 1 ? `, ${color.a.toFixed(2)}` : ""
+    color.a < 1 ? ` · ${formatPercent(color.a)}` : ""
   }`;
 
   $("#primaryChip .chip-fill").style.background = cssColor(state.primary);
@@ -583,22 +616,49 @@ function buildLayersPanel() {
     A.setLayerProp(state.doc.activeIndex, "blend", e.target.value, t("Blend mode"));
   });
 
-  // dragging previews live; the undo entry is written once the drag settles
+  // Dragging previews live; the undo entry is written once the drag settles.
+  // The value before the drag belongs to that layer and that drag only: a
+  // drag that ends where it started fires no "change", and its baseline must
+  // not become the next drag's (on another layer, after an undo…).
   const opacity = $("#layerOpacity");
-  let opacityBefore = null;
+  let opacityDrag = null; // { id, before }
+  // released where it started: no "change" comes — put back the exact value
+  // (an opacity like 0.333 from a PSD is shown as 33 %)
+  const endOpacityDrag = () => {
+    window.removeEventListener("pointerup", endOpacityDrag);
+    window.removeEventListener("pointercancel", endOpacityDrag);
+    setTimeout(() => {
+      const drag = opacityDrag;
+      if (!drag) return;
+      opacityDrag = null;
+      const at = state.doc?.indexOfLayer(drag.id) ?? -1;
+      if (at >= 0) A.previewLayerProp(at, "opacity", drag.before);
+    }, 0);
+  };
+  opacity.addEventListener("pointerdown", () => {
+    opacityDrag = null;
+    window.addEventListener("pointerup", endOpacityDrag);
+    window.addEventListener("pointercancel", endOpacityDrag);
+  });
+  opacity.addEventListener("keydown", () => {
+    opacityDrag = null;
+  });
   opacity.addEventListener("input", () => {
     const layer = state.doc?.active;
     if (!layer) return;
-    if (opacityBefore === null) opacityBefore = layer.opacity;
-    $("#layerOpacityOut").value = `${opacity.value}%`;
+    if (!opacityDrag || opacityDrag.id !== layer.id) {
+      opacityDrag = { id: layer.id, before: layer.opacity };
+    }
+    $("#layerOpacityOut").value = formatPercent(Number(opacity.value) / 100);
     A.previewLayerProp(state.doc.activeIndex, "opacity", Number(opacity.value) / 100);
   });
   opacity.addEventListener("change", () => {
     const layer = state.doc?.active;
+    const drag = opacityDrag;
+    opacityDrag = null;
     if (!layer) return;
     const value = Number(opacity.value) / 100;
-    if (opacityBefore !== null) layer.opacity = opacityBefore;
-    opacityBefore = null;
+    if (drag && drag.id === layer.id) layer.opacity = drag.before;
     A.setLayerProp(state.doc.activeIndex, "opacity", value, t("Layer opacity"));
   });
 
@@ -774,7 +834,8 @@ function startRename(nameEl, index) {
   const onBlur = () => done(true);
   input.addEventListener("blur", onBlur);
   input.addEventListener("keydown", (e) => {
-    e.stopPropagation();
+    // typing is the field's own; a command key (⌘S) goes on to the app
+    if (!e.metaKey && !e.ctrlKey) e.stopPropagation();
     if (e.key === "Enter") done(true, { refocus: true });
     if (e.key === "Escape") done(false, { refocus: true });
   });
@@ -830,7 +891,7 @@ function syncLayers() {
           <span class="layer-name">${escapeHtml(layer.name)}</span>
           <span class="layer-sub">${
             BLEND_MODES.find(([v]) => v === layer.blend)?.[1] || t("Normal")
-          } · ${Math.round(layer.opacity * 100)}%</span>
+          } · ${formatPercent(layer.opacity)}</span>
         </span>
         <span class="layer-actions">
           <button class="icon-btn xs" data-toggle-layer="visible" data-tip="${
@@ -866,7 +927,7 @@ function syncLayers() {
   if (active) {
     $("#layerBlend").value = active.blend;
     $("#layerOpacity").value = String(Math.round(active.opacity * 100));
-    $("#layerOpacityOut").value = `${Math.round(active.opacity * 100)}%`;
+    $("#layerOpacityOut").value = formatPercent(active.opacity);
   }
   $("#mergeLayerBtn").disabled = !canMergeDown(doc);
   $("#delLayerBtn").disabled = doc.layers.length <= 1;
@@ -938,7 +999,7 @@ function syncAdjustRow(key) {
   if (!row) return;
   const item = ADJUST_GROUPS.flatMap((g) => g.items).find((i) => i.id === key);
   const value = A.adjustValues[key] || 0;
-  $(".adjust-val", row).textContent = `${value > 0 ? "+" : ""}${value}${item.unit || ""}`;
+  $(".adjust-val", row).textContent = `${formatNumber(value, { signDisplay: "exceptZero" })}${item.unit || ""}`;
   row.classList.toggle("is-changed", value !== 0);
 }
 
@@ -1040,9 +1101,15 @@ function buildTabs() {
   select(tabs.find((t) => t.classList.contains("is-active")) || tabs[0]);
 }
 
-export function openTab(name) {
+/**
+ * Bring a panel tab forward. `reveal: false` only selects the tab: the
+ * column or the phone's sheet stay as they are (a task that already shows
+ * its result must not cover it with the sheet).
+ */
+export function openTab(name, { reveal = true } = {}) {
   const tab = $(`.tab[data-tab="${name}"]`);
   tab?.click();
+  if (!reveal) return;
   // the panel must be visible, also when the panels were hidden
   $(".workspace")?.classList.remove("side-collapsed");
   setSidebarOpen(true);
@@ -1127,7 +1194,10 @@ function buildChrome() {
     emit("doc-renamed");
   });
   $("#docTitle").addEventListener("keydown", (e) => {
-    e.stopPropagation();
+    // typing is the field's own; a command key (⌘S) goes on to the app —
+    // and the name typed so far is part of what ⌘S / ⇧⌘E save
+    if (!e.metaKey && !e.ctrlKey) e.stopPropagation();
+    else if (!e.altKey && (e.code === "KeyS" || (e.shiftKey && e.code === "KeyE"))) e.target.blur();
     if (e.key === "Enter") e.target.blur();
   });
 
@@ -1189,8 +1259,7 @@ function syncDocMeta() {
 
 function syncZoom() {
   const z = view.zoom;
-  $("#zoomValue").textContent =
-    z >= 1 ? `${Math.round(z * 100)}%` : `${(z * 100).toFixed(z < 0.1 ? 1 : 0)}%`;
+  $("#zoomValue").textContent = formatPercent(z, z < 0.1 ? 1 : 0);
 }
 
 function syncStatus() {
@@ -1372,5 +1441,6 @@ export function initUI() {
   syncDocMeta();
   syncZoom();
   syncStatus();
+  $("#layerOpacityOut").value = formatPercent(1);
   raise($("#toasts"));
 }

@@ -6,6 +6,7 @@ import { translateDOM } from "./i18n.js";
 import * as A from "./actions.js";
 import {
   SLOT_CURRENT,
+  SLOT_LATEST,
   initAutosave,
   listSessions,
   loadAutosave,
@@ -74,6 +75,13 @@ window.addEventListener("beforeunload", (e) => {
 const params = new URLSearchParams(location.search);
 const task = params.get("task");
 
+/** What ?restore= accepts besides "1": a session id (see autosave.js). */
+const SESSION_ID = /^[a-z0-9-]{1,40}$/i;
+/** How long the page before a reload may hold on to its session. */
+const RELOAD_LOCK_WAIT = 3000;
+/** How long the welcome screen waits for the stored sessions to be listed. */
+const SESSIONS_WAIT = 700;
+
 const handoffStale = (entry) => !(Math.abs(Date.now() - (entry?.at || 0)) <= HANDOFF_TTL);
 
 /** A file a landing page left for us, if it is fresh. */
@@ -96,12 +104,16 @@ async function takeHandoff() {
  */
 const shownName = (name) => (!name || name === "Untitled" || name === "Bez názvu" ? t("Untitled") : name);
 
-/** Restore the session in `slot` — or, given `sid`, that session wherever it is now. */
-async function restore(slot = SLOT_CURRENT, sid = null) {
+/**
+ * Restore the session in `slot` — or, given `sid`, that session wherever it
+ * is now. `waitForLock` (ms): how long a tab that still has the session open
+ * (the page being reloaded) may take to let go of it.
+ */
+async function restore(slot = SLOT_CURRENT, sid = null, { waitForLock = 0 } = {}) {
   if (state.doc && !A.confirmDiscard()) return false;
   emit("busy", t("Restoring…"));
   try {
-    const doc = await loadAutosave(slot, sid);
+    const doc = await loadAutosave(slot, sid, { waitForLock });
     if (!doc) {
       emit("toast", { msg: t("That session is no longer available"), kind: "err" });
       return false;
@@ -182,17 +194,29 @@ async function boot() {
   // files left for an editor that never opened (an aborted navigation)
   idbSweep(HANDOFF_KEY, handoffStale).catch(() => {});
   if (file) opened = await A.openImageFile(file);
-  if (!opened && params.get("restore") === "1") opened = restored = await restore();
+  // a reload that keeps the document (switching the language): ?restore=<the
+  // session's id>, or ?restore=1 from older pages — the session saved last
+  const again = params.get("restore");
+  if (!opened && again) {
+    const sid = again !== "1" && SESSION_ID.test(again) ? again : null;
+    if (sid || again === "1") {
+      opened = restored = await restore(sid ? SLOT_CURRENT : SLOT_LATEST, sid, { waitForLock: RELOAD_LOCK_WAIT });
+    }
+  }
   if (!opened && task && isBlankTask(task)) {
     startTask(task);
     opened = !!state.doc;
   }
   if (!opened) {
-    await renderSessions();
+    // the stored sessions come with the welcome screen — unless storage is
+    // slow to answer (a hung IndexedDB): then they join it when they can
+    const cards = renderSessions().catch(() => []);
+    await Promise.race([cards, new Promise((r) => setTimeout(r, SESSIONS_WAIT))]);
     showWelcome();
   } else if (!restored) {
-    // the earlier work is kept in the second autosave slot — say where
-    const earlier = (await listSessions())[0];
+    // the earlier work is kept in the autosave — say where (a document that
+    // was only opened, never edited, is not "work")
+    const earlier = (await listSessions()).find((s) => !s.pristine);
     if (earlier) {
       emit("toast", {
         msg: t("Your earlier work “{name}” is kept", { name: shownName(earlier.name) }),

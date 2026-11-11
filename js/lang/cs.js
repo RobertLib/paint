@@ -402,7 +402,6 @@ export default {
     "Tento dokument je na automatické ukládání příliš velký – uložte projekt, abyste o práci nepřišli",
   "Autosave failed — this browser's storage may be full or blocked. Save the project to keep your work":
     "Automatické uložení selhalo – úložiště prohlížeče je možná plné nebo blokované. Uložte projekt, abyste o práci nepřišli",
-  "The largest supported size is 8000 × 8000 px": "Největší podporovaná velikost je 8000 × 8000 px",
   "Copied {hex}": "Zkopírováno {hex}",
 
   // --------------------------------------------------- history labels
@@ -599,4 +598,23 @@ export default {
   "Bottom left": "Vlevo dole",
   Bottom: "Dole",
   "Bottom right": "Vpravo dole",
+
+  /* --- UI review fixes, round 3 --- */
+  "Collapse color panel": "Sbalit panel barev",
+  "Expand color panel": "Rozbalit panel barev",
+  "Enter a size from 1 to {max} px": "Zadejte velikost od 1 do {max} px",
+  "The largest supported size is 8000 × 8000 px — using {w} × {h}":
+    "Největší podporovaná velikost je 8000 × 8000 px – použije se {w} × {h}",
+  "Finish the text": "Dokončit text",
+
+  /* --- history, files and update messages --- */
+  "Not enough memory on this device for that — nothing was changed":
+    "Na to nemá toto zařízení dost paměti – nic se nezměnilo",
+  "That did not work — nothing was changed": "To se nepodařilo – nic se nezměnilo",
+  "Paint Studio was updated — reload the page to continue":
+    "Paint Studio bylo aktualizováno – pro pokračování znovu načtěte stránku",
+  "Nothing to clear — the selected area is empty": "Není co vymazat – vybraná oblast je prázdná",
+  "This HEIC photo could not be decoded": "Tuto fotku HEIC se nepodařilo dekódovat",
+  "This document is too large for a PSD file (over 2 GB) — save it as a project instead":
+    "Dokument je na soubor PSD příliš velký (přes 2 GB) – uložte ho raději jako projekt",
 };

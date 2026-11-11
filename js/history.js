@@ -6,11 +6,20 @@
    photos, so entries are frugal:
 
    - pixel edits keep only the rectangle that changed, when the caller knows
-     it (strokes, selections), otherwise the whole target;
+     it (strokes, selections), otherwise the whole target — and an edit that
+     changed no pixel at all is not recorded;
+   - structural edits (layers, masks, geometry) keep bitmaps only of the
+     layers they change. A layer they leave alone is recorded by its content
+     version: history is linear, so whenever such a step is undone or redone
+     that layer is back at exactly that version and needs no copy;
    - whole bitmaps are kept in a shared, reference-counted store keyed by
-     (layer id, content version): ten structural steps over the same layers
-     hold each layer once, not twenty times;
-   - selections are immutable, so entries keep references to them.
+     (layer id, content version), so a bitmap is held once however many
+     entries need it;
+   - selections are kept compactly: the selected area's alpha at one byte a
+     pixel (a plain rectangle as just its bounds), rebuilt when restored.
+
+   This relies on every content version being exact: an entry that puts
+   pixels back also puts back the versions they had.
 
    The oldest entries are dropped once the stack outgrows the budget.
 
@@ -22,6 +31,7 @@
 
 import {
   Layer,
+  Selection,
   cloneText,
   copyCanvas,
   ctx2d,
@@ -42,27 +52,41 @@ const MAX_BYTES = (() => {
   return (coarse ? 160 : 320) * MB;
 })();
 
-/* ------------------------------ bitmap store ------------------------------ */
+/* --------------------------------- store ---------------------------------- */
 
-/** key → { canvas, refs, bytes, owned } */
+/** key → { value, refs, bytes, free } */
 const store = new Map();
 let storeBytes = 0;
 
 /**
- * Take a reference to the bitmap stored under `key`, creating it with
- * `make()` the first time. `owned` canvases are freed when the last
- * reference goes; borrowed ones (selections) are only accounted for.
+ * Take a reference to the value stored under `key`, creating it with
+ * `make()` — which returns { value, bytes, free? } — the first time.
  */
-function retain(key, make, owned = true) {
+function retainEntry(key, make) {
   let e = store.get(key);
   if (!e) {
-    const canvas = make();
-    e = { canvas, refs: 0, bytes: canvas.width * canvas.height * 4, owned };
+    e = { refs: 0, free: null, ...make() };
     store.set(key, e);
     storeBytes += e.bytes;
   }
   e.refs++;
-  return e.canvas;
+  return e.value;
+}
+
+/**
+ * A bitmap in the store. `owned` canvases are freed when the last reference
+ * goes; borrowed ones (canvases a layer no longer uses) are only accounted
+ * for and left to the garbage collector.
+ */
+function retainCanvas(key, make, owned = true) {
+  return retainEntry(key, () => {
+    const canvas = make();
+    return {
+      value: canvas,
+      bytes: canvas.width * canvas.height * 4,
+      free: owned ? () => releaseCanvas(canvas) : null,
+    };
+  });
 }
 
 function release(key) {
@@ -72,10 +96,28 @@ function release(key) {
   if (--e.refs > 0) return;
   store.delete(key);
   storeBytes -= e.bytes;
-  if (e.owned) releaseCanvas(e.canvas);
+  e.free?.();
 }
 
-const stored = (key) => store.get(key)?.canvas || null;
+const stored = (key) => store.get(key)?.value || null;
+
+/**
+ * Give up one reference to a stored bitmap in exchange for a canvas with its
+ * content that the caller may keep: the stored canvas itself when this was
+ * the last reference (no copy — a rollback may run short of memory), a copy
+ * otherwise.
+ */
+function takeCanvas(key) {
+  const e = store.get(key);
+  if (!e) return null;
+  if (e.refs === 1) {
+    store.delete(key);
+    storeBytes -= e.bytes;
+    return e.value;
+  }
+  e.refs--;
+  return copyCanvas(e.value);
+}
 
 const pixelKey = (id, v) => `p${id}@${v}`;
 const maskKey = (id, v) => `m${id}@${v}`;
@@ -222,12 +264,19 @@ const hostOf = (target) => (target.isMask ? target.layer : target);
 const versionOf = (target) =>
   target.isMask ? target.layer.maskVersion : target.pixelVersion;
 
-/** Mark the target's content as the known version `v` (it was restored). */
-function setVersion(target, v) {
+/**
+ * Mark the target's content as the known version `v` (it was restored).
+ * A pixel edit also bumps the mask's version (Layer.touch) without changing
+ * the mask, so `mv`, when given, puts that one back too.
+ */
+function setVersion(target, v, mv) {
   const host = hostOf(target);
   host.version = nextVersion();
   if (target.isMask) host.maskVersion = v;
-  else host.pixelVersion = v;
+  else {
+    host.pixelVersion = v;
+    if (mv !== undefined) host.maskVersion = mv;
+  }
 }
 
 function afterRestore(doc) {
@@ -236,14 +285,17 @@ function afterRestore(doc) {
 }
 
 /** Put back a whole stored bitmap. */
-function restoreFull(doc, id, isMask, key, version, text) {
+function restoreFull(doc, id, isMask, key, version, text, mv) {
   const target = resolveTarget(doc, id, isMask);
   const src = stored(key);
   if (!target || !src) return;
   if (src.width !== target.width || src.height !== target.height) {
     const copy = copyCanvas(src);
     if (isMask) target.layer.restoreMask(copy, version);
-    else target.restorePixels(copy, version);
+    else {
+      target.restorePixels(copy, version);
+      if (mv !== undefined) target.maskVersion = mv;
+    }
   } else {
     const c = target.ctx;
     c.save();
@@ -252,14 +304,14 @@ function restoreFull(doc, id, isMask, key, version, text) {
     c.globalCompositeOperation = "copy";
     c.drawImage(src, 0, 0);
     c.restore();
-    setVersion(target, version);
+    setVersion(target, version, mv);
   }
   if (!isMask) target.text = cloneText(text);
   afterRestore(doc);
 }
 
 /** Put back one rectangle. */
-function restorePatch(doc, id, isMask, patch, r, version, text) {
+function restorePatch(doc, id, isMask, patch, r, version, text, mv) {
   const target = resolveTarget(doc, id, isMask);
   if (!target) return;
   const c = target.ctx;
@@ -270,7 +322,7 @@ function restorePatch(doc, id, isMask, patch, r, version, text) {
   c.clearRect(r.x, r.y, r.w, r.h);
   c.drawImage(patch, r.x, r.y);
   c.restore();
-  setVersion(target, version);
+  setVersion(target, version, mv);
   if (!isMask) target.text = cloneText(text);
   afterRestore(doc);
 }
@@ -281,17 +333,42 @@ function cropCanvas(src, r) {
   return out;
 }
 
-/** Integer rectangle inside the target, or null when it covers (almost) all. */
-function patchRect(rect, w, h) {
-  if (!rect) return null;
+/** The integer part of `rect` inside a w × h target ({0,0,0,0} when none). */
+function clipRect(rect, w, h) {
   const x = Math.max(0, Math.floor(rect.x));
   const y = Math.max(0, Math.floor(rect.y));
   const rw = Math.min(w, Math.ceil(rect.x + rect.w)) - x;
   const rh = Math.min(h, Math.ceil(rect.y + rect.h)) - y;
   if (rw <= 0 || rh <= 0) return { x: 0, y: 0, w: 0, h: 0 };
-  // two patches cost more than one shared full copy past this point
-  if (rw * rh > w * h * 0.45) return null;
   return { x, y, w: rw, h: rh };
+}
+
+/** Integer rectangle inside the target, or null when it covers (almost) all. */
+function patchRect(rect, w, h) {
+  if (!rect) return null;
+  const r = clipRect(rect, w, h);
+  // two patches cost more than one shared full copy past this point
+  if (r.w * r.h > w * h * 0.45) return null;
+  return r;
+}
+
+/**
+ * True when the w × h area of canvas `a` at (ax, ay) holds the same pixels
+ * as the area of `b` at (bx, by). Read in strips, stopping at the first
+ * difference.
+ */
+function samePixels(a, ax, ay, b, bx, by, w, h) {
+  if (w <= 0 || h <= 0) return true;
+  const ca = a.getContext("2d");
+  const cb = b.getContext("2d");
+  const rows = Math.max(1, Math.floor((256 * 1024) / w));
+  for (let y = 0; y < h; y += rows) {
+    const n = Math.min(rows, h - y);
+    const da = new Uint32Array(ca.getImageData(ax, ay + y, w, n).data.buffer);
+    const db = new Uint32Array(cb.getImageData(bx, by + y, w, n).data.buffer);
+    for (let i = 0; i < da.length; i++) if (da[i] !== db[i]) return false;
+  }
+  return true;
 }
 
 /**
@@ -312,6 +389,10 @@ function takeText(target) {
  * Without `rect`, `before` is a read-only copy of the whole target as it was,
  * and commit(label, rect) may still narrow what is kept. With `rect` (the
  * document-space area the edit can touch) only that area is copied at all.
+ *
+ * commit() compares the pixels inside that area (or the whole target) with
+ * what was there before: when nothing changed it records nothing, keeps an
+ * editable text layer editable and leaves the content version as it was.
  */
 export function beginPixelEdit(target = state.doc?.target, { rect = null } = {}) {
   settleSessions();
@@ -319,9 +400,10 @@ export function beginPixelEdit(target = state.doc?.target, { rect = null } = {})
   const id = target.id;
   const isMask = !!target.isMask;
   const v0 = versionOf(target);
+  const m0 = isMask ? undefined : target.maskVersion;
   const fixed = rect ? patchRect(rect, target.width, target.height) : null;
   const key0 = fixed ? null : (isMask ? maskKey : pixelKey)(id, v0);
-  const before = key0 ? retain(key0, () => copyCanvas(target.canvas)) : null;
+  const before = key0 ? retainCanvas(key0, () => copyCanvas(target.canvas)) : null;
   const beforePatch = fixed && fixed.w > 0 ? cropCanvas(target.canvas, fixed) : null;
   const text = takeText(target);
   let done = false;
@@ -331,13 +413,23 @@ export function beginPixelEdit(target = state.doc?.target, { rect = null } = {})
     if (beforePatch) releaseCanvas(beforePatch);
   };
 
-  const pushPatch = (label, r, bp, now, v1) => {
-    const ap = cropCanvas(now.canvas, r);
+  /** Nothing visible changed: keep the text, the version, and record nothing. */
+  const unchanged = (now) => {
+    if (text) now.text = text;
+    if (versionOf(now) !== v0) {
+      setVersion(now, v0, m0);
+      doc.invalidate();
+    }
+    cleanup();
+    return false;
+  };
+
+  const pushPatch = (label, r, bp, ap, v1, m1) => {
     history.push({
       label,
       bytes: r.w * r.h * 8,
-      undo: () => restorePatch(doc, id, isMask, bp, r, v0, text),
-      redo: () => restorePatch(doc, id, isMask, ap, r, v1, null),
+      undo: () => restorePatch(doc, id, isMask, bp, r, v0, text, m0),
+      redo: () => restorePatch(doc, id, isMask, ap, r, v1, null, m1),
       dispose: () => {
         releaseCanvas(bp);
         releaseCanvas(ap);
@@ -345,55 +437,95 @@ export function beginPixelEdit(target = state.doc?.target, { rect = null } = {})
     });
   };
 
-  return {
+  /** commit() without the bookkeeping; may throw (out of memory). */
+  const record = (label, area) => {
+    const now = resolveTarget(doc, id, isMask) || target;
+    const v1 = versionOf(now);
+    const m1 = isMask ? undefined : now.maskVersion;
+    if (v1 === v0 || (fixed && fixed.w === 0)) return unchanged(now);
+    const converted = () => {
+      if (text) emit("toast", { msg: t("Text layer converted to pixels"), kind: "info" });
+    };
+    if (fixed) {
+      if (samePixels(beforePatch, 0, 0, now.canvas, fixed.x, fixed.y, fixed.w, fixed.h)) {
+        return unchanged(now);
+      }
+      const ap = cropCanvas(now.canvas, fixed);
+      converted();
+      pushPatch(label, fixed, beforePatch, ap, v1, m1);
+      return true;
+    }
+    const sameSize = before.width === now.width && before.height === now.height;
+    if (sameSize) {
+      const clip = area ? clipRect(area, now.width, now.height) : null;
+      const cmp = clip && clip.w > 0 ? clip : { x: 0, y: 0, w: now.width, h: now.height };
+      if (samePixels(before, cmp.x, cmp.y, now.canvas, cmp.x, cmp.y, cmp.w, cmp.h)) {
+        return unchanged(now);
+      }
+    }
+    const r = patchRect(area, now.width, now.height);
+    if (r && r.w > 0 && sameSize) {
+      const bp = cropCanvas(before, r);
+      let ap;
+      try {
+        ap = cropCanvas(now.canvas, r);
+      } catch (err) {
+        releaseCanvas(bp);
+        throw err;
+      }
+      release(key0);
+      converted();
+      pushPatch(label, r, bp, ap, v1, m1);
+      return true;
+    }
+    const key1 = (isMask ? maskKey : pixelKey)(id, v1);
+    retainCanvas(key1, () => copyCanvas(now.canvas));
+    converted();
+    history.push({
+      label,
+      bytes: 0,
+      undo: () => restoreFull(doc, id, isMask, key0, v0, text, m0),
+      redo: () => restoreFull(doc, id, isMask, key1, v1, null, m1),
+      dispose: () => {
+        release(key0);
+        release(key1);
+      },
+    });
+    return true;
+  };
+
+  const edit = {
     before,
+    /**
+     * Record the edit (true), or nothing when no pixel changed (false). If
+     * recording fails — out of memory — the pixels are put back as they
+     * were and the error is passed on.
+     */
     commit(label, area = null) {
       if (done) return false;
-      done = true;
-      const now = resolveTarget(doc, id, isMask) || target;
-      const v1 = versionOf(now);
-      const nothing = v1 === v0 || (fixed && fixed.w === 0);
-      if (nothing) {
-        // nothing was drawn: keep the text editable and record nothing
-        if (text) now.text = text;
-        cleanup();
-        return false;
+      try {
+        const recorded = record(label, area);
+        done = true;
+        return recorded;
+      } catch (err) {
+        edit.rollback();
+        throw err;
       }
-      if (text) emit("toast", { msg: t("Text layer converted to pixels"), kind: "info" });
-      if (fixed) {
-        pushPatch(label, fixed, beforePatch, now, v1);
-        return true;
-      }
-      const r = patchRect(area, now.width, now.height);
-      if (r && r.w > 0 && before.width === now.width && before.height === now.height) {
-        const bp = cropCanvas(before, r);
-        release(key0);
-        pushPatch(label, r, bp, now, v1);
-        return true;
-      }
-      const key1 = (isMask ? maskKey : pixelKey)(id, v1);
-      retain(key1, () => copyCanvas(now.canvas));
-      history.push({
-        label,
-        bytes: 0,
-        undo: () => restoreFull(doc, id, isMask, key0, v0, text),
-        redo: () => restoreFull(doc, id, isMask, key1, v1, null),
-        dispose: () => {
-          release(key0);
-          release(key1);
-        },
-      });
-      return true;
     },
     /** Put the pixels back as they were and record nothing. */
     rollback() {
       if (done) return;
       done = true;
       if (fixed) {
-        if (beforePatch) restorePatch(doc, id, isMask, beforePatch, fixed, v0, text);
-        else if (text) target.text = text;
+        if (beforePatch) restorePatch(doc, id, isMask, beforePatch, fixed, v0, text, m0);
+        else {
+          const now = resolveTarget(doc, id, isMask) || target;
+          if (text) now.text = text;
+          if (versionOf(now) !== v0) setVersion(now, v0, m0);
+          afterRestore(doc);
+        }
       } else {
-        restoreFull(doc, id, isMask, key0, v0, text);
+        restoreFull(doc, id, isMask, key0, v0, text, m0);
       }
       cleanup();
     },
@@ -404,12 +536,14 @@ export function beginPixelEdit(target = state.doc?.target, { rect = null } = {})
       cleanup();
     },
   };
+  return edit;
 }
 
 /**
  * Run `fn` and record the pixel change of a single paint target. `rect`, when
  * given, bounds everything `fn` may change (only that area is copied).
- * Returns whatever `fn` returned.
+ * Returns whatever `fn` returned. When `fn` throws, the target is put back as
+ * it was, nothing is recorded and the error is passed on.
  */
 export function editPixels(label, fn, target = state.doc?.target, rect = null) {
   settleSessions();
@@ -419,23 +553,23 @@ export function editPixels(label, fn, target = state.doc?.target, rect = null) {
   let result;
   try {
     result = fn(target);
-  } finally {
-    edit.commit(label);
+  } catch (err) {
+    edit.rollback();
+    throw err;
   }
+  // (a commit that fails puts the pixels back itself)
+  edit.commit(label);
   return result;
 }
 
 /* ------------------------------ layer records ----------------------------- */
 
-/** Everything about one layer, with its bitmaps taken from the shared store. */
-function captureLayer(l) {
-  const pk = pixelKey(l.id, l.pixelVersion);
-  retain(pk, () => copyCanvas(l.canvas));
-  let mk = null;
-  if (l.mask) {
-    mk = maskKey(l.id, l.maskVersion);
-    retain(mk, () => copyCanvas(l.mask));
-  }
+/**
+ * Everything about one layer except its bitmaps. `pk` / `mk` name the
+ * stored pixels and mask once something keeps them; a record without them
+ * means "the layer holds exactly this version" (see the top of the file).
+ */
+function describeLayer(l) {
   return {
     id: l.id,
     name: l.name,
@@ -446,28 +580,79 @@ function captureLayer(l) {
     maskEnabled: l.maskEnabled,
     editMask: l.editMask,
     text: cloneText(l.text),
-    pk,
+    w: l.width,
+    h: l.height,
     pv: l.pixelVersion,
-    mk,
+    // a fresh empty layer needs no copy to be put back
+    blank: l.blankVersion === l.pixelVersion,
+    pk: null,
+    hasMask: !!l.mask,
     mv: l.maskVersion,
+    mk: null,
   };
+}
+
+/** Copy the layer's current pixels and/or mask into the store for `rec`. */
+function keepCopies(rec, l, { pixels = true, mask = true } = {}) {
+  // (a key is only noted once its reference is held: copying may fail)
+  if (pixels && !rec.blank && !rec.pk) {
+    const key = pixelKey(rec.id, rec.pv);
+    retainCanvas(key, () => copyCanvas(l.canvas));
+    rec.pk = key;
+  }
+  if (mask && rec.hasMask && !rec.mk) {
+    const key = maskKey(rec.id, rec.mv);
+    retainCanvas(key, () => copyCanvas(l.mask));
+    rec.mk = key;
+  }
 }
 
 function releaseLayer(rec) {
   release(rec.pk);
   release(rec.mk);
+  rec.pk = rec.mk = null;
 }
 
-/** Make `layer` match a record, copying bitmaps only where they differ. */
-function applyLayer(layer, rec) {
-  const pixels = stored(rec.pk);
-  if (pixels && (layer.pixelVersion !== rec.pv || layer.canvas.width !== pixels.width || layer.canvas.height !== pixels.height)) {
-    layer.restorePixels(copyCanvas(pixels), rec.pv);
+/** Forget the live objects a "before" record pointed at while it was open. */
+function unlink(rec) {
+  delete rec._canvas;
+  delete rec._mask;
+  delete rec._copied;
+}
+
+/**
+ * Make `layer` match a record, copying bitmaps only where they differ. With
+ * `take` (a rollback: the record is discarded afterwards) the record's own
+ * bitmaps are handed to the layer instead of copied.
+ */
+function applyLayer(layer, rec, take = false) {
+  const sizeOk = layer.canvas.width === rec.w && layer.canvas.height === rec.h;
+  if (layer.pixelVersion !== rec.pv || !sizeOk) {
+    let canvas = null;
+    if (rec.blank) canvas = makeCanvas(rec.w, rec.h);
+    else if (take && rec._canvas && !rec._copied) canvas = rec._canvas;
+    else if (rec.pk && take) {
+      canvas = takeCanvas(rec.pk);
+      rec.pk = null;
+    } else if (rec.pk && stored(rec.pk)) canvas = copyCanvas(stored(rec.pk));
+    if (!canvas) {
+      console.error("[paint] history: the pixels of a layer are missing");
+      if (!sizeOk) canvas = makeCanvas(rec.w, rec.h);
+    }
+    if (canvas) layer.restorePixels(canvas, rec.pv);
   }
-  if (rec.mk) {
-    const mask = stored(rec.mk);
-    if (mask && (!layer.mask || layer.maskVersion !== rec.mv || layer.mask.width !== mask.width || layer.mask.height !== mask.height)) {
-      layer.restoreMask(copyCanvas(mask), rec.mv);
+  if (rec.blank) layer.blankVersion = rec.pv;
+  if (rec.hasMask) {
+    const m = layer.mask;
+    if (!m || layer.maskVersion !== rec.mv || m.width !== rec.w || m.height !== rec.h) {
+      let canvas = null;
+      if (take && rec._mask && !rec._copied) canvas = rec._mask;
+      else if (rec.mk && take) {
+        canvas = takeCanvas(rec.mk);
+        rec.mk = null;
+      } else if (rec.mk && stored(rec.mk)) canvas = copyCanvas(stored(rec.mk));
+      if (canvas) layer.restoreMask(canvas, rec.mv);
+      else console.error("[paint] history: the mask of a layer is missing");
     }
   } else if (layer.mask) {
     layer.restoreMask(null, nextVersion());
@@ -478,35 +663,175 @@ function applyLayer(layer, rec) {
   layer.blend = rec.blend;
   layer.locked = rec.locked;
   layer.maskEnabled = rec.maskEnabled;
-  layer.editMask = !!(rec.editMask && rec.mk);
+  layer.editMask = !!(rec.editMask && rec.hasMask);
   layer.text = cloneText(rec.text);
   layer.version = nextVersion();
+}
+
+/* ------------------------------- selections ------------------------------- */
+
+const weakRef = (o) => (typeof WeakRef === "function" ? new WeakRef(o) : null);
+
+/**
+ * A selection as history keeps it: the alpha of its covered area, one byte a
+ * pixel — or only that area when it is a plain, fully selected rectangle.
+ * The live object is remembered weakly and reused while it exists.
+ */
+function packSelection(sel) {
+  const w = sel.canvas.width;
+  const h = sel.canvas.height;
+  const shape = sel.shape ? { ...sel.shape } : null;
+  let b = null;
+  let alpha = null;
+  const r = shape?.type === "rect" ? shape : null;
+  if (r && [r.x, r.y, r.w, r.h].every(Number.isInteger) && r.w > 0 && r.h > 0) {
+    // drawn by fillRect on whole pixels: solid, no need to read it back
+    b = { x: r.x, y: r.y, w: r.w, h: r.h };
+  } else {
+    b = sel.coverBounds;
+    if (b) {
+      const d = sel.ctx.getImageData(b.x, b.y, b.w, b.h).data;
+      alpha = new Uint8Array(b.w * b.h);
+      let solid = true;
+      for (let i = 0; i < alpha.length; i++) {
+        const a = d[i * 4 + 3];
+        alpha[i] = a;
+        if (a !== 255) solid = false;
+      }
+      if (solid) alpha = null;
+    }
+  }
+  return {
+    value: { w, h, b, alpha, shape, ref: weakRef(sel) },
+    bytes: (alpha ? alpha.length : 0) + 64,
+  };
+}
+
+function unpackSelection(data) {
+  const live = data.ref?.deref();
+  if (live) return live;
+  const s = new Selection(data.w, data.h);
+  const b = data.b;
+  if (b && !data.alpha) {
+    s.ctx.fillStyle = "#fff";
+    s.ctx.fillRect(b.x, b.y, b.w, b.h);
+  } else if (b) {
+    const img = s.ctx.createImageData(b.w, b.h);
+    const d = img.data;
+    const a = data.alpha;
+    for (let i = 0; i < a.length; i++) {
+      const j = i * 4;
+      d[j] = d[j + 1] = d[j + 2] = 255;
+      d[j + 3] = a[i];
+    }
+    s.ctx.putImageData(img, b.x, b.y);
+  }
+  s.shape = data.shape ? { ...data.shape } : null;
+  data.ref = weakRef(s);
+  return s;
 }
 
 function captureSelection(sel) {
   if (!sel) return null;
   const key = `s${sel.uid}`;
-  retain(key, () => sel.canvas, false);
-  return { key, sel };
+  return { key, data: retainEntry(key, () => packSelection(sel)) };
 }
 
 const releaseSelection = (s) => s && release(s.key);
+const selectionOf = (s) => (s ? unpackSelection(s.data) : null);
 
 /* ---------------------------- structural edits ---------------------------- */
 
-function captureDoc(doc) {
-  return {
-    width: doc.width,
-    height: doc.height,
-    name: doc.name,
-    activeIndex: doc.activeIndex,
-    sel: captureSelection(doc.selection),
-    layers: doc.layers.map(captureLayer),
-  };
+/**
+ * The document before a structural edit. Layers in `changes` (every layer
+ * when it is null) are copied at once: the edit may draw into them. The
+ * others are only described, with a pointer to their current canvases —
+ * finishBefore() decides once the edit is done what it needs of them.
+ */
+function captureBefore(doc, changes) {
+  const changing = changes ? new Set(changes) : null;
+  const snap = { width: doc.width, height: doc.height, activeIndex: doc.activeIndex, sel: null, layers: [] };
+  try {
+    for (const l of doc.layers) {
+      const rec = describeLayer(l);
+      rec._canvas = l.canvas;
+      rec._mask = l.mask;
+      snap.layers.push(rec);
+      if (!changing || changing.has(l)) {
+        rec._copied = true;
+        keepCopies(rec, l);
+      }
+    }
+    snap.sel = captureSelection(doc.selection);
+  } catch (err) {
+    releaseDoc(snap);
+    throw err;
+  }
+  return snap;
+}
+
+/**
+ * After the edit: keep for the "before" side only what changed. A layer that
+ * still has the same pixel (mask) version needs no bitmap. One whose pixels
+ * did change was either copied up front or still sits, untouched, in the
+ * canvas it had: the edit replaced that canvas or removed the layer.
+ */
+function finishBefore(doc, snap) {
+  const live = new Map(doc.layers.map((l) => [l.id, l]));
+  for (const rec of snap.layers) {
+    const l = live.get(rec.id);
+    if (l && l.pixelVersion === rec.pv) {
+      release(rec.pk);
+      rec.pk = null;
+    } else if (!rec.blank && !rec.pk) {
+      if (l && l.canvas === rec._canvas) {
+        console.error("[paint] history: a layer was drawn into without being declared");
+      }
+      rec.pk = pixelKey(rec.id, rec.pv);
+      retainCanvas(rec.pk, () => rec._canvas, false);
+    }
+    if (rec.hasMask) {
+      if (l && l.mask && l.maskVersion === rec.mv) {
+        release(rec.mk);
+        rec.mk = null;
+      } else if (!rec.mk) {
+        if (l && l.mask === rec._mask) {
+          console.error("[paint] history: a mask was drawn into without being declared");
+        }
+        rec.mk = maskKey(rec.id, rec.mv);
+        retainCanvas(rec.mk, () => rec._mask, false);
+      }
+    }
+    unlink(rec);
+  }
+}
+
+/** The document after a structural edit: copies of what it changed or added. */
+function captureAfter(doc, before) {
+  const prev = new Map(before.layers.map((r) => [r.id, r]));
+  const snap = { width: doc.width, height: doc.height, activeIndex: doc.activeIndex, sel: null, layers: [] };
+  try {
+    for (const l of doc.layers) {
+      const rec = describeLayer(l);
+      snap.layers.push(rec);
+      const b = prev.get(l.id);
+      const samePx = !!b && b.pv === rec.pv;
+      const sameMask = !rec.hasMask || (!!b && b.hasMask && b.mv === rec.mv);
+      keepCopies(rec, l, { pixels: !samePx, mask: !sameMask });
+    }
+    snap.sel = captureSelection(doc.selection);
+  } catch (err) {
+    releaseDoc(snap);
+    throw err;
+  }
+  return snap;
 }
 
 function releaseDoc(snap) {
-  for (const rec of snap.layers) releaseLayer(rec);
+  for (const rec of snap.layers) {
+    releaseLayer(rec);
+    unlink(rec);
+  }
   releaseSelection(snap.sel);
 }
 
@@ -514,10 +839,10 @@ function releaseDoc(snap) {
  * Bring the document back to a snapshot. Layer objects that still exist are
  * updated in place (and keep their bitmaps when the content is unchanged), so
  * references held by the UI stay valid and undoing "New layer" copies nothing.
+ * The document's name is not part of it: renaming is no step of its own.
  */
-function restoreDoc(doc, snap) {
+function restoreDoc(doc, snap, take = false) {
   doc.setSize(snap.width, snap.height);
-  doc.name = snap.name;
   const byId = new Map(doc.layers.map((l) => [l.id, l]));
   doc.layers = snap.layers.map((rec) => {
     let layer = byId.get(rec.id);
@@ -525,12 +850,13 @@ function restoreDoc(doc, snap) {
       layer = new Layer(1, 1, { name: rec.name });
       layer.id = rec.id;
       layer.pixelVersion = -1;
+      layer.maskVersion = -1;
     }
-    applyLayer(layer, rec);
+    applyLayer(layer, rec, take);
     return layer;
   });
   doc.activeIndex = Math.max(0, Math.min(snap.activeIndex, doc.layers.length - 1));
-  doc.selection = snap.sel ? snap.sel.sel : null;
+  doc.selection = selectionOf(snap.sel);
   doc.clearFloating();
   doc.invalidate();
   emit("layers", doc);
@@ -539,19 +865,30 @@ function restoreDoc(doc, snap) {
 }
 
 /**
- * Snapshot the whole document now and decide later what to do with it — used
- * by gestures (crop) and commands that change structure.
+ * Snapshot the document now and decide later what to do with it — used by
+ * commands that change structure (see editDoc for `changes`).
  */
-export function beginEdit() {
+export function beginEdit({ changes = null } = {}) {
   settleSessions();
   const doc = state.doc;
-  const before = captureDoc(doc);
+  const before = captureBefore(doc, changes);
   let done = false;
-  return {
+  const edit = {
+    /**
+     * Record the edit. If that fails (out of memory) the document is put
+     * back as it was and the error is passed on.
+     */
     commit(label) {
       if (done) return;
+      let after;
+      try {
+        finishBefore(doc, before);
+        after = captureAfter(doc, before);
+      } catch (err) {
+        edit.rollback();
+        throw err;
+      }
       done = true;
-      const after = captureDoc(doc);
       history.push({
         label,
         bytes: 0,
@@ -566,8 +903,11 @@ export function beginEdit() {
     rollback() {
       if (done) return;
       done = true;
-      restoreDoc(doc, before);
-      releaseDoc(before);
+      try {
+        restoreDoc(doc, before, true);
+      } finally {
+        releaseDoc(before);
+      }
     },
     dispose() {
       if (done) return;
@@ -575,23 +915,36 @@ export function beginEdit() {
       releaseDoc(before);
     },
   };
+  return edit;
 }
 
 /**
  * Run `fn` and record a document snapshot on both sides. Used for layer
  * management, canvas geometry and anything that changes more than one layer.
+ *
+ * `changes` lists the layers whose existing canvases `fn` draws into (their
+ * pixels or mask); every other layer may be reordered, removed, given new
+ * canvases (adopt, setMask) or left alone, and is never copied unless it
+ * changed. Without `changes` every layer counts as drawn into — always
+ * correct, but it copies every layer the store does not hold yet.
+ *
+ * When `fn` throws, the document is put back as it was, nothing is recorded
+ * and the error is passed on.
  */
-export function editDoc(label, fn) {
+export function editDoc(label, fn, { changes = null } = {}) {
   settleSessions();
   const doc = state.doc;
   if (!doc) return undefined;
-  const edit = beginEdit();
+  const edit = beginEdit({ changes });
   let result;
   try {
     result = fn(doc);
-  } finally {
-    edit.commit(label);
+  } catch (err) {
+    edit.rollback();
+    throw err;
   }
+  // (a commit that fails puts the document back itself)
+  edit.commit(label);
   return result;
 }
 
@@ -604,27 +957,55 @@ export function beginLayerEdit(layer = state.doc?.active) {
   settleSessions();
   const doc = state.doc;
   const id = layer.id;
-  const before = captureLayer(layer);
-  const selBefore = captureSelection(doc.selection);
+  const before = describeLayer(layer);
+  keepCopies(before, layer);
+  let selBefore;
+  try {
+    selBefore = captureSelection(doc.selection);
+  } catch (err) {
+    releaseLayer(before);
+    throw err;
+  }
   let done = false;
 
-  const apply = (rec, sel) => {
+  const apply = (rec, sel, take = false) => {
     const l = doc.layers.find((x) => x.id === id);
-    if (l) applyLayer(l, rec);
-    doc.selection = sel ? sel.sel : null;
+    if (l) applyLayer(l, rec, take);
+    doc.selection = selectionOf(sel);
     doc.clearFloating();
     doc.invalidate();
     emit("layers", doc);
     emit("selection", doc);
   };
 
-  return {
+  const edit = {
+    /** Record the gesture; if that fails, put everything back and throw. */
     commit(label) {
       if (done) return;
-      done = true;
       const l = doc.layers.find((x) => x.id === id) || layer;
-      const after = captureLayer(l);
-      const selAfter = captureSelection(doc.selection);
+      const after = describeLayer(l);
+      // what the gesture did not change needs a bitmap on neither side
+      const samePx = after.pv === before.pv;
+      const sameMask =
+        after.hasMask === before.hasMask && (!after.hasMask || after.mv === before.mv);
+      let selAfter;
+      try {
+        keepCopies(after, l, { pixels: !samePx, mask: !sameMask });
+        selAfter = captureSelection(doc.selection);
+      } catch (err) {
+        releaseLayer(after);
+        edit.rollback();
+        throw err;
+      }
+      if (samePx) {
+        release(before.pk);
+        before.pk = null;
+      }
+      if (sameMask) {
+        release(before.mk);
+        before.mk = null;
+      }
+      done = true;
       history.push({
         label,
         bytes: 0,
@@ -641,9 +1022,12 @@ export function beginLayerEdit(layer = state.doc?.active) {
     rollback() {
       if (done) return;
       done = true;
-      apply(before, selBefore);
-      releaseLayer(before);
-      releaseSelection(selBefore);
+      try {
+        apply(before, selBefore, true);
+      } finally {
+        releaseLayer(before);
+        releaseSelection(selBefore);
+      }
     },
     dispose() {
       if (done) return;
@@ -652,12 +1036,13 @@ export function beginLayerEdit(layer = state.doc?.active) {
       releaseSelection(selBefore);
     },
   };
+  return edit;
 }
 
 /**
- * Record a selection-only change (no pixels touched) — cheap, selections are
- * immutable so both sides are references. Nothing is recorded when `fn`
- * leaves the selection as it was.
+ * Record a selection-only change (no pixels touched) — cheap: selections are
+ * immutable and kept compactly. Nothing is recorded when `fn` leaves the
+ * selection as it was.
  */
 export function editSelection(label, fn) {
   settleSessions();
@@ -668,10 +1053,20 @@ export function editSelection(label, fn) {
   const after = doc.selection;
   if (before === after) return;
 
-  const b = captureSelection(before);
-  const a = captureSelection(after);
+  let b = null;
+  let a = null;
+  try {
+    b = captureSelection(before);
+    a = captureSelection(after);
+  } catch (err) {
+    // out of memory: leave the selection as it was rather than unrecorded
+    releaseSelection(b);
+    doc.selection = before;
+    emit("selection", doc);
+    throw err;
+  }
   const apply = (s) => {
-    doc.selection = s ? s.sel : null;
+    doc.selection = selectionOf(s);
     emit("selection", doc);
   };
 

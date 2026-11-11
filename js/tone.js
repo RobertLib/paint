@@ -10,6 +10,7 @@ import {
   applyLUTs,
   autoRange,
   chainLUT,
+  curveAddPoint,
   curveLUT,
   histogram,
   levelsLUT,
@@ -89,9 +90,19 @@ function sessionDialog(dialog, label, onOpen) {
     if (downOutside && outside(e)) dialog.close();
     downOutside = false;
   });
-  $("[data-apply]", dialog).addEventListener("click", () => {
+  const apply = $("[data-apply]", dialog);
+  apply.addEventListener("click", () => {
     applied = true;
     dialog.close();
+  });
+  // Enter in a number field applies, as in the other dialogs: the typed value
+  // is taken first (its `change` would otherwise come only on blur)
+  dialog.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.isComposing || e.repeat) return;
+    if (e.target.tagName !== "INPUT" || e.target.type !== "number") return;
+    e.preventDefault();
+    e.target.dispatchEvent(new Event("change", { bubbles: true }));
+    if (!apply.disabled) apply.click();
   });
   return {
     open(options) {
@@ -302,7 +313,8 @@ function drawCurves() {
   for (const ch of CHANNELS) {
     const lut = curveLUT(curves.points[ch]);
     const active = ch === curves.channel;
-    if (!active && curves.points[ch].length === 2 && lut[0] === 0 && lut[255] === 255) continue;
+    // an untouched channel is not drawn; one with only its end points moved is
+    if (!active && lut.every((v, i) => v === i)) continue;
     ctx.strokeStyle = CHANNEL_COLOR[ch];
     ctx.globalAlpha = active ? 1 : 0.35;
     ctx.lineWidth = active ? 2 : 1;
@@ -331,6 +343,27 @@ function drawCurves() {
 function updateCurves() {
   drawCurves();
   curves.ctl.session?.update(lutPreview(curvesLuts()));
+}
+
+/**
+ * The point a pointer at `p` grabs: the nearest one within reach, or else
+ * the one at the very same input level — a new point there would sit on top
+ * of it and bend the curve. −1 when there is none.
+ */
+function pointAt(pts, p) {
+  let best = -1;
+  let bestD = Infinity;
+  pts.forEach((q, i) => {
+    const dx = Math.abs(q.x - p.x);
+    const dy = Math.abs(q.y - p.y);
+    if (dx >= 10 || dy >= 14) return;
+    const d = dx * dx + dy * dy;
+    if (d < bestD) {
+      best = i;
+      bestD = d;
+    }
+  });
+  return best;
 }
 
 function curvePos(e) {
@@ -366,14 +399,18 @@ function initCurves() {
   canvas.addEventListener("pointerdown", (e) => {
     const pts = curves.points[curves.channel];
     const p = curvePos(e);
-    let index = pts.findIndex((q) => Math.abs(q.x - p.x) < 10 && Math.abs(q.y - p.y) < 14);
+    let index = pointAt(pts, p);
     if (index < 0) {
-      // a click adds a point on the curve under the pointer
-      const lut = curveLUT(pts);
-      const point = { x: Math.max(1, Math.min(254, p.x)), y: lut[Math.max(0, Math.min(255, p.x))] };
-      pts.push(point);
-      pts.sort((a, b) => a.x - b.x);
-      index = pts.indexOf(point);
+      // a click adds a point on the curve under the pointer — unless a point
+      // already sits at that input level: then that one is picked up
+      const x = Math.max(1, Math.min(254, p.x));
+      index = pts.findIndex((q) => q.x === x);
+      if (index < 0) {
+        // the new point keeps the curve exactly as it is until it moves
+        const added = curveAddPoint(pts, x);
+        pts.splice(0, pts.length, ...added.points);
+        index = pts.indexOf(added.point);
+      }
     }
     canvas.setPointerCapture(e.pointerId);
     curves.drag = { index };
@@ -391,6 +428,7 @@ function initCurves() {
     const isEnd = i === 0 || i === pts.length - 1;
     // dragging an inner point far outside removes it
     if (!isEnd && (p.y < -40 || p.y > 295 || p.x < -30 || p.x > 285)) {
+      for (const q of pts) delete q.m;
       pts.splice(i, 1);
       curves.drag = null;
       updateCurves();
@@ -398,10 +436,13 @@ function initCurves() {
     }
     const lo = i > 0 ? pts[i - 1].x + 1 : 0;
     const hi = i < pts.length - 1 ? pts[i + 1].x - 1 : 255;
-    pts[i] = {
-      x: Math.max(lo, Math.min(hi, p.x)),
-      y: Math.max(0, Math.min(255, p.y)),
-    };
+    const x = Math.max(lo, Math.min(hi, p.x));
+    const y = Math.max(0, Math.min(255, p.y));
+    // still where it was (a click, a twitch): the curve stays as it is
+    if (x === pts[i].x && Math.abs(y - pts[i].y) < 0.5) return;
+    // a moved point re-shapes the whole curve: drop the kept tangents
+    for (const q of pts) delete q.m;
+    pts[i] = { x, y };
     updateCurves();
   });
   // pointerup, pointercancel and a lost capture all end the drag
@@ -413,8 +454,9 @@ function initCurves() {
   canvas.addEventListener("dblclick", (e) => {
     const pts = curves.points[curves.channel];
     const p = curvePos(e);
-    const i = pts.findIndex((q) => Math.abs(q.x - p.x) < 10 && Math.abs(q.y - p.y) < 14);
+    const i = pointAt(pts, p);
     if (i > 0 && i < pts.length - 1) {
+      for (const q of pts) delete q.m;
       pts.splice(i, 1);
       updateCurves();
     }

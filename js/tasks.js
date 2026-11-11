@@ -16,7 +16,7 @@ import { openExportDialog, openResizeDialog } from "./menus.js";
 import { emit, on, setTool, state } from "./state.js";
 import { openCurves, openLevels } from "./tone.js";
 import { TOOLS } from "./tools.js";
-import { icon, openTab, sideScroll } from "./ui.js";
+import { icon, isPhoneLayout, openTab, sideScroll } from "./ui.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -52,8 +52,12 @@ async function swapFilter(to) {
   await applyTaskFilter(to);
 }
 
-/** The colour the picker is editing (the eyedropper fills that one). */
-const pickedColor = () => state[state.activeChip] || state.primary;
+/**
+ * The swatch the readout shows: the one the eyedropper filled last — a plain
+ * click fills the edited one, Alt-click the other — otherwise the edited one.
+ */
+let pickedChip = null;
+const pickedColor = () => state[pickedChip || state.activeChip] || state.primary;
 
 async function copyHex() {
   const hex = rgbToHex(pickedColor()).toUpperCase();
@@ -232,10 +236,14 @@ function showBar(task) {
   };
   offColor?.();
   offColor = null;
+  pickedChip = null;
   if (task.live) {
     offColor = on("color", ({ which } = {}) => {
       // recording a recent colour changes nothing that is shown
       if (bar.hidden || which === "recent") return;
+      // a new colour in one swatch: show that one; a swap or another chip
+      // to edit: the edited one
+      pickedChip = which === "primary" || which === "secondary" ? which : null;
       showColor($("#taskbarText"));
     });
   }
@@ -247,7 +255,9 @@ async function run(task) {
   if (applied) return;
   applied = true;
   if (task.tool) setTool(task.tool);
-  if (task.panel) openTab(task.panel);
+  // a phone's panel sheet would cover a result the task already shows (the
+  // black-and-white photo and its Noir / Sepia bar): pick the tab, keep it shut
+  if (task.panel) openTab(task.panel, { reveal: !(task.filter && isPhoneLayout()) });
   showBar(task);
   if (task.filter) await applyTaskFilter(task.filter);
   task.run?.();

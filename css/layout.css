@@ -105,12 +105,14 @@ html {
 
 /* the menus keep their room: the document name gives way first (and on
    narrow screens, where the name is hidden, the menu bar scrolls) */
+/* (the padding keeps the buttons' focus ring inside the scroller) */
 .menubar {
   display: flex;
   align-items: center;
   gap: 1px;
   flex: 0 0 auto;
   min-width: 0;
+  padding: 4px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -402,6 +404,11 @@ html {
 
 /* ------------------------------- sidebar --------------------------------- */
 
+/* The colour panel and the tabbed panels share the column. On a short
+   window (a 1366 × 768 laptop, a phone held sideways) the colour panel gives
+   way first — it shrinks and scrolls inside — so the Layers / Adjust /
+   Filters panel always keeps a usable height; the column itself scrolls only
+   as the last resort. */
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -411,10 +418,25 @@ html {
   background: var(--bg-1);
   border-left: 1px solid var(--stroke);
   z-index: 15;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .panel {
   border-bottom: 1px solid var(--stroke);
+  flex: none;
+}
+
+.color-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  /* the header with its buttons (collapse, eyedropper, close) stays */
+  min-height: 33px;
+}
+
+.color-panel .panel-head {
   flex: none;
 }
 
@@ -475,10 +497,12 @@ html {
   background: var(--bg-2);
 }
 
+/* basis 0: the panels take what the colour panel leaves, and never less
+   than their minimum (the colour panel shrinks instead) */
 .tab-panels {
   position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 1 1 0;
+  min-height: min(250px, 66%);
   display: flex;
   border-top: 1px solid var(--stroke);
 }
@@ -495,10 +519,10 @@ html {
   animation: panel-in var(--t-med) both;
 }
 
+/* opacity only: a moving panel would make the scrolling column overflow */
 @keyframes panel-in {
   from {
     opacity: 0;
-    transform: translateY(3px);
   }
 }
 
@@ -649,11 +673,19 @@ html {
     display: none;
   }
 
+  /* the icon alone — but the label stays the button's accessible name */
   .btn-primary#exportBtn span {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   #exportBtn {
+    position: relative;
     padding: 0 9px;
   }
 }

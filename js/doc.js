@@ -117,6 +117,14 @@ export function fitScale(w, h) {
   return Math.min(1, edge, area);
 }
 
+/**
+ * An edge of n pixels scaled by k (from fitScale), in whole pixels. Rounded
+ * down — rounding up could pass the area limit — but not below a whole
+ * number that n·k only misses by floating-point error (8000/8311 · 8311 is
+ * 7999.999…).
+ */
+export const scaledEdge = (n, k) => Math.max(1, Math.floor(n * k + 1e-6));
+
 /** Free a canvas's backing store now rather than whenever GC gets to it. */
 export function releaseCanvas(c) {
   if (c && typeof c.width === "number") {
@@ -346,6 +354,17 @@ export function textBounds(text) {
   return { x, y: text.y, w, h };
 }
 
+/**
+ * Where drawText puts the first line relative to the anchor: it matches the
+ * editor box (1px border + padding, half-leading of line-height 1.25).
+ */
+function textInset(text) {
+  return {
+    dx: text.align === "left" ? 3 : text.align === "right" ? -3 : 0,
+    dy: 1 + text.size * ((LINE_HEIGHT - 1) / 2),
+  };
+}
+
 /** Draw a text block exactly as the on-canvas editor showed it. */
 export function drawText(ctx, text) {
   const lines = text.value.split("\n");
@@ -356,14 +375,26 @@ export function drawText(ctx, text) {
   ctx.textBaseline = "top";
   ctx.fillStyle = cssColor({ ...text.color, a: 1 });
   ctx.globalAlpha = text.opacity ?? 1;
-  // match the editor box: 1px border + half-leading of line-height 1.25
-  const dx = text.align === "left" ? 3 : text.align === "right" ? -3 : 0;
-  const dy = 1 + text.size * ((LINE_HEIGHT - 1) / 2);
+  const { dx, dy } = textInset(text);
   lines.forEach((line, i) => ctx.fillText(line, text.x + dx, text.y + dy + i * lineHeight));
   ctx.restore();
 }
 
 export const cloneText = (text) => (text ? { ...text, color: { ...text.color } } : null);
+
+/**
+ * Text parameters for the document scaled by (sx, sy) — expected to be
+ * (nearly) equal. The drawn text lands where its scaled pixels would: the
+ * inset drawText adds to the anchor does not grow with the image.
+ */
+export function scaleText(text, sx, sy) {
+  const out = { ...cloneText(text), size: text.size * sx };
+  const a = textInset(text);
+  const b = textInset(out);
+  out.x = (text.x + a.dx) * sx - b.dx;
+  out.y = (text.y + a.dy) * sy - b.dy;
+  return out;
+}
 
 /* --------------------------------- Layer --------------------------------- */
 
@@ -434,6 +465,12 @@ export class Layer {
     /** identity of the current pixel / mask content (see nextVersion) */
     this.pixelVersion = this.version;
     this.maskVersion = this.version;
+    /**
+     * A pixel version known to be fully transparent (a fresh empty layer),
+     * or -1. While pixelVersion equals it, the history needs no copy of the
+     * pixels. Only code that knows the canvas is empty sets it.
+     */
+    this.blankVersion = -1;
     this._maskTarget = null;
 
     if (fill) {
@@ -532,6 +569,8 @@ export class Layer {
     l.editMask = this.editMask;
     l.text = cloneText(this.text);
     l.touch();
+    // a copy of an empty layer is empty too
+    if (this.blankVersion === this.pixelVersion) l.blankVersion = l.pixelVersion;
     return l;
   }
 
@@ -812,12 +851,12 @@ export class Doc {
   static blank(w, h, fill = "#ffffff") {
     const doc = new Doc(w, h);
     const transparent = !fill || fill === "transparent";
-    doc.layers.push(
-      new Layer(doc.width, doc.height, {
-        name: transparent ? t("Layer {n}", { n: 1 }) : t("Background"),
-        fill: transparent ? null : fill,
-      })
-    );
+    const layer = new Layer(doc.width, doc.height, {
+      name: transparent ? t("Layer {n}", { n: 1 }) : t("Background"),
+      fill: transparent ? null : fill,
+    });
+    if (transparent) layer.blankVersion = layer.pixelVersion;
+    doc.layers.push(layer);
     return doc;
   }
 
@@ -856,6 +895,8 @@ export class Doc {
       fill,
       image,
     });
+    // callers that draw into the new layer touch() it, which ends this
+    if (!fill && !image) layer.blankVersion = layer.pixelVersion;
     this.layers.splice(Math.max(0, Math.min(this.layers.length, index)), 0, layer);
     this.activeIndex = this.layers.indexOf(layer);
     return layer;
@@ -1188,9 +1229,9 @@ export class Doc {
         c.imageSmoothingQuality = "high";
         c.drawImage(src, 0, 0, w, h);
       },
-      Math.abs(sx - sy) < 0.01
-        ? (tx) => ({ ...tx, x: tx.x * sx, y: tx.y * sy, size: tx.size * sx })
-        : null
+      // a non-uniform resize stretches the letters, which text parameters
+      // cannot describe: those text layers become pixels
+      Math.abs(sx - sy) < 0.01 ? (tx) => scaleText(tx, sx, sy) : null
     );
   }
 
@@ -1265,7 +1306,11 @@ export class Doc {
 
   /** The document changed size (undo of a crop, resize…): new scratch buffers. */
   setSize(w, h) {
-    if (w === this.width && h === this.height) return;
+    // (a geometry change that failed half-way may have left the buffers at
+    // another size than the document, or missing)
+    const c = this._composite;
+    const buffersFit = c && c.width === w && c.height === h && this._compositeCtx?.canvas === c;
+    if (w === this.width && h === this.height && buffersFit) return;
     this.width = w;
     this.height = h;
     this._allocBuffers();
@@ -1373,7 +1418,7 @@ export class Doc {
       return loadImage(src);
     };
     const k = fitScale(width, height);
-    const doc = new Doc(Math.round(width * k), Math.round(height * k));
+    const doc = new Doc(scaledEdge(width, k), scaledEdge(height, k));
     const draw = (layerCanvas, image) => {
       const c = ctx2d(layerCanvas);
       c.drawImage(image, 0, 0, image.naturalWidth * k, image.naturalHeight * k);
@@ -1402,11 +1447,16 @@ export class Doc {
       }
       layer.maskEnabled = spec.maskEnabled !== false;
       const tx = spec.text;
-      layer.text =
-        k === 1 && tx && typeof tx.value === "string" && tx.color && Number.isFinite(tx.size)
-          ? cloneText(tx)
-          : null;
+      const valid =
+        tx &&
+        typeof tx.value === "string" &&
+        tx.color &&
+        [tx.size, tx.x, tx.y].every(Number.isFinite);
+      layer.text = valid ? (k === 1 ? cloneText(tx) : scaleText(tx, k, k)) : null;
       layer.touch();
+      // scaled down on open: the text stays editable and is drawn crisp
+      // at its new size rather than resampled
+      if (layer.text && k !== 1) layer.renderText();
       doc.layers.push(layer);
     }
     if (!doc.layers.length) doc.layers.push(new Layer(doc.width, doc.height));
@@ -1503,5 +1553,7 @@ export function paintMasked(
     c.drawImage(source, 0, 0);
   }
   c.restore();
+  // the document-sized temporary goes now, not whenever GC gets to it
+  if (source !== src) releaseCanvas(source);
   layer.touch();
 }

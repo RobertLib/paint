@@ -134,11 +134,23 @@ function endFloating(label, { erase = false, opacity = 1, blend = "source-over" 
   const doc = state.doc;
   // commit to the layer the stroke started on, even if another became active
   const { buf, bounds, target: layer } = takeFloating();
-  const rect = bounds && bounds !== "all" ? padRect(bounds, BOUNDS_PAD) : null;
+  // a buffer painted all over (a gradient) still changes only the selection
+  const rect =
+    bounds && bounds !== "all"
+      ? padRect(bounds, BOUNDS_PAD)
+      : doc?.selection?.coverBounds || null;
   // a stroke entirely outside the selection changes nothing: record nothing
   const sel = doc?.selection?.bounds;
   const outside = !!doc?.selection && (!sel || (rect && !intersects(rect, sel)));
-  if (buf && bounds && attached(doc, layer) && !layer.locked && !outside) {
+  if (
+    buf &&
+    bounds &&
+    attached(doc, layer) &&
+    !layer.locked &&
+    !outside &&
+    // erasing where nothing is left changes nothing: record nothing
+    !(erase && rect && nothingToErase(layer, buf, rect, doc.selection))
+  ) {
     editPixels(
       label,
       () => paintMasked(layer, buf, doc.selection, { opacity, blend, erase, rect }),
@@ -150,6 +162,27 @@ function endFloating(label, { erase = false, opacity = 1, blend = "source-over" 
   // the stroke is in the layer now (or dropped): free the document-sized buffer
   releaseCanvas(buf);
   requestRender();
+}
+
+/**
+ * Is everything an eraser stroke covers (inside `rect`, the selection
+ * allowing) already fully transparent — or, on a mask, fully hidden?
+ */
+function nothingToErase(layer, buf, rect, selection) {
+  const W = layer.width;
+  const H = layer.height;
+  const x = Math.max(0, Math.floor(rect.x));
+  const y = Math.max(0, Math.floor(rect.y));
+  const w = Math.min(W, Math.ceil(rect.x + rect.w)) - x;
+  const h = Math.min(H, Math.ceil(rect.y + rect.h)) - y;
+  if (w <= 0 || h <= 0) return true;
+  const own = layer.ctx.getImageData(x, y, w, h).data;
+  const paint = buf.getContext("2d").getImageData(x, y, w, h).data;
+  const selA = selection ? selection.ctx.getImageData(x, y, w, h).data : null;
+  for (let i = 3; i < own.length; i += 4) {
+    if (own[i] && paint[i] && (!selA || selA[i])) return false;
+  }
+  return true;
 }
 
 function abortFloating() {
@@ -269,13 +302,22 @@ function segRect(a, b, size) {
 
 const maskCache = new Map();
 
+/**
+ * A brush-sized scratch canvas kept in main memory: a dab reads the layer
+ * once and writes it back once, and everything in between stays on the CPU
+ * instead of crossing to the GPU and back at every step.
+ */
+function dabCanvas(w, h) {
+  const c = makeCanvas(w, h);
+  return [c, ctx2d(c, { willReadFrequently: true })];
+}
+
 function softMask(size, hardness) {
   const s = Math.max(1, Math.ceil(size));
   const key = `${s}|${hardness.toFixed(2)}`;
   const hit = maskCache.get(key);
   if (hit) return hit;
-  const c = makeCanvas(s, s);
-  const cc = ctx2d(c);
+  const [c, cc] = dabCanvas(s, s);
   const r = s / 2;
   const g = cc.createRadialGradient(r, r, r * Math.min(0.9, hardness), r, r, r);
   g.addColorStop(0, "rgba(255,255,255,1)");
@@ -289,14 +331,28 @@ function softMask(size, hardness) {
   return c;
 }
 
+/** Same pixels? (two canvases of equal size) */
+function samePixels(a, b) {
+  const w = a.width;
+  const h = a.height;
+  const da = new Uint32Array(a.getContext("2d").getImageData(0, 0, w, h).data.buffer);
+  const db = new Uint32Array(b.getContext("2d").getImageData(0, 0, w, h).data.buffer);
+  for (let i = 0; i < da.length; i++) if (da[i] !== db[i]) return false;
+  return true;
+}
+
 /**
  * Grab the patch under the brush (only the part inside the layer — nothing
  * from beyond the edge may leak in), let `produce` transform it, then blend
- * it back through a soft round mask and the selection:
- * result = old · (1 − m) + new · m, which also carries transparency over.
- * Returns the document rectangle that may have changed, or null.
+ * it back through a soft round mask and the selection. By default the result
+ * replaces the old pixels — result = old · (1 − m) + new · m, which also
+ * carries transparency over; with `over` it is painted on top instead, so a
+ * transparent result leaves the old pixels alone (the clone stamp).
+ * A dab that would change no pixel leaves the layer untouched (no new
+ * version, so a stroke of such dabs records nothing).
+ * Returns the document rectangle that changed, or null.
  */
-function retouchPatch(layer, cx, cy, radius, hardness, alpha, produce, source = layer.canvas) {
+function retouchPatch(layer, cx, cy, radius, hardness, alpha, produce, { over = false } = {}) {
   const size = Math.max(2, Math.ceil(radius * 2));
   const sx0 = Math.round(cx - size / 2);
   const sy0 = Math.round(cy - size / 2);
@@ -310,38 +366,54 @@ function retouchPatch(layer, cx, cy, radius, hardness, alpha, produce, source = 
   const selBounds = sel?.bounds;
   if (sel && (!selBounds || !intersects({ x: x0, y: y0, w, h }, selBounds))) return null;
 
-  const patch = makeCanvas(w, h);
-  const pc = ctx2d(patch);
-  pc.drawImage(source, -x0, -y0);
+  // the pixels as they are, kept to compare the result with
+  const [old, oc] = dabCanvas(w, h);
+  oc.drawImage(layer.canvas, -x0, -y0);
+
+  const [patch, pc] = dabCanvas(w, h);
+  pc.drawImage(old, 0, 0);
 
   const produced = produce(patch, pc, { x0, y0, w, h }) || patch;
 
   // coverage: the soft brush, limited to the selection
-  const m = makeCanvas(w, h);
-  const mmc = ctx2d(m);
+  const [m, mmc] = dabCanvas(w, h);
   mmc.drawImage(softMask(size, hardness), sx0 - x0, sy0 - y0);
   if (sel) {
     mmc.globalCompositeOperation = "destination-in";
     mmc.drawImage(sel.canvas, -x0, -y0);
   }
 
-  const masked = makeCanvas(w, h);
-  const mc = ctx2d(masked);
+  const [masked, mc] = dabCanvas(w, h);
   mc.drawImage(produced, 0, 0);
   mc.globalCompositeOperation = "destination-in";
   mc.drawImage(m, 0, 0);
 
-  const c = layer.ctx;
-  c.save();
-  c.setTransform(1, 0, 0, 1, 0, 0);
-  c.globalAlpha = clamp(alpha, 0, 1);
-  c.globalCompositeOperation = "destination-out";
-  c.drawImage(m, x0, y0);
-  c.globalCompositeOperation = "lighter";
-  c.drawImage(masked, x0, y0);
-  c.restore();
-  layer.touch();
-  return { x: x0, y: y0, w, h };
+  // the result, composed off the layer so an unchanged dab can be dropped
+  const [res, rc] = dabCanvas(w, h);
+  rc.drawImage(old, 0, 0);
+  rc.globalAlpha = clamp(alpha, 0, 1);
+  if (!over) {
+    rc.globalCompositeOperation = "destination-out";
+    rc.drawImage(m, 0, 0);
+    rc.globalCompositeOperation = "lighter";
+  }
+  rc.drawImage(masked, 0, 0);
+
+  const changed = !samePixels(old, res);
+  if (changed) {
+    const c = layer.ctx;
+    c.save();
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalAlpha = 1;
+    c.globalCompositeOperation = "source-over";
+    c.clearRect(x0, y0, w, h);
+    c.drawImage(res, x0, y0);
+    c.restore();
+    layer.touch();
+  }
+  // a dab allocates a handful of brush-sized canvases: free them now
+  for (const cv of new Set([old, patch, produced, m, masked, res])) releaseCanvas(cv);
+  return changed ? { x: x0, y: y0, w, h } : null;
 }
 
 /**
@@ -466,16 +538,21 @@ function floodMask(img, sx, sy, tolerance, contiguous) {
   return mask;
 }
 
-function maskToCanvas(mask, w, h) {
-  const c = makeCanvas(w, h);
+/** A w × h coverage array as a white canvas — all of it, or just `r`. */
+function maskToCanvas(mask, w, h, r = { x: 0, y: 0, w, h }) {
+  const c = makeCanvas(r.w, r.h);
   const cc = ctx2d(c);
-  const img = cc.createImageData(w, h);
+  const img = cc.createImageData(r.w, r.h);
   const d = img.data;
-  for (let p = 0; p < mask.length; p++) {
-    if (!mask[p]) continue;
-    const i = p * 4;
-    d[i] = d[i + 1] = d[i + 2] = 255;
-    d[i + 3] = mask[p];
+  for (let y = 0; y < r.h; y++) {
+    const row = (r.y + y) * w + r.x;
+    for (let x = 0; x < r.w; x++) {
+      const v = mask[row + x];
+      if (!v) continue;
+      const i = (y * r.w + x) * 4;
+      d[i] = d[i + 1] = d[i + 2] = 255;
+      d[i + 3] = v;
+    }
   }
   cc.putImageData(img, 0, 0);
   return c;
@@ -848,18 +925,30 @@ const bucket = {
     if (x < 0 || y < 0 || x >= doc.width || y >= doc.height) return;
 
     const id = this.id;
-    const source = opt("sampleAll", id) ? doc.composite() : layer.canvas;
+    const sel = doc.selection;
+    // nothing selected that a fill could reach
+    if (sel && !sel.coverBounds) return;
+    const fromLayer = !opt("sampleAll", id);
+    const source = fromLayer ? layer.canvas : doc.composite();
     const img = source
       .getContext("2d")
       .getImageData(0, 0, doc.width, doc.height);
     const mask = floodMask(img, x, y, opt("tolerance", id), !!opt("contiguous", id));
     if (!mask) return;
 
-    let maskCanvas = maskToCanvas(mask, doc.width, doc.height);
-    const grow = opt("grow", id);
+    // the area the fill covers: the region, the expansion, the selection
+    const grow = opt("grow", id) || 0;
+    const found = maskBounds(mask, doc.width, doc.height);
+    if (!found) return;
+    const region = clipRect(padRect(found, grow), doc.width, doc.height);
+    const rect = sel ? clipRect(region, doc.width, doc.height, sel.coverBounds) : region;
+    // the region lies entirely outside the selection: nothing to fill
+    if (!rect) return;
+
+    let maskCanvas = maskToCanvas(mask, doc.width, doc.height, region);
     if (grow > 0) {
       // dilate slightly so fills tuck under anti-aliased outlines
-      const grown = makeCanvas(doc.width, doc.height);
+      const grown = makeCanvas(region.w, region.h);
       const gc = ctx2d(grown);
       for (let dy = -grow; dy <= grow; dy++) {
         for (let dx = -grow; dx <= grow; dx++) {
@@ -871,21 +960,30 @@ const bucket = {
       maskCanvas = grown;
     }
 
+    const color = state.primary;
+    // already filled with this very colour: painting it again changes nothing
+    if (!layer.isMask && alreadyFilled(layer, fromLayer ? img : null, maskCanvas, region, rect, sel, color)) {
+      releaseCanvas(maskCanvas);
+      return;
+    }
+
     const paint = makeCanvas(doc.width, doc.height);
     const pc = ctx2d(paint);
-    pc.fillStyle = cssColor(state.primary);
-    pc.fillRect(0, 0, doc.width, doc.height);
+    pc.fillStyle = cssColor(color);
+    pc.fillRect(region.x, region.y, region.w, region.h);
     pc.globalCompositeOperation = "destination-in";
-    pc.drawImage(maskCanvas, 0, 0);
+    pc.drawImage(maskCanvas, region.x, region.y);
     releaseCanvas(maskCanvas);
 
     editPixels(
       t("Fill"),
       () =>
-        paintMasked(layer, paint, doc.selection, {
+        paintMasked(layer, paint, sel, {
           opacity: opt("opacity", id) / 100,
+          rect,
         }),
-      layer
+      layer,
+      rect
     );
     // the fill is in the layer now: free its document-sized buffer at once
     releaseCanvas(paint);
@@ -893,6 +991,63 @@ const bucket = {
     requestRender();
   },
 };
+
+/** Bounds of the non-zero entries of a w × h coverage array, or null. */
+function maskBounds(mask, w, h) {
+  let minX = w;
+  let minY = h;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    let x = 0;
+    while (x < w && !mask[row + x]) x++;
+    if (x === w) continue;
+    let r = w - 1;
+    while (!mask[row + r]) r--;
+    if (x < minX) minX = x;
+    if (r > maxX) maxX = r;
+    if (y < minY) minY = y;
+    maxY = y;
+  }
+  return maxX < 0 ? null : { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+
+/** `r` as whole pixels inside a W × H canvas (and inside `also`), or null. */
+function clipRect(r, W, H, also = null) {
+  let x0 = Math.max(0, Math.floor(r.x));
+  let y0 = Math.max(0, Math.floor(r.y));
+  let x1 = Math.min(W, Math.ceil(r.x + r.w));
+  let y1 = Math.min(H, Math.ceil(r.y + r.h));
+  if (also) {
+    x0 = Math.max(x0, Math.floor(also.x));
+    y0 = Math.max(y0, Math.floor(also.y));
+    x1 = Math.min(x1, Math.ceil(also.x + also.w));
+    y1 = Math.min(y1, Math.ceil(also.y + also.h));
+  }
+  return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
+}
+
+/**
+ * Does every pixel a fill would cover (coverage × selection > 0) already hold
+ * `color`, fully opaque? `img` is the layer's full ImageData when at hand.
+ */
+function alreadyFilled(layer, img, cover, region, rect, sel, color) {
+  const cov = cover.getContext("2d").getImageData(rect.x - region.x, rect.y - region.y, rect.w, rect.h).data;
+  const selA = sel ? sel.ctx.getImageData(rect.x, rect.y, rect.w, rect.h).data : null;
+  const own = img ? null : layer.ctx.getImageData(rect.x, rect.y, rect.w, rect.h).data;
+  const W = layer.width;
+  for (let yy = 0; yy < rect.h; yy++) {
+    for (let xx = 0; xx < rect.w; xx++) {
+      const i = (yy * rect.w + xx) * 4;
+      if (!cov[i + 3] || (selA && !selA[i + 3])) continue;
+      const d = own || img.data;
+      const j = own ? i : ((rect.y + yy) * W + rect.x + xx) * 4;
+      if (d[j] !== color.r || d[j + 1] !== color.g || d[j + 2] !== color.b || d[j + 3] !== 255) return false;
+    }
+  }
+  return true;
+}
 
 const gradient = {
   id: "gradient",
@@ -929,19 +1084,27 @@ const gradient = {
   _start: null,
   _length: 0,
   _opacity: 1,
+  /** a gradient into a layer mask: {edit, target, cov, val} (see _drawMask; the buffers only with a selection) */
+  _mask: null,
   down(ev) {
-    if (!state.doc.target || state.doc.target.locked) return;
+    const target = state.doc.target;
+    if (!target || target.locked) return;
     this._start = ev.p;
     this._length = 0;
     this._opacity = opt("opacity", this.id) / 100;
-    beginFloating({ opacity: this._opacity });
+    if (target.isMask) {
+      // A mask is drawn into directly, on the GPU: through the floating
+      // buffer every frame would turn the whole mask into mask values on the
+      // CPU again. The edit's "before" copy is the mask to start from.
+      this._mask = { edit: beginPixelEdit(target), target, cov: null, val: null };
+    } else {
+      beginFloating({ opacity: this._opacity });
+    }
     this.move(ev);
   },
   move(ev) {
-    if (!stroke.active || !this._start) return;
+    if (!this._start || (!stroke.active && !this._mask)) return;
     const doc = state.doc;
-    const ctx = stroke.bctx;
-    ctx.clearRect(0, 0, doc.width, doc.height);
     const a = this._start;
     let b = ev.p;
     if (ev.shift) {
@@ -959,25 +1122,109 @@ const gradient = {
         : kind === "fade"
         ? { ...state.primary, a: 0 }
         : state.primary;
+    const radial = opt("type", this.id) === "radial";
+    const gradientOn = (ctx, s1, s2) => {
+      const g = radial
+        ? ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, Math.max(1, this._length))
+        : ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+      g.addColorStop(0, s1);
+      g.addColorStop(1, s2);
+      return g;
+    };
 
-    let g;
-    if (opt("type", this.id) === "radial") {
-      const r = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
-      g = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, r);
-    } else {
-      g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+    if (this._mask) {
+      this._drawMask(gradientOn, c1, c2);
+      requestRender();
+      return;
     }
-    g.addColorStop(0, cssColor(c1));
-    g.addColorStop(1, cssColor(c2));
-    ctx.fillStyle = g;
+    const ctx = stroke.bctx;
+    ctx.clearRect(0, 0, doc.width, doc.height);
+    ctx.fillStyle = gradientOn(ctx, cssColor(c1), cssColor(c2));
     ctx.fillRect(0, 0, doc.width, doc.height);
     strokeChanged();
+    requestRender();
+  },
+  /**
+   * The mask with the gradient applied, as paintMaskRegion() would compute
+   * it: new = old · (1 − cov) + value · cov, where cov is the paint's alpha
+   * (× opacity × selection) and value its brightness. `cov` and `val` hold
+   * cov and value · cov; along every gradient one of alpha or colour is
+   * constant, so both are plain gradients themselves.
+   */
+  _drawMask(gradientOn, c1, c2) {
+    const m = this._mask;
+    const { edit, target } = m;
+    const sel = state.doc.selection;
+    const W = target.width;
+    const H = target.height;
+    const lum = (c) => (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) / 255;
+    const white = (alpha) => `rgba(255,255,255,${Math.max(0, Math.min(1, alpha))})`;
+    const a1 = c1.a ?? 1;
+    const a2 = c2.a ?? 1;
+    const stops = [
+      [white(a1), white(a2)],
+      [white(a1 * lum(c1)), white(a2 * lum(c2))],
+    ];
+    const c = target.ctx;
+    // without a selection both gradients go straight onto the mask; with one
+    // they are cut to it first, in buffers kept for the whole drag
+    let sources = null;
+    if (sel) {
+      m.cov ||= makeCanvas(W, H);
+      m.val ||= makeCanvas(W, H);
+      sources = [m.cov, m.val];
+      sources.forEach((canvas, i) => {
+        const bc = ctx2d(canvas);
+        bc.globalCompositeOperation = "source-over";
+        bc.clearRect(0, 0, W, H);
+        bc.fillStyle = gradientOn(bc, ...stops[i]);
+        bc.fillRect(0, 0, W, H);
+        bc.globalCompositeOperation = "destination-in";
+        bc.drawImage(sel.canvas, 0, 0);
+      });
+    }
+    c.save();
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalAlpha = 1;
+    c.globalCompositeOperation = "copy";
+    c.drawImage(edit.before, 0, 0);
+    c.globalAlpha = this._opacity;
+    ["destination-out", "lighter"].forEach((op, i) => {
+      c.globalCompositeOperation = op;
+      if (sources) {
+        c.drawImage(sources[i], 0, 0);
+      } else {
+        c.fillStyle = gradientOn(c, ...stops[i]);
+        c.fillRect(0, 0, W, H);
+      }
+    });
+    c.restore();
+    target.touch();
+  },
+  /** End a mask gradient: keep it (`label`) or put the mask back. */
+  _endMask(label) {
+    const { edit, target, cov, val } = this._mask;
+    this._mask = null;
+    const doc = state.doc;
+    if (label && attached(doc, target) && !target.locked) {
+      edit.commit(label, doc.selection?.coverBounds || null);
+      emit("layers", doc);
+    } else {
+      edit.rollback();
+    }
+    releaseCanvas(cov);
+    releaseCanvas(val);
     requestRender();
   },
   up() {
     this._start = null;
     // a click without a drag has no direction: nothing to paint
-    if (this._length < 1) {
+    const empty = this._length < 1;
+    if (this._mask) {
+      this._endMask(empty ? null : t("Gradient"));
+      return;
+    }
+    if (empty) {
       abortFloating();
       return;
     }
@@ -985,7 +1232,8 @@ const gradient = {
   },
   cancel() {
     this._start = null;
-    abortFloating();
+    if (this._mask) this._endMask(null);
+    else abortFloating();
   },
 };
 
@@ -1086,8 +1334,10 @@ function retouchTool({
       this._stamped = true;
       requestRender();
     },
-    up() {
+    up(ev) {
       if (!this._edit) return;
+      // the last stretch up to where the pointer was released
+      if (ev?.p) this.move(ev);
       this._edit.commit(label, this._bounds);
       this._edit = null;
       this._layer = null;
@@ -1142,7 +1392,10 @@ const smudgeTool = retouchTool({
     const dx = x - prev.x;
     const dy = y - prev.y;
     if (!dx && !dy) return null;
-    // drag the pixels from the previous position into the current one
+    // drag the pixels from the previous position into the current one: each
+    // pixel under the brush takes the one from just behind it
+    const ox = dx * 0.9;
+    const oy = dy * 0.9;
     return retouchPatch(
       layer,
       x,
@@ -1151,8 +1404,20 @@ const smudgeTool = retouchTool({
       hardness,
       Math.min(0.85, strength),
       (patch, pc, { x0, y0, w, h }) => {
+        // where "behind" lies beyond the canvas there is nothing to drag:
+        // those pixels keep what they had instead of turning transparent
+        const ux0 = Math.max(0, Math.ceil(ox - x0));
+        const uy0 = Math.max(0, Math.ceil(oy - y0));
+        const ux1 = Math.min(w, Math.floor(layer.width + ox - x0));
+        const uy1 = Math.min(h, Math.floor(layer.height + oy - y0));
+        if (ux1 <= ux0 || uy1 <= uy0) return patch;
+        pc.save();
+        pc.beginPath();
+        pc.rect(ux0, uy0, ux1 - ux0, uy1 - uy0);
+        pc.clip();
         pc.clearRect(0, 0, w, h);
-        pc.drawImage(layer.canvas, -x0 + -dx * 0.9, -y0 + -dy * 0.9);
+        pc.drawImage(layer.canvas, -x0 + ox, -y0 + oy);
+        pc.restore();
         return patch;
       }
     );
@@ -1164,15 +1429,19 @@ const smudgeTool = retouchTool({
 /**
  * Healing: keep the texture (high frequencies) of the source but the colour
  * and light (low frequencies) of the destination, so the repair blends in.
+ * Where the source is transparent (or beyond the canvas) it has no texture to
+ * give: the destination stays as it was there instead of turning dark.
  */
 function healPatch(src, dst, w, h, sigma) {
   const lowS = gaussData(src, w, h, sigma);
   const lowD = gaussData(dst, w, h, sigma);
   const out = new Uint8ClampedArray(dst.length);
   for (let i = 0; i < dst.length; i += 4) {
-    out[i] = src[i] - lowS[i] + lowD[i];
-    out[i + 1] = src[i + 1] - lowS[i + 1] + lowD[i + 1];
-    out[i + 2] = src[i + 2] - lowS[i + 2] + lowD[i + 2];
+    const a = src[i + 3] / 255;
+    for (let ch = 0; ch < 3; ch++) {
+      const healed = Math.min(255, Math.max(0, src[i + ch] - lowS[i + ch] + lowD[i + ch]));
+      out[i + ch] = dst[i + ch] + (healed - dst[i + ch]) * a;
+    }
     out[i + 3] = dst[i + 3];
   }
   return out;
@@ -1230,10 +1499,11 @@ const healTool = withSource(
       const { dx, dy } = tool._offset;
       return retouchPatch(layer, x, y, radius, hardness, strength, (patch, pc, { x0, y0, w, h }) => {
         const dst = pc.getImageData(0, 0, w, h);
-        const srcCanvas = makeCanvas(w, h);
-        const sc = ctx2d(srcCanvas);
-        sc.drawImage(snapshot || layer.canvas, -x0 + dx, -y0 + dy);
+        const [srcCanvas, sc] = dabCanvas(w, h);
+        // the source lies `_offset` away from the brush
+        sc.drawImage(snapshot || layer.canvas, -(x0 + dx), -(y0 + dy));
         const src = sc.getImageData(0, 0, w, h);
+        releaseCanvas(srcCanvas);
         dst.data.set(healPatch(src.data, dst.data, w, h, Math.max(2, Math.max(w, h) / 7)));
         pc.putImageData(dst, 0, 0);
         return patch;
@@ -1597,11 +1867,23 @@ const cloneTool = withSource(
     produce: ({ layer, x, y, radius, hardness, strength, tool, snapshot }) => {
       if (!tool._offset) return null;
       const { dx, dy } = tool._offset;
-      return retouchPatch(layer, x, y, radius, hardness, strength, (patch, pc, { x0, y0, w, h }) => {
-        pc.clearRect(0, 0, w, h);
-        pc.drawImage(snapshot || layer.canvas, -x0 + dx, -y0 + dy);
-        return patch;
-      });
+      // painted over the destination, like paint: a transparent source (or
+      // one beyond the canvas edge) has nothing to clone and erases nothing
+      return retouchPatch(
+        layer,
+        x,
+        y,
+        radius,
+        hardness,
+        strength,
+        (patch, pc, { x0, y0, w, h }) => {
+          pc.clearRect(0, 0, w, h);
+          // the source lies `_offset` away from the brush
+          pc.drawImage(snapshot || layer.canvas, -(x0 + dx), -(y0 + dy));
+          return patch;
+        },
+        { over: true }
+      );
     },
   }),
   t("Clone source set"),
@@ -1832,6 +2114,9 @@ const starShape = shapeTool({
 
 /* -------------------------------- text tool ------------------------------- */
 
+/** How far drawText() (doc.js) sets left- / right-aligned text in from its anchor. */
+const TEXT_INSET = 3;
+
 const FONTS = [
   ["system-ui, -apple-system, 'Segoe UI', sans-serif", t("System sans")],
   ["Georgia, 'Times New Roman', serif", t("Serif")],
@@ -1949,6 +2234,10 @@ const text = {
     const host = document.getElementById("stageLayer");
     const el = document.createElement("textarea");
     el.className = "text-editor";
+    // the generic `textarea:focus` rule would fill the box (and hide the
+    // picture behind the text being typed) and round its corners
+    el.style.background = "transparent";
+    el.style.borderRadius = "0";
     el.rows = 1;
     el.spellcheck = false;
     el.value = value;
@@ -1969,7 +2258,10 @@ const text = {
 
     el.addEventListener("input", () => this._sync());
     el.addEventListener("keydown", (e) => {
-      e.stopPropagation();
+      // typing is the editor's own; a command key goes on to the app, which
+      // takes only the file commands (⌘S, ⌘O, ⇧⌘E — saving settles the text
+      // first) and leaves every other key in a text field alone
+      if (!(e.metaKey || e.ctrlKey) || e.key === "Enter") e.stopPropagation();
       // Escape / Enter while an input method is composing belong to the IME
       if (e.isComposing || e.keyCode === 229) return;
       if (e.key === "Escape") {
@@ -2006,8 +2298,11 @@ const text = {
     el.style.color = cssColor(state.primary);
     el.style.opacity = String(this._style.opacity);
     el.style.textAlign = this._style.align;
+    // drawText() sets the text 3 px in from the anchor (left and right
+    // alignment): 1 px of border plus this padding puts the typed text there
+    el.style.padding = `0 ${TEXT_INSET - 1}px`;
     el.style.left = `${p.x}px`;
-    el.style.top = `${p.y}px`;
+    el.style.top = `${p.y + this._baselineShift(font, size) * view.zoom}px`;
 
     // scale about the anchor (the box's top-left), then shift the box left by
     // its own width for centred / right-aligned text — in that order, so the
@@ -2024,8 +2319,28 @@ const text = {
     m.font = font;
     let widest = 0;
     for (const line of lines) widest = Math.max(widest, m.measureText(line || " ").width);
-    el.style.width = `${Math.ceil(widest + size * 0.35 + 6)}px`;
+    el.style.width = `${Math.ceil(widest + size * 0.35 + 2 + TEXT_INSET * 2)}px`;
     el.style.height = `${Math.ceil(lines.length * size * LINE_HEIGHT + 4)}px`;
+  },
+  /**
+   * How far (document px) the baseline drawText() uses lies below the one
+   * the editor shows. drawText() puts the top of the em box half a leading
+   * of `size` below the border; CSS centres the font's whole ascent +
+   * descent in the line instead, which sits lower for most fonts. 0 when the
+   * browser lacks the metrics.
+   */
+  _baselineShift(font, size) {
+    const m = measureCtx();
+    m.font = font;
+    m.textBaseline = "top";
+    const top = Math.abs(m.measureText("H").alphabeticBaseline);
+    m.textBaseline = "alphabetic";
+    const { fontBoundingBoxAscent: A, fontBoundingBoxDescent: D } = m.measureText("H");
+    if (![top, A, D].every(Number.isFinite)) return 0;
+    const line = size * LINE_HEIGHT;
+    const drawn = (line - size) / 2 + top;
+    const shown = (line - (A + D)) / 2 + A;
+    return drawn - shown;
   },
   commit() {
     const el = this._editor;
@@ -2373,6 +2688,12 @@ const move = {
       bc.drawImage(orig, 0, 0);
       bc.globalCompositeOperation = "destination-out";
       bc.drawImage(sel.canvas, 0, 0);
+      if (target.isMask) {
+        // what a moved part of a mask leaves behind is revealed, as when
+        // the whole mask moves (see drawShiftedMask)
+        bc.globalCompositeOperation = "lighter";
+        bc.drawImage(sel.canvas, 0, 0);
+      }
       this._base = base;
       releaseCanvas(orig);
     } else {
@@ -2405,7 +2726,15 @@ const move = {
     if (this._base) {
       c.globalCompositeOperation = "copy";
       c.drawImage(this._base, 0, 0);
-      c.globalCompositeOperation = "source-over";
+      if (target.isMask) {
+        // a mask's alpha is its value: the moved part replaces what it lands
+        // on, so hidden parts stay hidden instead of vanishing over revealed
+        c.globalCompositeOperation = "destination-out";
+        c.drawImage(this._sel.canvas, dx, dy);
+        c.globalCompositeOperation = "lighter";
+      } else {
+        c.globalCompositeOperation = "source-over";
+      }
       c.drawImage(this._cut, dx, dy);
     } else if (target.isMask) {
       // an empty strip of a mask means "revealed", not "hidden"
@@ -2564,11 +2893,13 @@ const transform = {
     if (this._preview?.key === key) return this._preview.b;
     // a mask's "content" is all of it — its hidden parts matter as much
     let b = sel
-      ? sel.bounds
+      ? target.isMask
+        ? sel.coverBounds
+        : sel.bounds
       : target.isMask
       ? { x: 0, y: 0, w: target.width, h: target.height }
       : alphaBounds(target.canvas, 0);
-    if (sel && b) {
+    if (sel && b && !target.isMask) {
       // shrink to the pixels actually inside the selection
       const probe = makeCanvas(b.w, b.h);
       const pc = ctx2d(probe);
@@ -2637,6 +2968,12 @@ const transform = {
       const bc = ctx2d(base);
       bc.globalCompositeOperation = "destination-out";
       bc.drawImage(sel.canvas, 0, 0);
+      if (target.isMask) {
+        // the area a transformed part of a mask leaves is revealed, as when
+        // the whole mask is transformed
+        bc.globalCompositeOperation = "lighter";
+        bc.drawImage(sel.canvas, 0, 0);
+      }
     }
     let selPatch = null;
     if (sel) {
@@ -2704,6 +3041,13 @@ const transform = {
       c.imageSmoothingEnabled = true;
       c.imageSmoothingQuality = "high";
       c.setTransform(m);
+      if (s.target.isMask) {
+        // a mask's alpha is its value: the transformed part replaces what it
+        // lands on, hidden parts included
+        c.globalCompositeOperation = "destination-out";
+        c.drawImage(s.selPatch, 0, 0);
+        c.globalCompositeOperation = "lighter";
+      }
       c.drawImage(s.patch, 0, 0);
     }
     c.restore();
@@ -3186,6 +3530,12 @@ const crop = {
     // never more than the canvas: a crop must not add transparent margins
     const rect = fitCrop(r, doc.width, doc.height);
     overlay.crop = null;
+    // a frame around the whole canvas crops nothing: record nothing either
+    // (and keep the selection a crop would drop)
+    if (rect.x === 0 && rect.y === 0 && rect.w === doc.width && rect.h === doc.height) {
+      requestRender();
+      return;
+    }
     emit("crop-apply", rect);
   },
   cancel() {
@@ -3538,9 +3888,10 @@ export function initInput(canvas) {
         clientX: (a.clientX + b.clientX) / 2,
         clientY: (a.clientY + b.clientY) / 2,
       });
-      if (pinch.dist > 0) view.setZoom((dist / pinch.dist) * pinch.zoom, mid);
-      // two fingers moving together pan the canvas
+      // two fingers moving together pan the canvas — first, so the point
+      // that was under the fingers is under them again, then zoom about it
       view.pan(mid.x - pinch.mid.x, mid.y - pinch.mid.y);
+      if (pinch.dist > 0) view.setZoom((dist / pinch.dist) * pinch.zoom, mid);
       pinch.mid = mid;
       return;
     }
@@ -3639,15 +3990,51 @@ export function initInput(canvas) {
   });
 
   /* space = temporary pan, mirroring every other editor — but not while a
-     control has focus (Space toggles checkboxes, presses buttons) or a
-     dialog is open */
-  // (a focused toolbar button is fine: panning beats pressing it again)
-  const SPACE_ROLES = /^(checkbox|radio|switch|slider|option|menuitem|tab|listitem|textbox)$/;
-  const ownsSpace = (el) =>
-    !!el &&
-    (isTypingTarget(el) ||
-      /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName) ||
-      SPACE_ROLES.test(el.getAttribute?.("role") || ""));
+     control that Space works on has focus, nor while a dialog is open.
+     Fields, checkboxes, sliders and the like always keep Space. Buttons,
+     links and <summary> keep it when they were reached from the keyboard:
+     Space presses them, as everywhere. A button that only holds focus
+     because it was clicked or tapped — a tool on the rail, say — leaves Space
+     to panning, so click-a-tool-then-space-drag still works. (:focus-visible
+     cannot tell the two apart: a key press makes the focused element match
+     it before this handler runs.) */
+  const FIELD_ROLES =
+    /^(checkbox|radio|switch|slider|option|menuitem|menuitemcheckbox|menuitemradio|tab|treeitem|listitem|gridcell|textbox|combobox|spinbutton|searchbox)$/;
+  const PRESS_ROLES = /^(button|link)$/;
+  /** the element that last took focus from a pointer press, if it still has it */
+  let pointerFocused = null;
+  let pointerPressAt = -1e9;
+  for (const type of ["pointerdown", "pointerup"]) {
+    document.addEventListener(type, () => (pointerPressAt = performance.now()), true);
+  }
+  // a key pressed since (Tab) moves focus by keyboard
+  document.addEventListener("keydown", () => (pointerPressAt = -1e9), true);
+  document.addEventListener(
+    "focusin",
+    (e) => {
+      // focus that follows a press at once came from the pointer; any other
+      // (Tab, a script, a dialog closing) counts as keyboard focus
+      pointerFocused = performance.now() - pointerPressAt < 1000 ? e.target : null;
+    },
+    true
+  );
+  const keyboardFocused = (el) => el !== pointerFocused;
+  const ownsSpace = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    const role = el.getAttribute("role") || "";
+    if (
+      isTypingTarget(el) ||
+      /^(INPUT|SELECT|TEXTAREA|OPTION)$/.test(el.tagName) ||
+      FIELD_ROLES.test(role)
+    ) {
+      return true;
+    }
+    const pressable =
+      /^(BUTTON|SUMMARY)$/.test(el.tagName) ||
+      (el.tagName === "A" && el.hasAttribute("href")) ||
+      PRESS_ROLES.test(role);
+    return pressable && keyboardFocused(el);
+  };
   window.addEventListener("keydown", (e) => {
     if (
       e.code === "Space" &&

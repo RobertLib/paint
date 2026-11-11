@@ -33,13 +33,19 @@
     <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
 
     <script>
-      try {
-        var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
-        document.documentElement.dataset.theme =
-          (t && t.theme) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-      } catch (e) {
-        document.documentElement.dataset.theme = "dark";
-      }
+      (function () {
+        var choice = null;
+        try {
+          var p = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
+          if (p && (p.themeChoice === "light" || p.themeChoice === "dark")) choice = p.themeChoice;
+        } catch (e) {}
+        var light = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches;
+        document.documentElement.dataset.theme = choice || (light ? "light" : "dark");
+        if (choice) {
+          var metas = document.querySelectorAll('meta[name="theme-color"]');
+          for (var i = 0; i < metas.length; i++) metas[i].content = choice === "light" ? "#f4f5f9" : "#0e0f14";
+        }
+      })();
     </script>
     <link rel="stylesheet" href="../../css/tokens.css" />
     <link rel="stylesheet" href="../../css/site.css" />
@@ -73,7 +79,7 @@
         <strong class="drop-title">Přetáhněte sem obrázek</strong>
         <label class="btn btn-primary btn-lg"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-folder" /></svg><span>Vybrat obrázek</span>
           <input type="file" accept="image/*,.heic,.heif,.psd,.paint" class="sr-only" data-file /></label>
-        <p class="drop-hint">nebo ho vložte ze schránky (Ctrl+V) · PNG, JPG, WebP, HEIC, PSD…</p>
+        <p class="drop-hint">nebo ho vložte ze schránky · PNG, JPG, WebP, HEIC, PSD…</p>
         
         <p class="drop-busy" data-busy role="status" aria-live="polite" hidden>Editor se otevírá…</p>
         <p class="drop-error" data-error role="alert" hidden></p>

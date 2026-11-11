@@ -9,7 +9,7 @@ export default {
     ogImageAlt: "Paint Studio — image editor in your browser. Layers, retouching, filters.",
     dropTitle: "Drop an image here",
     dropButton: "Choose image",
-    dropHint: "or paste with Ctrl+V · PNG, JPG, WebP, HEIC, PSD…",
+    dropHint: "or paste it from the clipboard · PNG, JPG, WebP, HEIC, PSD…",
     dropBusy: "Opening the editor…",
     dropUnsupported:
       "This file can’t be opened here. Choose an image (PNG, JPG, WebP, HEIC…), a PSD file or a .paint project.",

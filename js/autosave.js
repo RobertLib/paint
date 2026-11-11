@@ -3,20 +3,33 @@
    moment after each change, so a closed tab, a crash or a reload never costs
    the work. Nothing is uploaded. The next visit offers to restore it.
 
-   Two slots: the current session and the one before it. Opening another
-   document (for example from a landing page) moves the previous session to
-   the second slot instead of overwriting it, so it can still be restored
-   from File › Restore previous session.
+   Work is kept in two slots: the current session and the one before it.
+   Editing another document moves the previous session to the second slot
+   instead of overwriting it, so it can still be restored from File › Restore
+   previous session. A document that has only been opened (or created) and
+   not edited or renamed yet does not take part in that: it waits in a slot
+   of its own, which the next such document replaces — opening files never
+   pushes real work out of storage.
+
+   A session open in one tab is not offered by the others, and restoring it
+   there anyway makes a copy with its own id, so two tabs never write over
+   each other's work.
    ========================================================================== */
 
 import { Doc } from "./doc.js";
 import { history, sessionsBusy, settleSessions } from "./history.js";
 import { t } from "./i18n.js";
 import { emit, on, state } from "./state.js";
-import { idbGet, idbRead, idbUpdate } from "./store.js";
+import { idbGetMany, idbReadMany, idbUpdate } from "./store.js";
 
 export const SLOT_CURRENT = "autosave";
 export const SLOT_PREVIOUS = "autosave-prev";
+/** A document that has been opened but not edited yet (never displaces work). */
+export const SLOT_OPENED = "autosave-open";
+/** For loadAutosave: whichever stored session was written last. */
+export const SLOT_LATEST = "latest";
+const SLOTS = [SLOT_CURRENT, SLOT_PREVIOUS, SLOT_OPENED];
+
 const DELAY = 1500;
 /** Skip autosave for documents too big to write without stutter. */
 const MAX_PIXELS = 8000 * 8000 * 3;
@@ -42,7 +55,117 @@ export function sidOf(doc) {
   return sid;
 }
 
-const tooBig = (doc) => doc.layers.length * doc.width * doc.height > MAX_PIXELS;
+/* documents that have been edited or renamed since they were opened */
+const edited = new WeakSet();
+
+/** Every layer and every layer mask is a document-sized bitmap to encode. */
+const tooBig = (doc) =>
+  doc.layers.reduce((n, l) => n + (l.mask ? 2 : 1), 0) * doc.width * doc.height > MAX_PIXELS;
+
+/* ------------------------------ session locks ----------------------------- */
+
+/* The tab that has a session open holds a Web Lock named after it, which
+   lets the other tabs see that it is taken (where the browser has locks).
+   A page that is being left lets go of its lock only a moment after the
+   next page of the same tab has started: the tab remembers its session
+   (sessionStorage outlives its pages), so that lock is not mistaken for
+   another tab's and is waited for instead. */
+const LOCK = "paint-studio-session:";
+/** sid → function that releases this tab's lock on it */
+const held = new Map();
+/** How long the page before may take to let go of this tab's session. */
+const HANDOVER_WAIT = 3000;
+const TAB_KEY = "paint-studio-session";
+
+function tabSession() {
+  try {
+    return sessionStorage.getItem(TAB_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** The session the page before this one in the tab had open, if any. */
+const pageBefore = tabSession();
+/** This tab's session — now, or on the page before (whose lock may linger). */
+const ofThisTab = (sid) => !!sid && (sid === pageBefore || sid === tabSession());
+
+function setTabSession(sid) {
+  try {
+    sessionStorage.setItem(TAB_KEY, sid);
+  } catch {
+    /* storage blocked: other tabs' sessions may then be offered too */
+  }
+}
+
+/**
+ * Take the lock of session `sid` for this tab. Resolves false when another
+ * tab has it — after waiting up to `wait` ms for it to let go (a reloading
+ * tab releases it as it unloads) — and true when it is ours, or when the
+ * browser has no locks to ask.
+ */
+function claim(sid, wait = 0) {
+  const locks = navigator.locks;
+  if (!locks?.request || held.has(sid)) return Promise.resolve(true);
+  const signal = wait > 0 && AbortSignal.timeout ? AbortSignal.timeout(wait) : null;
+  return new Promise((resolve) => {
+    locks
+      .request(LOCK + sid, signal ? { signal } : { ifAvailable: true }, (lock) => {
+        if (!lock) return resolve(false);
+        resolve(true);
+        // held until released (another document opens in this tab)
+        return new Promise((release) => held.set(sid, release));
+      })
+      .catch((err) => resolve(err?.name !== "AbortError"));
+  });
+}
+
+/** Let go of every session lock except the one of `keep`. */
+function releaseOthers(keep) {
+  for (const [sid, release] of held) {
+    if (sid === keep) continue;
+    held.delete(sid);
+    release();
+  }
+}
+
+/** Sessions that another tab has open. */
+async function takenElsewhere() {
+  try {
+    const { held: locks = [] } = (await navigator.locks?.query?.()) || {};
+    return new Set(
+      locks
+        .map((l) => l.name || "")
+        .filter((name) => name.startsWith(LOCK))
+        .map((name) => name.slice(LOCK.length))
+        .filter((sid) => !held.has(sid) && !ofThisTab(sid))
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+/* ---------------------------------- saving -------------------------------- */
+
+/**
+ * The writes that store `entry`. Work goes to the current slot; another
+ * session there moves to the second slot, so it is kept. A document not
+ * edited yet only replaces the previous such document. Copies of the same
+ * session elsewhere are dropped, so no session is ever listed twice.
+ */
+function placement(entry, [current, previous, opened]) {
+  const { sid } = entry;
+  if (entry.pristine) {
+    // (a copy that is already among the kept sessions is not needed twice)
+    if (current?.sid === sid || previous?.sid === sid) return null;
+    return { [SLOT_OPENED]: entry };
+  }
+  const out = { [SLOT_CURRENT]: entry };
+  if (current?.doc && current.sid !== sid && !current.pristine) out[SLOT_PREVIOUS] = current;
+  else if (previous?.sid === sid) out[SLOT_PREVIOUS] = undefined;
+  if (opened?.sid === sid) out[SLOT_OPENED] = undefined;
+  return out;
+}
 
 /** Write the open document. Resolves true when it is safely stored. */
 async function save() {
@@ -70,15 +193,12 @@ async function save() {
       const data = await doc.toStorable();
       const thumb = await thumbnail(doc);
       const entry = { sid, savedAt: Date.now(), thumb, doc: data };
-      // the slot is read again on every write — another tab or window may
-      // have saved its own document there since. That session moves to the
-      // second slot in the same transaction: either both writes land or
-      // neither does, so it is never overwritten without being kept
-      await idbUpdate(SLOT_CURRENT, (existing) =>
-        existing?.doc && existing.sid !== sid
-          ? { [SLOT_PREVIOUS]: existing, [SLOT_CURRENT]: entry }
-          : { [SLOT_CURRENT]: entry }
-      );
+      if (!edited.has(doc)) entry.pristine = true;
+      // the slots are read again on every write — another tab or window may
+      // have saved its own document since. Everything moves in the same
+      // transaction: either all writes land or none do, so a session is
+      // never overwritten without being kept
+      await idbUpdate(SLOTS, (slots) => placement(entry, slots));
       warned.delete(doc);
       emit("autosave", { ok: true });
       return true;
@@ -126,44 +246,70 @@ export async function flushAutosave() {
   return save();
 }
 
+/* --------------------------------- restoring ------------------------------ */
+
+const summary = (slot, entry) => ({
+  slot,
+  sid: entry.sid || null,
+  name: entry.doc.name,
+  width: entry.doc.width,
+  height: entry.doc.height,
+  layers: entry.doc.layers?.length || 0,
+  savedAt: entry.savedAt,
+  thumb: entry.thumb || null,
+  /** opened but never edited — not work that another session could lose */
+  pristine: !!entry.pristine,
+});
+
 /** What a session left behind, without loading the bitmaps. */
 export async function peekAutosave(slot = SLOT_CURRENT) {
-  const entry = await idbGet(slot);
-  if (!entry?.doc) return null;
-  return {
-    slot,
-    sid: entry.sid || null,
-    name: entry.doc.name,
-    width: entry.doc.width,
-    height: entry.doc.height,
-    layers: entry.doc.layers?.length || 0,
-    savedAt: entry.savedAt,
-    thumb: entry.thumb || null,
-  };
+  const [entry] = await idbGetMany([slot]);
+  return entry?.doc ? summary(slot, entry) : null;
 }
 
-/** Both stored sessions that are not the open document, newest first. */
+/**
+ * The stored sessions that are not the open document and not open in
+ * another tab, newest first (edited work before an opened-only document of
+ * the same age).
+ */
 export async function listSessions() {
   const open = state.doc ? sids.get(state.doc) : null;
-  const all = [await peekAutosave(SLOT_CURRENT), await peekAutosave(SLOT_PREVIOUS)];
-  return all.filter((s) => s && (!open || s.sid !== open));
+  const [entries, taken] = await Promise.all([idbGetMany(SLOTS), takenElsewhere()]);
+  const seen = new Set();
+  return entries
+    .map((entry, i) => (entry?.doc ? summary(SLOTS[i], entry) : null))
+    .filter((s) => s && (!open || s.sid !== open) && !(s.sid && taken.has(s.sid)))
+    .sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0) || a.pristine - b.pristine)
+    .filter((s) => !s.sid || (!seen.has(s.sid) && seen.add(s.sid)));
 }
 
 /**
  * Load a stored session: the one in `slot` — or, given its `sid`, the one
  * with that id in whichever slot holds it now (another tab may have moved
- * it). Resolves null when there is no such session; rejects when storage
- * fails, which is not the same as the session being gone.
+ * it). SLOT_LATEST picks the session written last. Resolves null when there
+ * is no such session; rejects when storage fails, which is not the same as
+ * the session being gone.
+ *
+ * When another tab has the session open, the restored document becomes a
+ * copy with an id of its own; `waitForLock` (ms) first gives that tab time
+ * to let go of it (a tab that is reloading).
  */
-export async function loadAutosave(slot = SLOT_CURRENT, sid = null) {
-  let entry = await idbRead(slot);
-  if (sid && entry?.sid !== sid) {
-    entry = await idbRead(slot === SLOT_PREVIOUS ? SLOT_CURRENT : SLOT_PREVIOUS);
-    if (entry?.sid !== sid) return null;
-  }
+export async function loadAutosave(slot = SLOT_CURRENT, sid = null, { waitForLock = 0 } = {}) {
+  const entries = await idbReadMany(SLOTS);
+  const stored = entries.filter((e) => e?.doc);
+  let entry;
+  if (sid) entry = stored.find((e) => e.sid === sid);
+  else if (slot === SLOT_LATEST) entry = stored.reduce((a, e) => (!a || (e.savedAt || 0) > (a.savedAt || 0) ? e : a), null);
+  else entry = entries[SLOTS.indexOf(slot)];
   if (!entry?.doc) return null;
   const doc = await Doc.fromJSON(entry.doc);
-  sids.set(doc, entry.sid || newSid());
+  const wait = Math.max(waitForLock, ofThisTab(entry.sid) ? HANDOVER_WAIT : 0);
+  const own = entry.sid && (await claim(entry.sid, wait));
+  const docSid = own ? entry.sid : newSid();
+  if (!own) await claim(docSid);
+  sids.set(doc, docSid);
+  // stored work stays work; an opened-only document stays just opened
+  if (!entry.pristine) edited.add(doc);
   return doc;
 }
 
@@ -180,16 +326,26 @@ export function relativeTime(ts) {
 
 export function initAutosave() {
   on("history", () => {
-    if (history.stack.length) schedule();
+    if (!history.stack.length || !state.doc) return;
+    edited.add(state.doc);
+    schedule();
   });
   on("doc", ({ reason }) => {
-    // a freshly opened document is saved right away (the session before it
-    // moves to the second slot)
-    if (reason === "open") schedule();
+    if (reason !== "open" || !state.doc) return;
+    // this tab now has this session open (and no other)
+    const sid = sidOf(state.doc);
+    releaseOthers(sid);
+    claim(sid);
+    setTabSession(sid);
+    // a freshly opened document is saved right away — in its own slot
+    // until it is edited, where it pushes no stored work out
+    schedule();
   });
-  // a new title is part of the document too
+  // a new title is part of the document too (and makes it work worth keeping)
   on("doc-renamed", () => {
-    if (state.doc) schedule();
+    if (!state.doc) return;
+    edited.add(state.doc);
+    schedule();
   });
   on("flush-autosave", () => flushAutosave());
   // last chance when the tab goes away

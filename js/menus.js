@@ -5,7 +5,7 @@
 import * as A from "./actions.js";
 import { clamp } from "./color.js";
 import { history } from "./history.js";
-import { LANGS, lang, platformKeys, saveLang, t } from "./i18n.js";
+import { LANGS, formatNumber, formatPercent, lang, platformKeys, saveLang, t } from "./i18n.js";
 import { overlay, requestRender } from "./render.js";
 import { emit, on, opt, setOpt, setTheme, setTool, state, swapColors } from "./state.js";
 import { openCurves, openLevels } from "./tone.js";
@@ -117,8 +117,8 @@ const MENUS = [
         { divider: true },
         { label: t("Add mask (reveal all)"), icon: "i-mask", run: () => A.addMask("reveal"), enabled: !!layer && !hasMask },
         { label: t("Add mask from selection"), run: () => A.addMask("selection"), enabled: !!layer && !hasMask && !!state.doc?.selection },
-        { label: t("Edit layer pixels"), icon: hasMask && !editingMask ? "i-check" : null, run: target(false), enabled: hasMask },
-        { label: t("Edit mask"), icon: editingMask ? "i-check" : null, run: target(true), enabled: hasMask },
+        { label: t("Edit layer pixels"), checked: hasMask && !editingMask, run: target(false), enabled: hasMask },
+        { label: t("Edit mask"), checked: editingMask, run: target(true), enabled: hasMask },
         { label: t("Invert mask"), run: A.invertMask, enabled: hasMask },
         { label: layer?.maskEnabled === false ? t("Enable mask") : t("Disable mask"), run: () => A.toggleMaskEnabled(), enabled: hasMask },
         { label: t("Apply mask"), run: A.applyLayerMask, enabled: hasMask },
@@ -170,7 +170,8 @@ const MENUS = [
       { divider: true },
       ...LANGS.map(([code, name]) => ({
         label: name,
-        icon: code === lang ? "i-check" : null,
+        lang: code,
+        checked: code === lang,
         run: () => switchLanguage(code),
       })),
     ],
@@ -193,9 +194,13 @@ const MENUS = [
 async function switchLanguage(code) {
   if (code === lang) return;
   let saved = true;
+  // the session to bring back: this document's own, wherever another tab
+  // may move it in the meantime
+  let sid = null;
   if (state.doc) {
-    const { flushAutosave } = await import("./autosave.js");
+    const { flushAutosave, sidOf } = await import("./autosave.js");
     saved = await flushAutosave();
+    sid = sidOf(state.doc);
     if (
       !saved &&
       !window.confirm(
@@ -208,7 +213,7 @@ async function switchLanguage(code) {
   saveLang(code);
   const url = new URL(location.href);
   url.searchParams.set("lang", code);
-  if (state.doc && saved) url.searchParams.set("restore", "1");
+  if (state.doc && saved) url.searchParams.set("restore", sid || "1");
   else url.searchParams.delete("restore");
   url.searchParams.delete("task");
   // the document is safe in the autosave: no "leave page?" prompt
@@ -239,6 +244,9 @@ function buildMenubar() {
   sideScroll(bar);
 
   let openIndex = null;
+  // the menu a mouse opened by passing over its button: a click on that
+  // button keeps it open rather than closing what the hover just opened
+  let hoverOpened = null;
 
   /** Move the menu bar's tab stop — and the focus — to a menu button. */
   const focusButton = (index) => {
@@ -251,6 +259,7 @@ function buildMenubar() {
   /** focus: back to the menu's button (Escape, a command picked by keyboard). */
   const close = ({ focus = false } = {}) => {
     const index = openIndex;
+    hoverOpened = null;
     pop.hidden = true;
     for (const b of buttons) {
       b.classList.remove("is-open");
@@ -286,10 +295,16 @@ function buildMenubar() {
       .map((item, i) =>
         item.divider
           ? `<div class="menu-divider" role="separator"></div>`
-          : `<button class="menu-item" data-item="${i}" role="menuitem" tabindex="-1"${
-              item.enabled === false ? ' disabled aria-disabled="true"' : ""
-            }>${item.icon ? icon(item.icon) : `<span class="icon"></span>`}
-               <span>${item.label}</span>
+          : `<button class="menu-item" data-item="${i}" tabindex="-1"${
+              // a choice among several (the edit target, the language) says
+              // which one is on — not just with its check mark
+              item.checked === undefined
+                ? ' role="menuitem"'
+                : ` role="menuitemradio" aria-checked="${!!item.checked}"`
+            }${item.enabled === false ? ' disabled aria-disabled="true"' : ""}>${
+              item.checked ? icon("i-check") : item.icon ? icon(item.icon) : `<span class="icon"></span>`
+            }
+               <span${item.lang ? ` lang="${item.lang}"` : ""}>${item.label}</span>
                ${item.keys ? `<span class="keys">${platformKeys(item.keys)}</span>` : ""}
              </button>`
       )
@@ -336,14 +351,20 @@ function buildMenubar() {
     // Enter/Space on a menu button arrive as a click without a pointer: the
     // menu opens with its first command focused
     const keyboard = e.detail === 0;
-    if (openIndex === index) close({ focus: keyboard });
-    else open(index, { focus: keyboard ? "first" : null });
+    const hovered = hoverOpened === index;
+    hoverOpened = null;
+    if (openIndex === index && !hovered) close({ focus: keyboard });
+    else if (openIndex !== index) open(index, { focus: keyboard ? "first" : null });
   });
 
+  // with a menu open, a mouse passing over another button opens that one;
+  // a finger or a pen has no hover — their tap is the click above
   bar.addEventListener("pointerover", (e) => {
+    if (e.pointerType !== "mouse") return;
     const btn = e.target.closest("[data-menu]");
     if (btn && openIndex !== null && openIndex !== Number(btn.dataset.menu)) {
       open(Number(btn.dataset.menu));
+      hoverOpened = openIndex;
     }
   });
 
@@ -415,9 +436,27 @@ function buildMenubar() {
     if (openIndex !== null && to && !pop.contains(to) && !bar.contains(to)) close();
   });
 
-  document.addEventListener("pointerdown", (e) => {
-    if (!e.target.closest("#menuPopover") && !e.target.closest("#menubar")) close();
-  });
+  // A press outside closes the menu — and on the image that is all it does:
+  // it must not also paint, fill or move the crop frame (the buttons and
+  // fields around it still work as they are pressed). Capture, so it runs
+  // before the canvas sees the press.
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (openIndex === null) return;
+      const target = e.target;
+      if (target.closest?.("#menuPopover") || target.closest?.("#menubar")) return;
+      close();
+      if (
+        target.closest?.("#stage") &&
+        !target.closest("button, input, select, textarea, a, .taskbar")
+      ) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    },
+    true
+  );
   window.addEventListener("keydown", (e) => {
     // Escape closes the menu — and only the menu, not the selection under it
     if (e.key === "Escape" && openIndex !== null) {
@@ -432,10 +471,22 @@ function buildMenubar() {
 
 /* ================================= dialogs ================================ */
 
-export function wireDialog(dialog, { canClose = () => true } = {}) {
+/**
+ * Close buttons and backdrop clicks for a dialog. `submit`: the button that
+ * Enter in one of its text or number fields presses, as in any form.
+ */
+export function wireDialog(dialog, { canClose = () => true, submit = null } = {}) {
   $$("[data-close]", dialog).forEach((btn) =>
     btn.addEventListener("click", () => dialog.close())
   );
+  if (submit) {
+    dialog.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" || e.isComposing || e.repeat) return;
+      if (e.target.tagName !== "INPUT" || !/^(text|number|search)$/.test(e.target.type)) return;
+      e.preventDefault();
+      if (!submit.disabled) submit.click();
+    });
+  }
   // a click on the backdrop closes — but only one that started there too:
   // releasing a slider or a text selection outside the box is not a click
   // on the backdrop
@@ -462,6 +513,61 @@ export const modalOpen = () =>
   !!document.querySelector("dialog[open]:not(#welcomeDialog)") ||
   (!!state.doc && !!document.getElementById("welcomeDialog")?.open);
 
+/* --- sizes typed into the New and Resize dialogs --- */
+
+const SIZE_FIELDS = ["#newDocW", "#newDocH", "#resizeW", "#resizeH"];
+
+/** Forget an earlier refusal (the dialog opens again, a preset filled it). */
+const clearInvalid = () => {
+  for (const sel of SIZE_FIELDS) $(sel)?.setAttribute("aria-invalid", "false");
+};
+
+/**
+ * The whole pixels typed into a size field, or null (empty, not a number,
+ * under 1 px). A refused field is marked as such.
+ */
+function readSize(input) {
+  const raw = input.value.trim().replace(",", ".");
+  const value = raw === "" ? NaN : Math.round(Number(raw));
+  const ok = Number.isFinite(value) && value >= 1;
+  input.setAttribute("aria-invalid", String(!ok));
+  return ok ? value : null;
+}
+
+/** Read both fields; on a bad one say what is allowed and stay in the dialog. */
+function readSizes(wInput, hInput) {
+  const w = readSize(wInput);
+  const h = readSize(hInput);
+  if (w !== null && h !== null) return { w, h };
+  const bad = w === null ? wInput : hInput;
+  bad.focus();
+  bad.select?.();
+  emit("toast", {
+    msg: t("Enter a size from 1 to {max} px", { max: A.MAX_DIM }),
+    kind: "err",
+  });
+  return null;
+}
+
+/**
+ * Keep a size within the largest supported one. `proportional` scales both
+ * sides together (an image with its ratio locked), otherwise each side is
+ * capped on its own (a canvas, a new document).
+ */
+function capSize(w, h, proportional) {
+  const max = A.MAX_DIM;
+  if (w <= max && h <= max) return { w, h, capped: false };
+  if (!proportional) return { w: Math.min(w, max), h: Math.min(h, max), capped: true };
+  const k = Math.min(max / w, max / h);
+  return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)), capped: true };
+}
+
+const sizeCapped = ({ w, h }) =>
+  emit("toast", {
+    msg: t("The largest supported size is 8000 × 8000 px — using {w} × {h}", { w, h }),
+    kind: "info",
+  });
+
 /* --- new document --- */
 
 function presetChips(host, onPick) {
@@ -483,23 +589,29 @@ function openNewDialog() {
     $("#newDocW").value = String(state.doc.width);
     $("#newDocH").value = String(state.doc.height);
   }
+  clearInvalid();
   dialog.showModal();
 }
 
 function initNewDialog() {
   const dialog = $("#newDocDialog");
-  wireDialog(dialog);
+  wireDialog(dialog, { submit: $("#newDocCreate") });
   presetChips($("#newDocPresets"), (w, h) => {
     $("#newDocW").value = String(w);
     $("#newDocH").value = String(h);
+    clearInvalid();
   });
   $("#newDocCreate").addEventListener("click", () => {
     const bg = $('#newDocBg input:checked').value;
+    const typed = readSizes($("#newDocW"), $("#newDocH"));
+    if (!typed) return;
+    const size = capSize(typed.w, typed.h, false);
     const created = A.newDocument({
-      width: Number($("#newDocW").value),
-      height: Number($("#newDocH").value),
+      width: size.w,
+      height: size.h,
       background: bg,
     });
+    if (created && size.capped) sizeCapped(size);
     // kept the unsaved document ("discard changes?" → Cancel): stay here
     if (!created) return;
     dialog.close();
@@ -539,12 +651,13 @@ function openResizeDialog(mode) {
   $("#resizePctRow").hidden = mode !== "image";
   $("#anchorPicker").hidden = mode !== "canvas";
   $("#resizeLock").checked = mode === "image";
+  clearInvalid();
   $("#resizeDialog").showModal();
 }
 
 function initResizeDialog() {
   const dialog = $("#resizeDialog");
-  wireDialog(dialog);
+  wireDialog(dialog, { submit: $("#resizeApply") });
 
   const grid = $("#anchorPicker .anchor-grid");
   grid.setAttribute("role", "group");
@@ -569,12 +682,21 @@ function initResizeDialog() {
   const pct = $("#resizePct");
   const lock = $("#resizeLock");
   const ratio = () => (state.doc ? state.doc.width / state.doc.height : 1);
+  // the percentage follows the width (both sides, with the ratio locked)
+  const syncPct = () => {
+    const width = Number(w.value);
+    if (state.doc && width > 0) pct.value = String(Math.round((width / state.doc.width) * 100));
+  };
   w.addEventListener("input", () => {
+    w.setAttribute("aria-invalid", "false");
     if (lock.checked) h.value = String(Math.max(1, Math.round(Number(w.value) / ratio())));
-    if (state.doc) pct.value = String(Math.round((Number(w.value) / state.doc.width) * 100));
+    syncPct();
   });
   h.addEventListener("input", () => {
-    if (lock.checked) w.value = String(Math.max(1, Math.round(Number(h.value) * ratio())));
+    h.setAttribute("aria-invalid", "false");
+    if (!lock.checked) return;
+    w.value = String(Math.max(1, Math.round(Number(h.value) * ratio())));
+    syncPct();
   });
   pct.addEventListener("input", () => {
     const doc = state.doc;
@@ -585,14 +707,13 @@ function initResizeDialog() {
   });
 
   $("#resizeApply").addEventListener("click", () => {
-    const width = Number(w.value);
-    const height = Number(h.value);
-    if (!(width > 0) || !(height > 0)) return;
-    if (width > A.MAX_DIM || height > A.MAX_DIM) {
-      emit("toast", { msg: t("The largest supported size is 8000 × 8000 px"), kind: "info" });
-    }
-    if (resizeMode === "image") A.resizeImage(width, height);
-    else A.resizeCanvas(width, height, resizeAnchor);
+    const typed = readSizes(w, h);
+    if (!typed) return;
+    // one message for a size over the limit, with the size that is used
+    const size = capSize(typed.w, typed.h, resizeMode === "image" && lock.checked);
+    if (size.capped) sizeCapped(size);
+    if (resizeMode === "image") A.resizeImage(size.w, size.h);
+    else A.resizeCanvas(size.w, size.h, resizeAnchor);
     dialog.close();
   });
 }
@@ -619,22 +740,57 @@ function setExportFormat(format) {
       : t("PNG is lossless and keeps transparency.");
 }
 
+/**
+ * The format and quality a task opened the dialog with (JPEG at 75 for
+ * "compress"), and what was set before: a preset is for that one export —
+ * left untouched, the earlier choice is back once the dialog closes.
+ */
+let exportPreset = null;
+
+const setExportQuality = (quality) => {
+  $("#exportQuality").value = String(quality);
+  $("#exportQualityOut").value = String(quality);
+};
+
+/** The dialog closed: a preset nobody changed gives the earlier choice back. */
+function settleExportPreset() {
+  const preset = exportPreset;
+  exportPreset = null;
+  if (!preset) return;
+  if (exportFormat === preset.format) setExportFormat(preset.before.format);
+  if (Number($("#exportQuality").value) === preset.quality) setExportQuality(preset.before.quality);
+}
+
 function openExportDialog({ format, quality } = {}) {
   if (!state.doc) return;
+  const dialog = $("#exportDialog");
+  if (dialog.open) return;
   $("#exportName").value = state.doc.name || "paint-studio";
-  if (format) setExportFormat(format);
-  if (quality) {
-    $("#exportQuality").value = String(quality);
-    $("#exportQualityOut").value = String(quality);
+  // ("close" arrives a moment after close(): settle the last preset first)
+  settleExportPreset();
+  if (format || quality) {
+    exportPreset = {
+      before: { format: exportFormat, quality: Number($("#exportQuality").value) },
+      format: format || exportFormat,
+      quality: quality || Number($("#exportQuality").value),
+    };
   }
-  $("#exportDialog").showModal();
+  if (format) setExportFormat(format);
+  if (quality) setExportQuality(quality);
+  dialog.showModal();
   refreshExportPreview();
 }
 
 function initExportDialog() {
   const dialog = $("#exportDialog");
-  wireDialog(dialog);
+  wireDialog(dialog, { submit: $("#exportGo") });
   setExportFormat(exportFormat);
+  $("#exportScaleOut").value = formatPercent(Number($("#exportScale").value) / 100);
+
+  dialog.addEventListener("close", () => {
+    // (already open again: that opening settled the preset itself)
+    if (!dialog.open) settleExportPreset();
+  });
 
   $("#exportFormat").addEventListener("click", (e) => {
     const btn = e.target.closest("[data-format]");
@@ -648,7 +804,7 @@ function initExportDialog() {
     refreshExportPreview();
   });
   $("#exportScale").addEventListener("input", (e) => {
-    $("#exportScaleOut").value = `${e.target.value}%`;
+    $("#exportScaleOut").value = formatPercent(Number(e.target.value) / 100);
     refreshExportPreview();
   });
 
@@ -672,7 +828,9 @@ function initExportDialog() {
 
 const formatSize = (bytes) => {
   const kb = bytes / 1024;
-  return kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`;
+  return kb > 1024
+    ? `${formatNumber(kb / 1024, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB`
+    : `${formatNumber(Math.max(1, Math.round(kb)))} KB`;
 };
 
 let estimateId = 0;
@@ -759,6 +917,7 @@ const SHORTCUT_GROUPS = [
       [t("New layer"), KEY_NEW_LAYER],
       [t("Duplicate layer"), `${MOD}J`],
       [t("Merge down"), `${MOD}E`],
+      [t("Rename layer"), "F2"],
       [t("Levels / Curves"), `${MOD}L · ${MOD}M`],
     ],
   },
@@ -783,6 +942,7 @@ const SHORTCUT_GROUPS = [
       [t("Draw shape from centre"), "Alt"],
       [t("Add / subtract selection"), "Shift · Alt"],
       [t("Apply crop or transform"), "Enter"],
+      [t("Finish the text"), `${MOD}Enter`],
       [t("Cancel current action"), "Esc"],
     ],
   },
@@ -973,9 +1133,6 @@ function initShortcuts() {
     // keeps the keys it works with, every other key stays a shortcut — and a
     // letter must not also pick an option by typing ("E" → Exclusion).
     const onSelect = e.target?.tagName === "SELECT";
-    if (onSelect ? SELECT_KEYS.has(e.key) : isTypingTarget(e.target)) return;
-    if (modalOpen()) return;
-    if (onSelect && e.key.length === 1) e.preventDefault();
     // AltGr arrives as Ctrl+Alt on Windows: it types characters, not commands
     const altGraph = e.getModifierState?.("AltGraph");
     const mod = (e.metaKey || e.ctrlKey) && !altGraph;
@@ -983,6 +1140,13 @@ function initShortcuts() {
     const phys = physicalKey(e);
     // letters follow the layout (Z/Y swap on QWERTZ), everything else the key
     const letter = key.length === 1 && /\p{L}/u.test(key) && /^[a-z]$/.test(key) ? key : phys;
+    // In a text field the keys are the field's — except the file commands,
+    // which would otherwise reach the browser (⌘S "save page", ⌘O)
+    const fileCommand =
+      mod && !e.altKey && (letter === "s" || letter === "o" || (letter === "e" && e.shiftKey));
+    if ((onSelect ? SELECT_KEYS.has(e.key) : isTypingTarget(e.target)) && !fileCommand) return;
+    if (modalOpen()) return;
+    if (onSelect && e.key.length === 1) e.preventDefault();
 
     if (mod) {
       // A command key is always ours (no browser zoom, no "save page"), but
@@ -999,9 +1163,14 @@ function initShortcuts() {
         command(startTransform);
         return;
       }
-      // Zoom by the character first: on a Czech keyboard "+" is the Digit1
-      // key (Ctrl+1 by position would be "actual pixels"). Ctrl+0 / Ctrl+1 go
-      // by position, so they work where the digit row types ěščř… too.
+      // Ctrl+0 / Ctrl+1 go by position, so they are where the menus put them
+      // on every layout — also where the digit row types +ěščř… (Czech). Its
+      // 1 key types "+" there: zooming in is Ctrl+= (or the keypad's +).
+      if (!e.shiftKey && (phys === "0" || phys === "1")) {
+        command(phys === "0" ? () => view.fit() : () => view.actualSize());
+        return;
+      }
+      // then the zoom characters wherever the layout has them
       if (key === "+" || key === "=") {
         command(() => view.zoomStep(1), { repeat: true });
         return;
@@ -1100,6 +1269,9 @@ function initShortcuts() {
     }
 
     if (e.key === "Enter") {
+      // Enter on a focused button, link or tab presses that control — it
+      // must not apply the crop instead (Cancel would apply a transform)
+      if (e.target?.closest?.(ACTIVATABLE)) return;
       if (state.tool === "crop") {
         TOOLS.crop.apply();
         e.preventDefault();
@@ -1160,6 +1332,10 @@ function initShortcuts() {
     }
   });
 }
+
+/** Controls that Enter presses by itself (see initShortcuts). */
+const ACTIVATABLE =
+  'button, a[href], summary, [role="button"], [role="menuitem"], [role="menuitemradio"], [role="tab"], [role="radio"], [role="checkbox"], [role="switch"], [role="option"], [role="listitem"]';
 
 /** Keys a focused dropdown needs for itself (see initShortcuts). */
 const SELECT_KEYS = new Set([

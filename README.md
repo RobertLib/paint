@@ -28,8 +28,9 @@ dodge/burn by tonal range.
 (with corner radius), ellipse, polygon and star, each as outline, solid or
 both. The text tool types directly on the canvas in the final font; every text
 becomes a **text layer that stays editable** until its pixels change (painting,
-filters, adjustments, the Transform tool, rotating or flipping the image, merge
-down, apply mask).
+filters, adjustments, the Transform tool, rotating or flipping the image,
+resizing it to a different aspect ratio, merge down, apply mask); an edit that
+leaves every pixel as it was keeps it editable.
 
 **Selections** — rectangular, elliptical, freehand lasso and magic wand, with
 new/add/subtract/intersect modes, feathering and animated marching ants. Every
@@ -39,8 +40,8 @@ brush, fill, filter and adjustment respects the active selection.
 handles (proportional corners, Alt from the centre, Shift snaps rotation).
 
 **Photo adjustments** — exposure, brightness, contrast, highlights, shadows,
-gamma, saturation, vibrance, temperature, tint, hue, clarity, softness, grain
-and vignette, previewing live on the active layer. **Levels** (histogram, per
+gamma, saturation, vibrance, temperature, tint, hue, clarity (midtone local
+contrast), softness, grain and vignette, previewing live on the active layer. **Levels** (histogram, per
 channel, auto) and **Curves** (per channel).
 
 **Filters** — 21 one-click effects, each shown as a live thumbnail of your own
@@ -49,7 +50,7 @@ image.
 **Files** — opens PNG, JPEG, WebP, GIF, SVG, BMP, AVIF, **HEIC** (natively in
 Safari; elsewhere a decoder is fetched once from jsDelivr, pinned by version and
 integrity hash) and **PSD** — 8-, 16- and 32-bit RGB or grayscale with layers,
-masks and blend modes, including Photoshop's 16/32-bit layer blocks and
+masks (vector masks as Photoshop rasterised them) and blend modes, including Photoshop's 16/32-bit layer blocks and
 ZIP-compressed channels (converted to 8 bits per channel); clipping masks are baked
 into the clipped layers and fill opacity is folded into opacity; groups are
 flattened, text/shape/smart-object layers come in as pixels, adjustment layers
@@ -58,8 +59,12 @@ Exports PNG, JPEG, WebP with quality, scale and a live size estimate, and
 **layered PSD**. `.paint` project files keep layers, masks and editable text.
 
 **Everything else** — undo/redo history (up to 80 steps within a memory
-budget), **autosave** to the browser's own storage with restore on the next
-visit (skipped for documents above 192 megapixels summed over all layers),
+budget; a step keeps copies only of the layers it changes, and an edit that
+changes nothing is not recorded), **autosave** to the browser's own storage
+with restore on the next visit (skipped for documents above 192 megapixels
+summed over all layers and layer masks; a file that is only opened never
+pushes earlier work out — the previous session stays available from
+File › Restore previous session),
 documents up to 8000 × 8000 px within the browser's canvas limit (about
 16.7 MP in iPhone/iPad Safari; larger images are scaled down on open), zoom to
 3200% with pan and pinch, dark and light themes that follow the system until

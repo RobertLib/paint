@@ -18,7 +18,7 @@
    - A shell that cannot be cached completely fails the install: the worker
      before keeps running with its complete cache, and the next visit retries. */
 
-const CACHE = "paint-studio-v5";
+const CACHE = "paint-studio-v6";
 const NAV_TIMEOUT = 4000;
 
 const SHELL = [
@@ -116,13 +116,26 @@ async function offlineRedirect(url) {
 /** Pages (client ids) that were served from the cache: their files come from it too. */
 const pinned = new Set();
 
+/**
+ * Forget pages that have since been closed, so the set never grows for good.
+ * `keep` is the page being opened right now: it is no client yet.
+ */
+async function prunePinned(keep) {
+  const open = new Set((await self.clients.matchAll({ includeUncontrolled: true })).map((c) => c.id));
+  for (const id of pinned) if (id !== keep && !open.has(id)) pinned.delete(id);
+}
+
 async function navigate(event, url) {
   const network = fetchAndStore(event, keyOf(url));
   network.catch(() => {}); // a failure is handled below, once the cache has answered
   const cached = await caches.match(keyOf(url));
   if (!cached) return network.catch(() => offlineRedirect(url));
   const fromCache = () => {
-    if (event.resultingClientId) pinned.add(event.resultingClientId);
+    const id = event.resultingClientId;
+    if (id) {
+      pinned.add(id);
+      if (pinned.size > 32) prunePinned(id).catch(() => {});
+    }
     return cached;
   };
   let timer;

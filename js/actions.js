@@ -5,6 +5,7 @@
 
 import { cssColor } from "./color.js";
 import {
+  CanvasTooLargeError,
   Doc,
   Layer,
   MAX_DIM,
@@ -20,6 +21,7 @@ import {
   maxCanvasPixels,
   paintMasked,
   releaseCanvas,
+  scaledEdge,
 } from "./doc.js";
 import {
   ADJUST_DEFAULTS,
@@ -55,6 +57,62 @@ export const settle = () => settleSessions();
 
 const toast = (msg, kind = "info") => emit("toast", { msg, kind });
 
+/** The errors a browser throws when it runs out of (canvas) memory. */
+const outOfMemory = (err) =>
+  err instanceof CanvasTooLargeError ||
+  err instanceof RangeError ||
+  /out of memory/i.test(String(err?.message || ""));
+
+/**
+ * Run a command that edits the document. When it fails half-way — typically
+ * the device running out of canvas memory on a big image — editDoc and
+ * editPixels have already put the document back as it was; the user is told
+ * so instead of nothing happening. Returns false after a failure.
+ */
+function attempt(fn) {
+  try {
+    fn();
+    return true;
+  } catch (err) {
+    console.error(err);
+    toast(
+      outOfMemory(err)
+        ? t("Not enough memory on this device for that — nothing was changed")
+        : t("That did not work — nothing was changed"),
+      "err"
+    );
+    requestRender();
+    return false;
+  }
+}
+
+/**
+ * A module loaded on demand that does not fit the code already running:
+ * after a deploy an open tab still runs the old modules, and the new file
+ * may expect exports they lack (a SyntaxError when it is linked) or may not
+ * be there any more. Only reloading the page helps.
+ */
+class UpdatedError extends Error {
+  constructor(cause) {
+    super("Paint Studio was updated");
+    this.name = "UpdatedError";
+    this.cause = cause;
+  }
+}
+
+/** import() for modules loaded on demand; a failure is an UpdatedError. */
+async function loadModule(load) {
+  try {
+    return await load();
+  } catch (err) {
+    console.error(err);
+    throw new UpdatedError(err);
+  }
+}
+
+const toastUpdated = () =>
+  toast(t("Paint Studio was updated — reload the page to continue"), "err");
+
 /* ============================== documents ================================= */
 
 /**
@@ -80,7 +138,8 @@ export function newDocument({ width, height, background = "#ffffff" }) {
   if (!confirmDiscard()) return false;
   const bg = background === "custom" ? cssColor(state.primary) : background;
   const { w, h } = clampSize(width, height);
-  const doc = Doc.blank(w, h, bg);
+  let doc = null;
+  if (!attempt(() => (doc = Doc.blank(w, h, bg)))) return false;
   setDocument(doc);
   toast(t("New {w} × {h} document", { w: doc.width, h: doc.height }), "ok");
   track("new-document");
@@ -104,11 +163,7 @@ export function clampSize(width, height) {
   const w0 = Math.max(1, Math.round(Number(width) || 1));
   const h0 = Math.max(1, Math.round(Number(height) || 1));
   const k = fitScale(w0, h0);
-  return {
-    w: Math.max(1, Math.floor(w0 * k)),
-    h: Math.max(1, Math.floor(h0 * k)),
-    scaled: k < 1,
-  };
+  return { w: scaledEdge(w0, k), h: scaledEdge(h0, k), scaled: k < 1 };
 }
 
 /* ================================ import ================================= */
@@ -155,7 +210,7 @@ async function decodeFile(file) {
   // HEIC: Safari decodes natively above; everyone else gets a decoder on demand
   emit("busy", t("Decoding HEIC photo…"));
   try {
-    const { decodeHeic } = await import("./heic.js");
+    const { decodeHeic } = await loadModule(() => import("./heic.js"));
     const png = await decodeHeic(file);
     const pngUrl = URL.createObjectURL(png);
     try {
@@ -193,12 +248,20 @@ export async function openImageFile(file, { asLayer = false } = {}) {
     return true;
   } catch (err) {
     console.error(err);
-    toast(
-      isHeic(file)
-        ? t("Could not decode this HEIC photo — check your connection and try again")
-        : t("Could not open that image"),
-      "err"
-    );
+    if (err instanceof UpdatedError) toastUpdated();
+    else if (outOfMemory(err)) toast(t("Not enough memory on this device for that — nothing was changed"), "err");
+    else {
+      // heic.js tells a decoder that could not be downloaded (kind "download")
+      // from one that could not read the photo (kind "decode")
+      toast(
+        err?.kind === "download"
+          ? t("Could not decode this HEIC photo — check your connection and try again")
+          : err?.kind === "decode" || isHeic(file)
+          ? t("This HEIC photo could not be decoded")
+          : t("Could not open that image"),
+        "err"
+      );
+    }
     return false;
   }
 }
@@ -223,7 +286,7 @@ async function openPsdFile(file) {
   if (!confirmDiscard()) return false;
   emit("busy", t("Reading PSD…"));
   try {
-    const { readPSD } = await import("./psd.js");
+    const { readPSD } = await loadModule(() => import("./psd.js"));
     const doc = await readPSD(await file.arrayBuffer(), {
       maxDim: MAX_DIM,
       maxPixels: maxCanvasPixels(),
@@ -246,6 +309,10 @@ async function openPsdFile(file) {
     return true;
   } catch (err) {
     console.error(err);
+    if (err instanceof UpdatedError) {
+      toastUpdated();
+      return false;
+    }
     const msg = PSD_ERRORS.has(err?.message) ? t(err.message) : t("The file could not be read");
     toast(t("Could not read that PSD file: {msg}", { msg }), "err");
     return false;
@@ -265,8 +332,8 @@ function docFromImage(img, name) {
   const scale = fitScale(w, h);
   const iw = w;
   const ih = h;
-  w = Math.max(1, Math.floor(w * scale));
-  h = Math.max(1, Math.floor(h * scale));
+  w = scaledEdge(w, scale);
+  h = scaledEdge(h, scale);
   const doc = new Doc(w, h);
   const layer = new Layer(w, h, { name });
   layer.ctx.drawImage(img, 0, 0, w, h);
@@ -304,14 +371,20 @@ export function placeImage(img, name = t("Image")) {
   const x = Math.round((doc.width - w) / 2);
   const y = Math.round((doc.height - h) / 2);
 
-  editDoc(t("Place image"), () => {
-    const layer = doc.addLayer({ name });
-    layer.ctx.drawImage(img, x, y, w, h);
-    layer.touch();
-  });
+  const ok = attempt(() =>
+    editDoc(
+      t("Place image"),
+      () => {
+        const layer = doc.addLayer({ name });
+        layer.ctx.drawImage(img, x, y, w, h);
+        layer.touch();
+      },
+      { changes: [] }
+    )
+  );
   emit("layers", doc);
   requestRender();
-  toast(t("Placed “{name}” as a new layer", { name }), "ok");
+  if (ok) toast(t("Placed “{name}” as a new layer", { name }), "ok");
 }
 
 async function imageFromBlob(blob) {
@@ -393,11 +466,14 @@ function selectionCanvas({ layer = null } = {}) {
   if (!sel) return null;
   const b = sel.bounds;
   if (!b) return null;
+  const src = layer ? layer.maskedPixels() : doc.composite();
   const out = makeCanvas(b.w, b.h);
   const c = ctx2d(out);
-  c.drawImage(layer ? layer.maskedPixels() : doc.composite(), -b.x, -b.y);
+  c.drawImage(src, -b.x, -b.y);
   c.globalCompositeOperation = "destination-in";
   c.drawImage(sel.canvas, -b.x, -b.y);
+  // a masked copy of the layer is a temporary of its own
+  if (layer && src !== layer.canvas) releaseCanvas(src);
   return out;
 }
 
@@ -447,7 +523,7 @@ export async function exportBlob({ format = "image/png", quality = 0.92, scale =
   const doc = state.doc;
   if (!doc) return null;
   if (format === "psd") {
-    const { writePSD } = await import("./psd.js");
+    const { writePSD } = await loadModule(() => import("./psd.js"));
     return writePSD(doc);
   }
   const canvas = exportCanvas({ scale, format });
@@ -474,16 +550,27 @@ export async function exportImage({
   exporting = true;
   if (format === "psd") emit("busy", t("Writing PSD…"));
   let blob = null;
+  let failure = null;
   try {
     blob = await exportBlob({ format, quality, scale });
   } catch (err) {
     console.error(err);
+    failure = err;
   } finally {
     exporting = false;
     if (format === "psd") emit("busy", null);
   }
+  if (failure instanceof UpdatedError) {
+    toastUpdated();
+    return false;
+  }
   if (!blob) {
-    toast(t("Export failed — try PNG"), "err");
+    toast(
+      failure?.message === "This document is too large for a PSD file"
+        ? t("This document is too large for a PSD file (over 2 GB) — save it as a project instead")
+        : t("Export failed — try PNG"),
+      "err"
+    );
     return false;
   }
   if (!encodedAs(blob, format)) {
@@ -697,7 +784,7 @@ function settleLayer(layer) {
 export function addLayer() {
   const doc = state.doc;
   if (!doc) return;
-  editDoc(t("New layer"), () => doc.addLayer());
+  attempt(() => editDoc(t("New layer"), () => doc.addLayer(), { changes: [] }));
   emit("layers", doc);
   requestRender();
 }
@@ -707,7 +794,7 @@ export function duplicateLayer() {
   if (!doc) return;
   const index = settleLayer(doc.active);
   if (index < 0) return;
-  editDoc(t("Duplicate layer"), () => doc.duplicateLayer(index));
+  attempt(() => editDoc(t("Duplicate layer"), () => doc.duplicateLayer(index), { changes: [] }));
   emit("layers", doc);
   requestRender();
 }
@@ -727,7 +814,7 @@ export function deleteLayer(index = state.doc?.activeIndex) {
     toast(t("A document needs at least one layer"), "err");
     return;
   }
-  editDoc(t("Delete layer"), () => doc.removeLayer(at));
+  attempt(() => editDoc(t("Delete layer"), () => doc.removeLayer(at), { changes: [] }));
   emit("layers", doc);
   requestRender();
 }
@@ -751,7 +838,8 @@ export function mergeDown() {
     toast(t("The layer below is hidden"), "err");
     return;
   }
-  editDoc(t("Merge down"), () => doc.mergeDown(index));
+  // the lower layer is drawn into; the upper one is only removed
+  attempt(() => editDoc(t("Merge down"), () => doc.mergeDown(index), { changes: [below] }));
   emit("layers", doc);
   requestRender();
 }
@@ -762,7 +850,7 @@ export function flattenImage() {
   // an open text box becomes a layer of its own first: count it
   settleSessions();
   if (doc.layers.length === 1) return;
-  editDoc(t("Flatten image"), () => doc.flatten());
+  attempt(() => editDoc(t("Flatten image"), () => doc.flatten(), { changes: [] }));
   emit("layers", doc);
   requestRender();
 }
@@ -788,7 +876,7 @@ export function moveLayer(from, to) {
   else if (!above) target = rest.length;
   else return;
   if (target === index) return;
-  editDoc(t("Reorder layers"), () => doc.moveLayer(index, target));
+  attempt(() => editDoc(t("Reorder layers"), () => doc.moveLayer(index, target), { changes: [] }));
   emit("layers", doc);
   requestRender();
 }
@@ -878,24 +966,31 @@ export function addMask(mode = state.doc?.selection ? "selection" : "reveal") {
     return;
   }
   if (settleLayer(layer) < 0 || layer.mask) return;
-  editDoc(t("Add layer mask"), () => {
-    let mask;
-    if (mode === "selection" && doc.selection) {
-      mask = makeMask(doc.width, doc.height, false);
-      ctx2d(mask).drawImage(doc.selection.canvas, 0, 0);
-    } else {
-      mask = makeMask(doc.width, doc.height, mode !== "hide");
-    }
-    layer.setMask(mask);
-    layer.maskEnabled = true;
-    layer.editMask = true;
-    layer.touch();
-    if (mode === "selection") doc.setSelection(null);
-  });
+  // a new mask canvas: the layer's pixels stay as they are (and uncopied)
+  const ok = attempt(() =>
+    editDoc(
+      t("Add layer mask"),
+      () => {
+        let mask;
+        if (mode === "selection" && doc.selection) {
+          mask = makeMask(doc.width, doc.height, false);
+          ctx2d(mask).drawImage(doc.selection.canvas, 0, 0);
+        } else {
+          mask = makeMask(doc.width, doc.height, mode !== "hide");
+        }
+        layer.setMask(mask);
+        layer.maskEnabled = true;
+        layer.editMask = true;
+        if (mode === "selection") doc.setSelection(null);
+      },
+      { changes: [] }
+    )
+  );
   emit("layers", doc);
   emit("selection", doc);
   emit("target", doc.target);
   requestRender();
+  if (!ok) return;
   toast(t("Mask added — paint black to hide, white to reveal"), "ok");
   track("add-mask");
 }
@@ -909,10 +1004,7 @@ export function deleteMask() {
     return;
   }
   if (settleLayer(layer) < 0 || !layer.mask) return;
-  editDoc(t("Delete layer mask"), () => {
-    layer.setMask(null);
-    layer.touch();
-  });
+  attempt(() => editDoc(t("Delete layer mask"), () => layer.setMask(null), { changes: [] }));
   emit("layers", doc);
   emit("target", doc.target);
   requestRender();
@@ -927,7 +1019,7 @@ export function applyLayerMask() {
     return;
   }
   if (settleLayer(layer) < 0 || !layer.mask) return;
-  editDoc(t("Apply layer mask"), () => doc.applyMask(layer));
+  attempt(() => editDoc(t("Apply layer mask"), () => doc.applyMask(layer), { changes: [layer] }));
   emit("layers", doc);
   emit("target", doc.target);
   requestRender();
@@ -943,21 +1035,24 @@ export function invertMask() {
   }
   if (settleLayer(layer) < 0 || !layer.mask) return;
   const target = layer.maskTarget;
-  editPixels(
-    t("Invert mask"),
-    () => {
-      const inv = makeMask(doc.width, doc.height, true);
-      const c = ctx2d(inv);
-      c.globalCompositeOperation = "destination-out";
-      c.drawImage(layer.mask, 0, 0);
-      const mc = target.ctx;
-      mc.save();
-      mc.globalCompositeOperation = "copy";
-      mc.drawImage(inv, 0, 0);
-      mc.restore();
-      target.touch();
-    },
-    target
+  attempt(() =>
+    editPixels(
+      t("Invert mask"),
+      () => {
+        const inv = makeMask(doc.width, doc.height, true);
+        const c = ctx2d(inv);
+        c.globalCompositeOperation = "destination-out";
+        c.drawImage(layer.mask, 0, 0);
+        const mc = target.ctx;
+        mc.save();
+        mc.globalCompositeOperation = "copy";
+        mc.drawImage(inv, 0, 0);
+        mc.restore();
+        releaseCanvas(inv);
+        target.touch();
+      },
+      target
+    )
   );
   emit("layers", doc);
   requestRender();
@@ -985,11 +1080,17 @@ const textName = (value) => {
 export function addTextLayer(text) {
   const doc = state.doc;
   if (!doc || !text.value.trim()) return;
-  editDoc(t("Text"), () => {
-    const layer = doc.addLayer({ name: textName(text.value) });
-    layer.text = { ...text, color: { ...text.color } };
-    layer.renderText();
-  });
+  attempt(() =>
+    editDoc(
+      t("Text"),
+      () => {
+        const layer = doc.addLayer({ name: textName(text.value) });
+        layer.text = { ...text, color: { ...text.color } };
+        layer.renderText();
+      },
+      { changes: [] }
+    )
+  );
   emit("layers", doc);
   requestRender();
   track("text");
@@ -1003,20 +1104,32 @@ export function updateTextLayer(id, text) {
   const layer = doc.layers[index];
   if (!text.value.trim()) {
     if (doc.layers.length > 1) {
-      editDoc(t("Delete layer"), () => doc.removeLayer(index));
+      attempt(() => editDoc(t("Delete layer"), () => doc.removeLayer(index), { changes: [] }));
     } else {
-      editDoc(t("Text"), () => {
-        layer.text = null;
-        layer.ctx.clearRect(0, 0, layer.width, layer.height);
-        layer.touch();
-      });
+      attempt(() =>
+        editDoc(
+          t("Text"),
+          () => {
+            layer.text = null;
+            layer.ctx.clearRect(0, 0, layer.width, layer.height);
+            layer.touch();
+          },
+          { changes: [layer] }
+        )
+      );
     }
   } else {
-    editDoc(t("Edit text"), () => {
-      layer.text = { ...text, color: { ...text.color } };
-      layer.name = textName(text.value);
-      layer.renderText();
-    });
+    attempt(() =>
+      editDoc(
+        t("Edit text"),
+        () => {
+          layer.text = { ...text, color: { ...text.color } };
+          layer.name = textName(text.value);
+          layer.renderText();
+        },
+        { changes: [layer] }
+      )
+    );
   }
   emit("layers", doc);
   requestRender();
@@ -1027,9 +1140,15 @@ export function paintText(text) {
   const doc = state.doc;
   const target = doc?.target;
   if (!target || target.locked || !text.value.trim()) return;
-  const buf = makeCanvas(doc.width, doc.height);
-  drawText(ctx2d(buf), text);
-  editPixels(t("Text"), () => paintMasked(target, buf, doc.selection, {}), target);
+  attempt(() => {
+    const buf = makeCanvas(doc.width, doc.height);
+    try {
+      drawText(ctx2d(buf), text);
+      editPixels(t("Text"), () => paintMasked(target, buf, doc.selection, {}), target);
+    } finally {
+      releaseCanvas(buf);
+    }
+  });
   emit("layers", doc);
   requestRender();
 }
@@ -1074,22 +1193,26 @@ export function clearSelectionPixels() {
     toast(t("This layer is locked"), "err");
     return;
   }
-  editPixels(
-    t("Clear"),
-    () => {
-      const c = target.ctx;
-      c.save();
-      if (doc.selection) {
+  // nothing there to clear: no step, and a text layer stays editable
+  const cover = doc.selection.coverBounds;
+  if (!cover || isClear(target.canvas, cover)) {
+    toast(t("Nothing to clear — the selected area is empty"), "info");
+    return;
+  }
+  attempt(() =>
+    editPixels(
+      t("Clear"),
+      () => {
+        const c = target.ctx;
+        c.save();
         c.globalCompositeOperation = "destination-out";
         c.drawImage(doc.selection.canvas, 0, 0);
-      } else {
-        c.clearRect(0, 0, doc.width, doc.height);
-      }
-      c.restore();
-      target.touch();
-    },
-    target,
-    doc.selection?.coverBounds || null
+        c.restore();
+        target.touch();
+      },
+      target,
+      cover
+    )
   );
   emit("layers", doc);
   requestRender();
@@ -1104,16 +1227,22 @@ export function fillSelection(which = "primary") {
     toast(t("This layer is locked"), "err");
     return;
   }
-  const paint = makeCanvas(doc.width, doc.height);
-  const pc = ctx2d(paint);
-  pc.fillStyle = cssColor(state[which]);
-  pc.fillRect(0, 0, doc.width, doc.height);
-  editPixels(
-    t("Fill"),
-    () => paintMasked(target, paint, doc.selection, {}),
-    target,
-    doc.selection?.coverBounds || null
-  );
+  attempt(() => {
+    const paint = makeCanvas(doc.width, doc.height);
+    try {
+      const pc = ctx2d(paint);
+      pc.fillStyle = cssColor(state[which]);
+      pc.fillRect(0, 0, doc.width, doc.height);
+      editPixels(
+        t("Fill"),
+        () => paintMasked(target, paint, doc.selection, {}),
+        target,
+        doc.selection?.coverBounds || null
+      );
+    } finally {
+      releaseCanvas(paint);
+    }
+  });
   emit("layers", doc);
   requestRender();
 }
@@ -1122,17 +1251,27 @@ export function duplicateSelectionToLayer() {
   settleSessions();
   const doc = state.doc;
   if (!doc) return;
-  // like "Layer via Copy": the active layer's pixels, not the whole picture
-  const cut = selectionCanvas({ layer: doc.active });
-  if (!cut) {
+  const b = doc.selection?.bounds;
+  if (!b) {
     toast(t("Make a selection first"), "err");
     return;
   }
-  const b = doc.selection.bounds;
-  editDoc(t("Selection to layer"), () => {
-    const layer = doc.addLayer({ name: t("Selection") });
-    layer.ctx.drawImage(cut, b.x, b.y);
-    layer.touch();
+  attempt(() => {
+    // like "Layer via Copy": the active layer's pixels, not the whole picture
+    const cut = selectionCanvas({ layer: doc.active });
+    try {
+      editDoc(
+        t("Selection to layer"),
+        () => {
+          const layer = doc.addLayer({ name: t("Selection") });
+          layer.ctx.drawImage(cut, b.x, b.y);
+          layer.touch();
+        },
+        { changes: [] }
+      );
+    } finally {
+      releaseCanvas(cut);
+    }
   });
   emit("layers", doc);
   requestRender();
@@ -1140,10 +1279,16 @@ export function duplicateSelectionToLayer() {
 
 /* ================================ geometry =============================== */
 
+/*
+ * Geometry gives every layer (and mask) a new canvas and leaves the old ones
+ * untouched, so editDoc keeps those as they are instead of copying them
+ * first ({ changes: [] }).
+ */
+
 export function cropTo(rect) {
   const doc = state.doc;
   if (!doc) return;
-  editDoc(t("Crop"), () => doc.crop(rect));
+  if (!attempt(() => editDoc(t("Crop"), () => doc.crop(rect), { changes: [] }))) return;
   emit("layers", doc);
   emit("doc", { reason: "geometry" });
   view.fit();
@@ -1200,7 +1345,7 @@ export function resizeImage(width, height) {
   const { w, h, scaled } = clampSize(width, height);
   if (w === doc.width && h === doc.height) return;
   if (scaled) toast(t("That is larger than this device supports — using {w} × {h}", { w, h }), "info");
-  editDoc(t("Image size"), () => doc.scaleImage(w, h));
+  if (!attempt(() => editDoc(t("Image size"), () => doc.scaleImage(w, h), { changes: [] }))) return;
   emit("layers", doc);
   emit("doc", { reason: "geometry" });
   view.fit();
@@ -1215,7 +1360,10 @@ export function resizeCanvas(width, height, anchor = "center") {
   const { w, h, scaled } = clampSize(width, height);
   if (w === doc.width && h === doc.height) return;
   if (scaled) toast(t("That is larger than this device supports — using {w} × {h}", { w, h }), "info");
-  editDoc(t("Canvas size"), () => doc.resizeCanvas(w, h, anchor));
+  const resized = attempt(() =>
+    editDoc(t("Canvas size"), () => doc.resizeCanvas(w, h, anchor), { changes: [] })
+  );
+  if (!resized) return;
   emit("layers", doc);
   emit("doc", { reason: "geometry" });
   view.fit();
@@ -1226,10 +1374,11 @@ export function resizeCanvas(width, height, anchor = "center") {
 export function rotate(dir) {
   const doc = state.doc;
   if (!doc) return;
-  editDoc(dir === 180 ? t("Rotate 180°") : t("Rotate 90°"), () => {
-    if (dir === 180) doc.rotate180();
-    else doc.rotate90(dir);
-  });
+  const label = dir === 180 ? t("Rotate 180°") : t("Rotate 90°");
+  const turned = attempt(() =>
+    editDoc(label, () => (dir === 180 ? doc.rotate180() : doc.rotate90(dir)), { changes: [] })
+  );
+  if (!turned) return;
   emit("layers", doc);
   emit("doc", { reason: "geometry" });
   view.fit();
@@ -1240,7 +1389,8 @@ export function rotate(dir) {
 export function flip(axis) {
   const doc = state.doc;
   if (!doc) return;
-  editDoc(axis === "h" ? t("Flip horizontal") : t("Flip vertical"), () => doc.flip(axis));
+  const label = axis === "h" ? t("Flip horizontal") : t("Flip vertical");
+  if (!attempt(() => editDoc(label, () => doc.flip(axis), { changes: [] }))) return;
   emit("layers", doc);
   requestRender();
 }
@@ -1314,20 +1464,42 @@ function ensureAdjustSession() {
   return adjustSession;
 }
 
+/**
+ * One preview frame: `processed` (a fresh canvas, freed here) replaces the
+ * target's pixels inside the selection, or everywhere without one. Inside a
+ * selection only its area is reset to `orig` first — nothing outside it ever
+ * changes — unless the area moved since the last frame (`last`).
+ */
+function showPreview(target, orig, processed, selection, last) {
+  if (selection) {
+    const r = selection.coverBounds;
+    const c = target.ctx;
+    c.save();
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalAlpha = 1;
+    if (r && last && r.x === last.x && r.y === last.y && r.w === last.w && r.h === last.h) {
+      c.clearRect(r.x, r.y, r.w, r.h);
+      c.drawImage(orig, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
+    } else {
+      c.globalCompositeOperation = "copy";
+      c.drawImage(orig, 0, 0);
+    }
+    c.restore();
+  }
+  // without a selection the processed picture replaces everything anyway
+  paintMasked(target, processed, selection, { replace: true });
+  if (processed !== orig) releaseCanvas(processed);
+  return selection?.coverBounds || null;
+}
+
 function renderAdjust(session, values) {
   const doc = state.doc;
   const layer = doc.layers.find((l) => l.id === session.layerId);
   if (!layer) return;
   // the selection may have changed since the session began: use it as it is
-  const region = doc.selection?.coverBounds || null;
-  const processed = applyAdjustments(session.orig, values, region);
-  const c = layer.ctx;
-  c.save();
-  c.setTransform(1, 0, 0, 1, 0, 0);
-  c.globalCompositeOperation = "copy";
-  c.drawImage(session.orig, 0, 0);
-  c.restore();
-  paintMasked(layer, processed, doc.selection, { replace: true });
+  const sel = doc.selection;
+  const processed = applyAdjustments(session.orig, values, sel?.coverBounds || null);
+  session.area = showPreview(layer, session.orig, processed, sel, session.area);
   session.version = layer.version;
   doc.invalidate();
 }
@@ -1370,10 +1542,16 @@ function finishAdjustments({ quiet = false } = {}) {
     renderAdjust(session, adjustValues);
   }
   adjustSession = null;
-  session.edit.commit(t("Adjustments"), state.doc?.selection?.coverBounds || null);
+  // (a commit that fails puts the original pixels back itself; one that
+  // changed no pixel records nothing)
+  let recorded = false;
+  attempt(() => {
+    recorded = session.edit.commit(t("Adjustments"), state.doc?.selection?.coverBounds || null);
+  });
   resetAdjustValues();
   emit("layers", state.doc);
   requestRender();
+  if (!recorded) return false;
   if (!quiet) toast(t("Adjustments applied"), "ok");
   track("adjust");
   return true;
@@ -1465,20 +1643,27 @@ export function beginPreview(label) {
   let changed = false;
   let open = true;
 
+  let shown = null;
   const render = () => {
     if (!open) return;
-    const c = target.ctx;
-    c.save();
-    c.setTransform(1, 0, 0, 1, 0, 0);
-    c.globalCompositeOperation = "copy";
-    c.drawImage(edit.before, 0, 0);
-    c.restore();
     if (pending) {
       let processed = pending(orig, region);
-      if (isMask) processed = grayToMask(processed);
-      paintMasked(target, processed, doc.selection, { replace: true });
+      if (isMask) {
+        const mask = grayToMask(processed);
+        if (processed !== orig) releaseCanvas(processed);
+        processed = mask;
+      }
+      shown = showPreview(target, edit.before, processed, doc.selection, shown);
     } else {
+      // back to the original
+      const c = target.ctx;
+      c.save();
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.globalCompositeOperation = "copy";
+      c.drawImage(edit.before, 0, 0);
+      c.restore();
       target.touch();
+      shown = null;
     }
     doc.invalidate();
     changed = !!pending;
@@ -1517,10 +1702,13 @@ export function beginPreview(label) {
         edit.rollback();
         return;
       }
-      edit.commit(label, doc.selection?.coverBounds || null);
+      let recorded = false;
+      attempt(() => {
+        recorded = edit.commit(label, doc.selection?.coverBounds || null);
+      });
       emit("layers", doc);
       requestRender();
-      toast(t("{label} applied", { label }), "ok");
+      if (recorded) toast(t("{label} applied", { label }), "ok");
     },
     cancel() {
       if (!open) return;
@@ -1592,11 +1780,21 @@ export async function applyFilter(id, params = {}) {
   }
   const effect = EFFECTS.find((e) => e.id === id);
   if (!effect) return false;
-  // effects keep transparent pixels transparent: an empty layer stays as it is
+  // effects keep transparent pixels transparent: an empty area stays as it
+  // is — but one that reads its neighbours (a blur) can bring colour into
+  // a selection from around it, so the area it reads is what must be empty
   const cover = doc.selection?.coverBounds || null;
-  if (!target.isMask && isClear(target.canvas, cover)) {
-    toast(t("Nothing to apply the effect to — the area is empty"), "info");
-    return false;
+  if (!target.isMask) {
+    const opts = { primary: state.primary, secondary: state.secondary, ...params };
+    const reads = !cover
+      ? null
+      : effect.reach
+      ? effectArea(id, cover, target.width, target.height, opts)
+      : cover;
+    if (isClear(target.canvas, reads)) {
+      toast(t("Nothing to apply the effect to — the area is empty"), "info");
+      return false;
+    }
   }
 
   filtering = true;
@@ -1613,24 +1811,39 @@ export async function applyFilter(id, params = {}) {
       // on the selected area and the margin it reads — the same result there
       const sel = doc.selection?.coverBounds;
       const area = sel ? effectArea(id, sel, W, H, opts) : null;
-      // effects may work in place: never hand them the layer itself
-      let src = area ? cropCanvas(target.canvas, area) : null;
-      if (isMask) src = maskToGray(src || target.canvas);
-      else src ||= copyCanvas(target.canvas);
-      let out = applyEffect(id, src, area ? { ...opts, image: { width: W, height: H } } : opts);
-      if (isMask) out = grayToMask(out);
-      if (area) {
-        const full = makeCanvas(W, H);
-        ctx2d(full).drawImage(out, area.x, area.y);
-        out = full;
-      }
-      editPixels(
-        effect.name,
-        () => paintMasked(target, out, doc.selection, { replace: true }),
-        target,
-        doc.selection?.coverBounds || null
-      );
-      return true;
+      // every intermediate canvas is freed once the result is painted (never
+      // the layer's own canvas, which the effect is not handed anyway)
+      const temps = new Set();
+      const temp = (c) => {
+        if (c && c !== target.canvas) temps.add(c);
+        return c;
+      };
+      const top = history.stack[history.index];
+      const ok = attempt(() => {
+        try {
+          // effects may work in place: never hand them the layer itself
+          let src = area ? temp(cropCanvas(target.canvas, area)) : null;
+          if (isMask) src = temp(maskToGray(src || target.canvas));
+          else src ||= temp(copyCanvas(target.canvas));
+          let out = temp(applyEffect(id, src, area ? { ...opts, image: { width: W, height: H } } : opts));
+          if (isMask) out = temp(grayToMask(out));
+          if (area) {
+            const full = temp(makeCanvas(W, H));
+            ctx2d(full).drawImage(out, area.x, area.y);
+            out = full;
+          }
+          editPixels(
+            effect.name,
+            () => paintMasked(target, out, doc.selection, { replace: true }),
+            target,
+            doc.selection?.coverBounds || null
+          );
+        } finally {
+          for (const c of temps) releaseCanvas(c);
+        }
+      });
+      // an effect that changed no pixel records nothing
+      return ok && history.stack[history.index] !== top;
     });
   } finally {
     filtering = false;

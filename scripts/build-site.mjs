@@ -94,16 +94,24 @@ const icon = (id, cls = "icon") =>
 /** Files the pickers offer; the editor's open path handles all of them. */
 const ACCEPT = "image/*,.heic,.heif,.psd,.paint";
 
-/* the editor's theme choice applies here too; otherwise follow the system.
-   Runs before the stylesheets so the page never flashes the wrong theme. */
+/* the theme picked in the editor (js/state.js saves it as `themeChoice`, and
+   only once the user has chosen) applies here too, browser chrome included;
+   otherwise follow the system. Runs after the theme-color metas and before
+   the stylesheets, so the page never flashes the wrong theme. */
 const THEME_SCRIPT = `<script>
-      try {
-        var t = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
-        document.documentElement.dataset.theme =
-          (t && t.theme) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-      } catch (e) {
-        document.documentElement.dataset.theme = "dark";
-      }
+      (function () {
+        var choice = null;
+        try {
+          var p = JSON.parse(localStorage.getItem("paint-studio:prefs:v2") || "null");
+          if (p && (p.themeChoice === "light" || p.themeChoice === "dark")) choice = p.themeChoice;
+        } catch (e) {}
+        var light = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches;
+        document.documentElement.dataset.theme = choice || (light ? "light" : "dark");
+        if (choice) {
+          var metas = document.querySelectorAll('meta[name="theme-color"]');
+          for (var i = 0; i < metas.length; i++) metas[i].content = choice === "light" ? "#f4f5f9" : "#0e0f14";
+        }
+      })();
     </script>`;
 
 const THEME_COLOR = `<meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />

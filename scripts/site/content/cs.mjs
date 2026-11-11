@@ -12,7 +12,7 @@ export default {
     ogImageAlt: "Paint Studio – editor obrázků v prohlížeči. Vrstvy, retuš, filtry.",
     dropTitle: "Přetáhněte sem obrázek",
     dropButton: "Vybrat obrázek",
-    dropHint: "nebo ho vložte ze schránky (Ctrl+V) · PNG, JPG, WebP, HEIC, PSD…",
+    dropHint: "nebo ho vložte ze schránky · PNG, JPG, WebP, HEIC, PSD…",
     dropBusy: "Editor se otevírá…",
     dropUnsupported:
       "Tento soubor tu otevřít nejde. Vyberte obrázek (PNG, JPG, WebP, HEIC…), soubor PSD nebo projekt .paint.",

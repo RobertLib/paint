@@ -226,7 +226,10 @@
         <aside class="sidebar" id="sidebar" aria-label="Panels">
           <section class="panel color-panel">
             <header class="panel-head">
-              <h2>Color</h2>
+              <h2 id="colorTitle">Color</h2>
+              <button class="icon-btn sm color-collapse" id="colorCollapse" data-tip="Collapse color panel" aria-label="Collapse color panel" aria-expanded="true" aria-controls="colorBody">
+                <svg class="icon"><use href="#i-chevron" /></svg>
+              </button>
               <button class="icon-btn sm" id="pickFromCanvas" data-tip="Pick color from canvas · I" aria-label="Pick color from canvas">
                 <svg class="icon"><use href="#i-eyedropper" /></svg>
               </button>
@@ -235,7 +238,7 @@
               </button>
             </header>
 
-            <div class="color-body">
+            <div class="color-body" id="colorBody" role="group" aria-labelledby="colorTitle">
               <div class="color-chips">
                 <button class="chip chip-primary is-active" id="primaryChip" data-tip="Primary color" aria-label="Primary color" aria-pressed="true">
                   <span class="chip-fill"></span>
@@ -345,7 +348,7 @@
     </div>
 
     <!-- ───────────────────────── dialogs ───────────────────────── -->
-    <dialog id="welcomeDialog" class="dialog welcome">
+    <dialog id="welcomeDialog" class="dialog welcome" aria-label="Paint Studio">
       <div class="welcome-hero">
         <span class="brand-mark lg" aria-hidden="true">
           <svg class="icon"><use href="#i-brush" /></svg>
@@ -395,9 +398,9 @@
       </p>
     </dialog>
 
-    <dialog id="newDocDialog" class="dialog">
+    <dialog id="newDocDialog" class="dialog" aria-labelledby="newDocTitle">
       <header class="dialog-head">
-        <h2>New document</h2>
+        <h2 id="newDocTitle">New document</h2>
         <button class="icon-btn sm" data-close aria-label="Close"><svg class="icon"><use href="#i-close" /></svg></button>
       </header>
       <div class="dialog-body">
@@ -418,7 +421,7 @@
       </footer>
     </dialog>
 
-    <dialog id="resizeDialog" class="dialog">
+    <dialog id="resizeDialog" class="dialog" aria-labelledby="resizeTitle">
       <header class="dialog-head">
         <h2 id="resizeTitle">Image size</h2>
         <button class="icon-btn sm" data-close aria-label="Close"><svg class="icon"><use href="#i-close" /></svg></button>
@@ -443,9 +446,9 @@
       </footer>
     </dialog>
 
-    <dialog id="exportDialog" class="dialog">
+    <dialog id="exportDialog" class="dialog" aria-labelledby="exportTitle">
       <header class="dialog-head">
-        <h2>Export image</h2>
+        <h2 id="exportTitle">Export image</h2>
         <button class="icon-btn sm" data-close aria-label="Close"><svg class="icon"><use href="#i-close" /></svg></button>
       </header>
       <div class="dialog-body">
@@ -482,9 +485,9 @@
       </footer>
     </dialog>
 
-    <dialog id="levelsDialog" class="dialog tone-dialog">
+    <dialog id="levelsDialog" class="dialog tone-dialog" aria-labelledby="levelsTitle">
       <header class="dialog-head">
-        <h2>Levels</h2>
+        <h2 id="levelsTitle">Levels</h2>
         <button class="icon-btn sm" data-close aria-label="Close"><svg class="icon"><use href="#i-close" /></svg></button>
       </header>
       <div class="dialog-body">
@@ -532,9 +535,9 @@
       </footer>
     </dialog>
 
-    <dialog id="curvesDialog" class="dialog tone-dialog">
+    <dialog id="curvesDialog" class="dialog tone-dialog" aria-labelledby="curvesTitle">
       <header class="dialog-head">
-        <h2>Curves</h2>
+        <h2 id="curvesTitle">Curves</h2>
         <button class="icon-btn sm" data-close aria-label="Close"><svg class="icon"><use href="#i-close" /></svg></button>
       </header>
       <div class="dialog-body">
@@ -555,9 +558,9 @@
       </footer>
     </dialog>
 
-    <dialog id="shortcutsDialog" class="dialog wide">
+    <dialog id="shortcutsDialog" class="dialog wide" aria-labelledby="shortcutsTitle">
       <header class="dialog-head">
-        <h2>Keyboard shortcuts</h2>
+        <h2 id="shortcutsTitle">Keyboard shortcuts</h2>
         <button class="icon-btn sm" data-close aria-label="Close"><svg class="icon"><use href="#i-close" /></svg></button>
       </header>
       <div class="dialog-body">
