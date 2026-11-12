@@ -76,8 +76,9 @@ async function openInEditor(file) {
   });
   const q = new URLSearchParams({ lang: cfg.lang });
   if (cfg.task) q.set("task", cfg.task);
-  // without storage the editor still opens and asks for the file itself
-  if (stored !== null) q.set("open", id);
+  // without storage the editor still opens, says the file did not come
+  // along (?open=0) and asks for it itself
+  q.set("open", stored !== null ? id : "0");
   location.href = `${cfg.editor}?${q}`;
 }
 

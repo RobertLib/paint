@@ -87,7 +87,8 @@ export default {
   "Reset to 100% · ⌘1": "Zpět na 100 % · ⌘1",
   "Fit to screen": "Přizpůsobit obrazovce",
   "Fit to screen · ⌘0": "Přizpůsobit obrazovce · ⌘0",
-  "Drop image to open": "Pusťte obrázek pro otevření",
+  "Drop image to open": "Pusťte obrázek a otevře se",
+  "Drop image to add it as a new layer": "Pusťte obrázek a přidá se jako nová vrstva",
   "PNG · JPEG · WebP · HEIC · GIF · SVG · PSD": "PNG · JPEG · WebP · HEIC · GIF · SVG · PSD",
   Panels: "Panely",
   "Working…": "Pracuji…",
@@ -258,6 +259,7 @@ export default {
   "Transparent → Primary": "Průhledná → hlavní",
   Strength: "Síla",
   Aligned: "Zarovnané",
+  "Set source": "Nastavit zdroj",
   Mode: "Režim",
   Range: "Rozsah",
   Style: "Styl",
@@ -333,14 +335,19 @@ export default {
   // ------------------------------------------------------------ toasts
   "This layer is locked": "Vrstva je zamčená",
   "Clone source set": "Zdroj razítka nastaven",
-  "Alt-click to set the clone source first": "Nejdřív Alt+klikem nastavte zdroj razítka",
+  "Set the clone source first: Alt-click it or use Set source":
+    "Nejdřív nastavte zdroj razítka: Alt+klikem nebo tlačítkem Nastavit zdroj",
   "Healing source set": "Zdroj retuše nastaven",
-  "Alt-click to set the healing source first": "Nejdřív Alt+klikem nastavte zdroj retuše",
+  "Set the healing source first: Alt-click it or use Set source":
+    "Nejdřív nastavte zdroj retuše: Alt+klikem nebo tlačítkem Nastavit zdroj",
+  "Click or tap the spot to use as the source": "Klikněte nebo klepněte na místo, které poslouží jako zdroj",
   "Spot healing works on layer pixels — click the layer thumbnail first":
     "Bodová retuš pracuje s pixely vrstvy – nejdřív klikněte na náhled vrstvy",
   "{tool} works on layer pixels — click the layer thumbnail first":
     "Nástroj „{tool}“ pracuje s pixely vrstvy – nejdřív klikněte na náhled vrstvy",
   "Nothing to transform on this layer": "Na této vrstvě není co transformovat",
+  "The shape is too small for this feather radius — the selection is unchanged":
+    "Tvar je na toto prolnutí okraje příliš malý – výběr zůstal beze změny",
   "Text layer converted to pixels": "Textová vrstva převedena na pixely",
   "New {w} × {h} document": "Nový dokument {w} × {h}",
   "You have unsaved changes in this document. Discard them and continue?":
@@ -350,6 +357,10 @@ export default {
   "Could not decode this HEIC photo — check your connection and try again":
     "Fotku HEIC se nepodařilo dekódovat – zkontrolujte připojení a zkuste to znovu",
   "Could not open that image": "Obrázek se nepodařilo otevřít",
+  "The file could not be handed over to the editor — open it again":
+    "Soubor se nepodařilo předat editoru – otevřete ho prosím znovu",
+  "This browser won't let the editor read this SVG — it contains HTML text (foreignObject). Export it as PNG from the app that made it":
+    "Tento prohlížeč nedovolí editoru toto SVG přečíst – obsahuje text v HTML (foreignObject). Vyexportujte ho jako PNG z aplikace, ve které vzniklo",
   "Decoding HEIC photo…": "Dekóduji fotku HEIC…",
   "Reading PSD…": "Načítám PSD…",
   "Writing PSD…": "Ukládám PSD…",
@@ -392,6 +403,7 @@ export default {
   "Cropped to {w} × {h}": "Oříznuto na {w} × {h}",
   "Nothing to trim — the image is empty": "Není co oříznout – obrázek je prázdný",
   "No transparent border to trim": "Obrázek nemá průhledný okraj",
+  "The selection covers the whole canvas — nothing to crop": "Výběr pokrývá celé plátno – není co oříznout",
   "Resized to {w} × {h}": "Velikost změněna na {w} × {h}",
   "Canvas is now {w} × {h}": "Plátno má nyní {w} × {h}",
   "Nothing to undo": "Není co vrátit",
@@ -408,7 +420,7 @@ export default {
   "Layer settings": "Nastavení vrstvy",
   "Layer visibility": "Viditelnost vrstvy",
   "Layer opacity": "Krytí vrstvy",
-  "Rename layer": "Přejmenování vrstvy",
+  "Layer rename": "Přejmenování vrstvy",
   "Reorder layers": "Změna pořadí vrstev",
   "Apply layer mask": "Použít masku vrstvy",
   "Enable layer mask": "Zapnout masku vrstvy",
@@ -456,9 +468,10 @@ export default {
   Width: "Šířka",
   Height: "Výška",
   Percent: "Procenta",
+  "Background color": "Barva pozadí",
   White: "Bílá",
   Black: "Černá",
-  Transparent: "Průhledné",
+  Transparent: "Průhledná",
   Create: "Vytvořit",
   "Keep aspect ratio": "Zachovat poměr stran",
   Anchor: "Ukotvení",
@@ -468,6 +481,8 @@ export default {
   Scale: "Měřítko",
   "File name": "Název souboru",
   Download: "Stáhnout",
+  "{w} × {h} px": "{w} × {h} px",
+  "Show file size": "Zjistit velikost souboru",
   "{w} × {h} px — calculating size…": "{w} × {h} px – počítám velikost…",
   "{w} × {h} px — about {size}": "{w} × {h} px – přibližně {size}",
   "JPEG has no transparency — transparent areas become white.":
@@ -493,6 +508,7 @@ export default {
   "Undo / Redo": "Zpět / znovu",
   "Select all / Deselect": "Vybrat vše / zrušit výběr",
   "Fill with primary color": "Vyplnit hlavní barvou",
+  "Rename layer": "Přejmenovat vrstvu",
   "Levels / Curves": "Úrovně / křivky",
   "Zoom in / out": "Přiblížit / oddálit",
   "Pan the canvas": "Posun plátna",
@@ -579,6 +595,7 @@ export default {
   "9:16": "9:16",
   "3:2": "3:2",
   "This layer is hidden — show it to paint on it": "Vrstva je skrytá – pro kreslení ji nejdřív zobrazte",
+  "This layer is hidden — show it to edit it": "Vrstva je skrytá – pro úpravy ji nejdřív zobrazte",
   "Saturation and brightness": "Sytost a jas",
   "Layer name": "Název vrstvy",
   "Paint Studio — Editor": "Paint Studio – editor",

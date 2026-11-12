@@ -95,7 +95,7 @@
 
       <section class="block prose">
         <h2>Quality, scale and format: what shrinks a file most</h2>
-        <p>Three controls decide the file size. <strong>Scale</strong> reduces the pixel dimensions and has by far the biggest effect: at 50% only a quarter of the pixels remain, and the file shrinks accordingly. <strong>Quality</strong> controls how much detail JPEG and WebP discard; going from 100 down to around 80 typically saves a lot of space with little visible change. <strong>Format</strong> matters too — WebP usually produces smaller files than JPEG at similar quality. Start with scale if the image is larger than it will ever be displayed, then fine-tune quality.</p>
+        <p>Three controls decide the file size. <strong>Scale</strong> reduces the pixel dimensions and has by far the biggest effect: at 50% only a quarter of the pixels remain, and the file shrinks accordingly. <strong>Quality</strong> controls how much detail JPEG and WebP discard; going from 100 down to around 80 typically saves a lot of space with little visible change. <strong>Format</strong> matters too — WebP, where your browser can save it, usually produces smaller files than JPEG at similar quality. Start with scale if the image is larger than it will ever be displayed, then fine-tune quality.</p>
         <h2>Settings that work for common limits</h2>
         <p>For photos on a website or in an email, quality 70–80 is usually indistinguishable from the original at normal viewing size. Go down to 50–60 only for thumbnails, where artifacts are hard to spot. If a form says “max 1 MB” or “max 500 KB”, watch the estimate in the dialog and lower the scale first, then the quality, until it fits. Screenshots with text compress poorly as JPEG — letters get fuzzy halos — so try WebP or keep PNG and reduce the scale instead.</p>
         <h2>What compression can’t do</h2>
@@ -107,11 +107,11 @@
         <h3>What quality setting should I use for JPEG?</h3>
         <p>For most photos, 70–85 is a good balance between size and sharpness, and the preset 75 suits web pages and email. Use 90 or more for images you plan to print or edit further, and 50–60 only when size matters more than detail.</p>
         <h3>Is WebP better than JPEG for small files?</h3>
-        <p>Usually, yes. At similar visual quality WebP files tend to be smaller, and WebP can also keep transparency. JPEG is still the safest choice when the file must open everywhere, for example in older software or strict upload forms.</p>
+        <p>Usually, yes. At similar visual quality WebP files tend to be smaller, and WebP can also keep transparency. Not every browser can save WebP, though; where it can’t, the editor says so and you pick PNG or JPEG. JPEG is still the safest choice when the file must open everywhere, for example in older software or strict upload forms.</p>
         <h3>How can I get a photo under a size limit like 1 MB?</h3>
         <p>Lower the Scale slider first, because fewer pixels shrink the file the most, then reduce Quality. The estimate updates as you drag, so you can stop as soon as it fits. For very small targets, combine a low scale with moderate quality rather than pushing quality to the minimum, which looks blocky.</p>
         <h3>Will compressing remove transparency?</h3>
-        <p>Only if you choose JPEG, which can’t store transparency and fills those areas with white. Pick WebP to keep transparency and still get a compact file, or PNG for lossless output.</p>
+        <p>Only if you choose JPEG, which can’t store transparency and fills those areas with white. Pick WebP to keep transparency and still get a compact file (if your browser can save WebP), or PNG for lossless output.</p>
       </section>
 
       <section class="block">

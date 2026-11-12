@@ -15,6 +15,7 @@ import {
   alphaBounds,
   copyCanvas,
   ctx2d,
+  drawText,
   fontString,
   makeCanvas,
   makeMask,
@@ -24,7 +25,7 @@ import {
   unionRect,
 } from "./doc.js";
 import { gaussData, unsharp } from "./filters.js";
-import { addTextLayer, paintText, setActiveLayer, updateTextLayer } from "./actions.js";
+import { addTextLayer, attempt, paintText, setActiveLayer, updateTextLayer } from "./actions.js";
 import { t } from "./i18n.js";
 import {
   beginLayerEdit,
@@ -151,13 +152,17 @@ function endFloating(label, { erase = false, opacity = 1, blend = "source-over" 
     // erasing where nothing is left changes nothing: record nothing
     !(erase && rect && nothingToErase(layer, buf, rect, doc.selection))
   ) {
-    editPixels(
-      label,
-      () => paintMasked(layer, buf, doc.selection, { opacity, blend, erase, rect }),
-      layer,
-      rect
+    // out of canvas memory on the way in: the layer stays as it was, the
+    // user is told, and the buffer below is freed all the same
+    const done = attempt(() =>
+      editPixels(
+        label,
+        () => paintMasked(layer, buf, doc.selection, { opacity, blend, erase, rect }),
+        layer,
+        rect
+      )
     );
-    emit("layers", doc);
+    if (done) emit("layers", doc);
   }
   // the stroke is in the layer now (or dropped): free the document-sized buffer
   releaseCanvas(buf);
@@ -260,6 +265,13 @@ function stampSegment(ctx, from, to, size, hardness, color, spacingFactor) {
   }
   stroke.residual = t - dist;
 }
+
+/**
+ * The primary colour's own opacity (the colour picker's Opacity). Brushes
+ * apply it to the whole stroke, like the tool's opacity, so overlapping dabs
+ * still don't darken; on a mask it lowers the coverage, as a fill's does.
+ */
+const colorAlpha = () => clamp(state.primary.a ?? 1, 0, 1);
 
 /** Pointer pressure, but only from real pens — mice report a constant 0.5. */
 function pressureOf(ev) {
@@ -580,6 +592,22 @@ function snapRect(r) {
   return { x, y, w: Math.round(r.x + r.w) - x, h: Math.round(r.y + r.h) - y };
 }
 
+/**
+ * Where a stroke `width` wide has to run to cover whole pixels: through pixel
+ * centres for odd widths, along pixel edges for even ones. A 1 px line is
+ * then one row of pixels, not two at half strength.
+ */
+const strokeCoord = (v, width) => (Math.round(width) % 2 ? Math.floor(v) + 0.5 : Math.round(v));
+
+const snapStroke = (p, width) => ({ x: strokeCoord(p.x, width), y: strokeCoord(p.y, width) });
+
+/** A box whose outline (`width` wide) covers whole pixels. */
+function strokeRect(r, width) {
+  const x = strokeCoord(r.x, width);
+  const y = strokeCoord(r.y, width);
+  return { x, y, w: strokeCoord(r.x + r.w, width) - x, h: strokeCoord(r.y + r.h, width) - y };
+}
+
 function roundRectPath(ctx, r, radius) {
   const rad = Math.min(radius, Math.abs(r.w) / 2, Math.abs(r.h) / 2);
   ctx.beginPath();
@@ -604,11 +632,15 @@ function polygonPath(ctx, r, sides, star) {
   ctx.closePath();
 }
 
-function paintShape(ctx, drawPath, o) {
+/** `join`: "miter" keeps the corners of boxes, polygons and stars sharp. */
+function paintShape(ctx, drawPath, o, join = "round") {
   const strokeCol = cssColor(state.primary);
   const fillCol = cssColor(state.secondary);
   ctx.save();
-  ctx.lineJoin = "round";
+  ctx.lineJoin = join;
+  // the narrow points of a star (or a squashed polygon) are bevelled
+  // rather than grow spikes many stroke widths long
+  ctx.miterLimit = 4;
   ctx.lineCap = "round";
   drawPath(ctx);
   if (o.fillMode === "fill" || o.fillMode === "both") {
@@ -701,10 +733,11 @@ function paintTool({ id, label, icon, shortcut, group, erase = false, defaults =
         hardness: opt("hardness", id) / 100,
         smooth: opt("smooth", id) / 100,
       };
-      this._opacity = o.opacity;
+      // the colour's own opacity (an eraser has no colour)
+      this._opacity = erase ? o.opacity : o.opacity * colorAlpha();
       const ctx = beginFloating({
         mode: erase ? "erase" : "normal",
-        opacity: o.opacity,
+        opacity: this._opacity,
       });
       stroke.smoothed = null;
       const p = smoothPoint(ev.p, 0);
@@ -813,7 +846,7 @@ function pixelSegment(ctx, from, to, size) {
 
 pencil.down = function down(ev) {
   const size = opt("size", this.id);
-  this._opacity = opt("opacity", this.id) / 100;
+  this._opacity = (opt("opacity", this.id) / 100) * colorAlpha();
   const ctx = beginFloating({ opacity: this._opacity });
   stroke.smoothed = null;
   const p = smoothPoint(ev.p, 0);
@@ -855,7 +888,7 @@ const airbrush = {
   _timer: 0,
   _pos: null,
   down(ev) {
-    this._opacity = opt("opacity", this.id) / 100;
+    this._opacity = (opt("opacity", this.id) / 100) * colorAlpha();
     beginFloating({ opacity: this._opacity });
     this._pos = ev.p;
     const spray = () => {
@@ -917,6 +950,11 @@ const bucket = {
     { key: "sampleAll", type: "toggle", label: t("Sample all layers"), def: false },
   ],
   down(ev) {
+    // a fill needs a few document-sized buffers: out of canvas memory, the
+    // layer stays as it was and the user is told
+    attempt(() => this._fill(ev));
+  },
+  _fill(ev) {
     const doc = state.doc;
     const layer = doc.target;
     if (!layer || layer.locked) return;
@@ -968,25 +1006,30 @@ const bucket = {
     }
 
     const paint = makeCanvas(doc.width, doc.height);
-    const pc = ctx2d(paint);
-    pc.fillStyle = cssColor(color);
-    pc.fillRect(region.x, region.y, region.w, region.h);
-    pc.globalCompositeOperation = "destination-in";
-    pc.drawImage(maskCanvas, region.x, region.y);
-    releaseCanvas(maskCanvas);
+    try {
+      const pc = ctx2d(paint);
+      pc.fillStyle = cssColor(color);
+      pc.fillRect(region.x, region.y, region.w, region.h);
+      pc.globalCompositeOperation = "destination-in";
+      pc.drawImage(maskCanvas, region.x, region.y);
+      releaseCanvas(maskCanvas);
 
-    editPixels(
-      t("Fill"),
-      () =>
-        paintMasked(layer, paint, sel, {
-          opacity: opt("opacity", id) / 100,
-          rect,
-        }),
-      layer,
-      rect
-    );
-    // the fill is in the layer now: free its document-sized buffer at once
-    releaseCanvas(paint);
+      editPixels(
+        t("Fill"),
+        () =>
+          paintMasked(layer, paint, sel, {
+            opacity: opt("opacity", id) / 100,
+            rect,
+          }),
+        layer,
+        rect
+      );
+    } finally {
+      // the fill is in the layer now (or failed half-way): free the
+      // document-sized buffers at once
+      releaseCanvas(maskCanvas);
+      releaseCanvas(paint);
+    }
     emit("layers", doc);
     requestRender();
   },
@@ -1124,6 +1167,9 @@ const gradient = {
         : state.primary;
     const radial = opt("type", this.id) === "radial";
     const gradientOn = (ctx, s1, s2) => {
+      // a press without a drag has no direction or size yet: paint nothing
+      // (a radial one would fill everything with the end colour)
+      if (this._length < 1) return "rgba(0,0,0,0)";
       const g = radial
         ? ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, Math.max(1, this._length))
         : ctx.createLinearGradient(a.x, a.y, b.x, b.y);
@@ -1207,8 +1253,9 @@ const gradient = {
     this._mask = null;
     const doc = state.doc;
     if (label && attached(doc, target) && !target.locked) {
-      edit.commit(label, doc.selection?.coverBounds || null);
-      emit("layers", doc);
+      const area = doc.selection?.coverBounds || null;
+      // out of memory while recording: the mask is put back, the user told
+      if (attempt(() => edit.commit(label, area))) emit("layers", doc);
     } else {
       edit.rollback();
     }
@@ -1336,15 +1383,21 @@ function retouchTool({
     },
     up(ev) {
       if (!this._edit) return;
-      // the last stretch up to where the pointer was released
-      if (ev?.p) this.move(ev);
-      this._edit.commit(label, this._bounds);
+      const edit = this._edit;
+      // out of memory on the last stretch or while recording: the layer is
+      // put back as it was, and the user is told
+      const done = attempt(() => {
+        // the last stretch up to where the pointer was released
+        if (ev?.p) this.move(ev);
+        edit.commit(label, this._bounds);
+      });
+      if (!done) edit.rollback();
       this._edit = null;
       this._layer = null;
       this._last = null;
       this._snap = null;
       this._bounds = null;
-      emit("layers", state.doc);
+      if (done) emit("layers", state.doc);
     },
     cancel() {
       if (this._edit) this._edit.rollback();
@@ -1447,17 +1500,37 @@ function healPatch(src, dst, w, h, sigma) {
   return out;
 }
 
-/** Alt-click sets a source; the offset sticks between strokes when aligned. */
+/**
+ * Alt-click sets a source — or, without an Alt key (a phone, a tablet), Set
+ * source in the options bar and then a tap. The offset sticks between
+ * strokes when aligned.
+ */
 function withSource(tool, setMsg, missingMsg) {
   const baseDown = tool.down;
   const baseUp = tool.up;
   tool._offset = null;
   tool._source = null;
+  /** Set source was pressed: the next click or tap picks the source */
+  tool._picking = false;
+  // meanwhile a tap is a one-shot click: a finger that turns into a pinch
+  // (zooming in to find the spot) picks nothing
+  Object.defineProperty(tool, "oneShot", {
+    get() {
+      return this._picking;
+    },
+  });
+  tool._pick = function pick(on) {
+    this._picking = on;
+    if (on) emit("toast", { msg: t("Click or tap the spot to use as the source"), kind: "info" });
+    // the options bar shows Set source pressed while it waits
+    emit("tool", { tool: state.tool });
+  };
   tool.down = function down(ev) {
-    if (ev.alt) {
+    if (ev.alt || this._picking) {
       this._source = { x: ev.p.x, y: ev.p.y };
       this._offset = null;
       overlay.cloneSrc = this._source;
+      if (this._picking) this._pick(false);
       emit("toast", { msg: setMsg, kind: "ok" });
       requestRender();
       return;
@@ -1481,9 +1554,22 @@ function withSource(tool, setMsg, missingMsg) {
   };
   tool.deactivate = function deactivate() {
     overlay.cloneSrc = null;
+    this._picking = false;
   };
   return tool;
 }
+
+/**
+ * The options-bar button that arms Set source (first, so a phone shows it
+ * without scrolling the bar); it stays pressed until the source is picked.
+ */
+const sourceOpt = (tool) => ({
+  type: "button",
+  label: t("Set source"),
+  icon: "i-check",
+  pressed: () => tool._picking,
+  onClick: () => tool._pick(!tool._picking),
+});
 
 const healTool = withSource(
   retouchTool({
@@ -1511,9 +1597,10 @@ const healTool = withSource(
     },
   }),
   t("Healing source set"),
-  t("Alt-click to set the healing source first")
+  t("Set the healing source first: Alt-click it or use Set source")
 );
 healTool.opts = [
+  sourceOpt(healTool),
   sizeOpt(50),
   RANGE("strength", t("Strength"), 1, 100, 100, { unit: "%" }),
   hardnessOpt(50),
@@ -1776,13 +1863,17 @@ const spotHeal = {
       const size = opt("size", this.id);
       // the repair reaches a little past the painted area (see spotHealRegion)
       const reach = Math.ceil(size * 0.8) + 8;
-      editPixels(
-        t("Spot healing"),
-        () => spotHealRegion(target, buf, b, doc.selection, size),
-        target,
-        padRect(b, reach)
+      // out of memory: the layer stays as it was, the user is told, and the
+      // buffer below is freed all the same
+      const done = attempt(() =>
+        editPixels(
+          t("Spot healing"),
+          () => spotHealRegion(target, buf, b, doc.selection, size),
+          target,
+          padRect(b, reach)
+        )
       );
-      emit("layers", doc);
+      if (done) emit("layers", doc);
     }
     releaseCanvas(buf);
     requestRender();
@@ -1887,9 +1978,10 @@ const cloneTool = withSource(
     },
   }),
   t("Clone source set"),
-  t("Alt-click to set the clone source first")
+  t("Set the clone source first: Alt-click it or use Set source")
 );
 cloneTool.opts = [
+  sourceOpt(cloneTool),
   sizeOpt(70),
   RANGE("strength", t("Strength"), 1, 100, 100, { unit: "%" }),
   hardnessOpt(70),
@@ -1943,14 +2035,15 @@ function shapeTool({ id, label, icon, shortcut, extraOpts = [], draw, endpoints 
     move(ev) {
       if (!stroke.active || !this._start) return;
       const ctx = stroke.bctx;
-      const a = this._start;
+      const width = opt("width", id);
+      // lines and arrows run along whole pixels (see strokeCoord)
+      const a = endpoints ? snapStroke(this._start, width) : this._start;
       // the end actually drawn: lines and arrows snap to 45° with Shift
-      const b = endpoints && ev.shift ? snapAngle(a, ev.p) : ev.p;
+      const b = endpoints ? snapStroke(ev.shift ? snapAngle(a, ev.p) : ev.p, width) : ev.p;
       const rect = normalizedRect(a, ev.p, {
         square: ev.shift,
         fromCenter: ev.alt,
       });
-      const width = opt("width", id);
       const fillMode = opt("fillMode", id);
       // everything this shape can cover: its box, the stroke and an arrowhead
       const span = {
@@ -2062,7 +2155,9 @@ const rectShape = shapeTool({
   shortcut: "r",
   extraOpts: [RANGE("radius", t("Corner"), 0, 200, 0, { unit: "px" })],
   draw(ctx, { rect, o }) {
-    paintShape(ctx, (c) => roundRectPath(c, rect, o.radius), o);
+    // an outline runs along whole pixels; a solid fill keeps its box as is
+    const r = o.fillMode === "fill" ? rect : strokeRect(rect, o.width);
+    paintShape(ctx, (c) => roundRectPath(c, r, o.radius), o, "miter");
   },
 });
 
@@ -2098,7 +2193,7 @@ const polygonShape = shapeTool({
   shortcut: "p",
   extraOpts: [RANGE("sides", t("Sides"), 3, 16, 6)],
   draw(ctx, { rect, o }) {
-    paintShape(ctx, (c) => polygonPath(c, rect, o.sides, false), o);
+    paintShape(ctx, (c) => polygonPath(c, rect, o.sides, false), o, "miter");
   },
 });
 
@@ -2108,7 +2203,7 @@ const starShape = shapeTool({
   icon: "i-star",
   extraOpts: [RANGE("sides", t("Points"), 3, 16, 5)],
   draw(ctx, { rect, o }) {
-    paintShape(ctx, (c) => polygonPath(c, rect, o.sides, true), o);
+    paintShape(ctx, (c) => polygonPath(c, rect, o.sides, true), o, "miter");
   },
 });
 
@@ -2437,9 +2532,18 @@ function selectionModeFrom(ev, toolId) {
 function applySelection(next, mode, label, toolId) {
   const doc = state.doc;
   const feather = opt("feather", toolId) || 0;
+  let faded = false;
   editSelection(label, () => {
     let sel = next;
-    if (feather > 0) sel = sel.feather(feather);
+    if (feather > 0) {
+      sel = sel.feather(feather);
+      // a shape much smaller than the feather fades to (almost) nothing:
+      // keep the selection there was rather than silently dropping it
+      if (sel.isEmpty && !next.isEmpty) {
+        faded = true;
+        return;
+      }
+    }
     if (mode === "intersect" && !doc.selection) {
       // intersecting with nothing leaves nothing
       sel = null;
@@ -2450,6 +2554,12 @@ function applySelection(next, mode, label, toolId) {
     }
     doc.setSelection(sel && !sel.isEmpty ? sel : null);
   });
+  if (faded) {
+    emit("toast", {
+      msg: t("The shape is too small for this feather radius — the selection is unchanged"),
+      kind: "info",
+    });
+  }
   requestRender();
 }
 
@@ -2627,6 +2737,32 @@ function drawShiftedMask(ctx, orig, dx, dy) {
   ctx.restore();
 }
 
+/**
+ * How much of a text layer's pixels `sel` holds: "none", "all" or "part".
+ * Only the area around the text is read — the layer has no pixels elsewhere.
+ */
+function textInSelection(layer, sel) {
+  const b = textBounds(layer.text);
+  // generous room for glyphs that reach past the text box
+  const pad = layer.text.size;
+  const x = Math.max(0, Math.floor(b.x - pad));
+  const y = Math.max(0, Math.floor(b.y - pad));
+  const w = Math.min(layer.width, Math.ceil(b.x + b.w + pad)) - x;
+  const h = Math.min(layer.height, Math.ceil(b.y + b.h + pad)) - y;
+  if (w <= 0 || h <= 0) return "none";
+  const px = layer.ctx.getImageData(x, y, w, h).data;
+  const sa = sel.ctx.getImageData(x, y, w, h).data;
+  let some = false;
+  let all = true;
+  for (let i = 3; i < px.length; i += 4) {
+    if (!px[i]) continue;
+    if (sa[i]) some = true;
+    if (sa[i] !== 255) all = false;
+    if (some && !all) return "part";
+  }
+  return some ? "all" : "none";
+}
+
 const move = {
   id: "move",
   label: t("Move"),
@@ -2666,11 +2802,14 @@ const move = {
     this._delta = { x: 0, y: 0 };
 
     const sel = opt("target", this.id) === "layer" ? null : doc.selection;
+    // a selection holding all of a text layer moves it whole; one holding
+    // none of it moves no pixel at all
+    const inSel = sel && !target.isMask && layer.text ? textInSelection(layer, sel) : null;
     // moving the whole layer keeps text editable and carries the mask along
-    this._text = !sel && !target.isMask && layer.text ? { ...layer.text } : null;
+    this._text = (!sel || inSel === "all") && !target.isMask && layer.text ? { ...layer.text } : null;
     this._mask = !sel && !target.isMask && layer.mask ? copyCanvas(layer.mask) : null;
     // moving part of a text layer turns it into pixels (only if it moves)
-    this._dropText = !!(sel && !target.isMask && layer.text);
+    this._dropText = inSel === "part";
     // the drag stays with this layer even if another one becomes active
     this._layer = layer;
     this._target = target;
@@ -2723,7 +2862,14 @@ const move = {
     const c = target.ctx;
     c.save();
     c.setTransform(1, 0, 0, 1, 0, 0);
-    if (this._base) {
+    if (this._text) {
+      // text is drawn again where it now is rather than shifted, so what
+      // went past the edge comes back and the pixels always match the text
+      const text = { ...this._text, x: this._text.x + dx, y: this._text.y + dy };
+      this._layer.text = text;
+      c.clearRect(0, 0, target.width, target.height);
+      drawText(c, text);
+    } else if (this._base) {
       c.globalCompositeOperation = "copy";
       c.drawImage(this._base, 0, 0);
       if (target.isMask) {
@@ -2756,31 +2902,44 @@ const move = {
     requestRender();
   },
   up() {
-    if (!this._edit) return;
+    const edit = this._edit;
+    if (!edit) return;
+    this._edit = null;
     const doc = state.doc;
     const { x: dx, y: dy } = this._delta || { x: 0, y: 0 };
     overlay.floatFrame = null;
-    if (!dx && !dy) {
-      // a click without a drag: put everything back exactly as it was
-      this._edit.rollback();
-    } else {
-      if (this._sel) {
-        // carry the selection along with the pixels it holds
-        const moved = new Selection(doc.width, doc.height);
-        moved.ctx.drawImage(this._sel.canvas, dx, dy);
-        doc.setSelection(moved);
-        emit("selection", doc);
+    try {
+      if (!dx && !dy) {
+        // a click without a drag: put everything back exactly as it was
+        edit.rollback();
+      } else {
+        // carry the selection along with the pixels it holds — made before
+        // anything is recorded, so running out of memory for it puts the
+        // layer back instead of leaving moved pixels without an undo step
+        let moved = null;
+        if (this._sel) {
+          moved = new Selection(doc.width, doc.height);
+          moved.ctx.drawImage(this._sel.canvas, dx, dy);
+        }
+        if (this._text) {
+          const layer = this._layer;
+          layer.text = { ...this._text, x: this._text.x + dx, y: this._text.y + dy };
+        }
+        if (moved) {
+          doc.setSelection(moved);
+          emit("selection", doc);
+        }
+        edit.commit(t("Move"));
       }
-      if (this._text) {
-        const layer = this._layer;
-        layer.text = { ...this._text, x: this._text.x + dx, y: this._text.y + dy };
-      }
-      this._edit.commit(t("Move"));
+    } catch (err) {
+      // (does nothing once the step is recorded)
+      edit.rollback();
+      throw err;
+    } finally {
+      this._release();
+      emit("layers", doc);
+      requestRender();
     }
-    this._edit = null;
-    this._release();
-    emit("layers", doc);
-    requestRender();
   },
   cancel() {
     if (this._edit) this._edit.rollback();
@@ -2871,9 +3030,18 @@ const transform = {
     // show the box right away, but take no snapshot until something moves
     this._showPreview({ quiet: false });
   },
-  /** A gesture was interrupted (pinch, window blur): keep the session. */
+  /**
+   * A gesture was interrupted (pinch, window blur): keep the session, but
+   * not the part of the drag made before (a pinch starts with one finger).
+   */
   abortGesture() {
+    const d = this._drag;
+    const s = this._s;
     this._drag = null;
+    if (!d || !s) return;
+    const { cx, cy, sx, sy, angle } = d.s0;
+    Object.assign(s, { cx, cy, sx, sy, angle });
+    this._render();
   },
   deactivate() {
     this.apply();
@@ -2986,6 +3154,7 @@ const transform = {
       layerId: layer.id,
       patch,
       base,
+      sel,
       selPatch,
       mask: !sel && !target.isMask && layer.mask ? copyCanvas(layer.mask) : null,
       /** preview buffers for a transformed mask, reused on every move */
@@ -3201,20 +3370,33 @@ const transform = {
       this._afterSession();
       return;
     }
-    if (s.selPatch) {
-      const moved = new Selection(doc.width, doc.height);
-      moved.ctx.setTransform(this._matrix(s));
-      moved.ctx.drawImage(s.selPatch, 0, 0);
-      moved.ctx.setTransform(1, 0, 0, 1, 0, 0);
-      doc.setSelection(moved);
-      emit("selection", doc);
-    }
-    const layer = doc.layers.find((l) => l.id === s.layerId);
-    if (!s.target.isMask && layer?.text) {
-      layer.text = null;
-      emit("toast", { msg: t("Text layer converted to pixels"), kind: "info" });
-    }
-    s.edit.commit(t("Transform"));
+    // Enter, Apply, a tool switch and settling all end here: running out of
+    // memory puts the layer back (and says so) instead of leaving
+    // transformed pixels without an undo step
+    const ok = attempt(() => {
+      let moved = null;
+      if (s.sel) {
+        // the whole selection follows its pixels, not just the box around
+        // them — made before anything changes
+        moved = new Selection(doc.width, doc.height);
+        moved.ctx.setTransform(
+          this._matrix(s).multiply(new DOMMatrix().translateSelf(-s.origin.x, -s.origin.y))
+        );
+        moved.ctx.drawImage(s.sel.canvas, 0, 0);
+        moved.ctx.setTransform(1, 0, 0, 1, 0, 0);
+      }
+      const layer = doc.layers.find((l) => l.id === s.layerId);
+      const dropText = !s.target.isMask && !!layer?.text;
+      if (moved) {
+        doc.setSelection(moved);
+        emit("selection", doc);
+      }
+      if (dropText) layer.text = null;
+      s.edit.commit(t("Transform"));
+      if (dropText) emit("toast", { msg: t("Text layer converted to pixels"), kind: "info" });
+    });
+    // (does nothing once the step is recorded)
+    if (!ok) s.edit.rollback();
     this._free(s);
     emit("layers", doc);
     this._afterSession();
@@ -3313,9 +3495,11 @@ const crop = {
       type: "button",
       label: t("Reset"),
       icon: "i-reset",
+      // back to the frame the tool started with (none would leave Apply
+      // with nothing to do)
       onClick: () => {
-        overlay.crop = null;
-        requestRender();
+        crop._drag = null;
+        crop.activate();
       },
     },
   ],
@@ -3335,6 +3519,8 @@ const crop = {
           h: Math.round(doc.height * 0.84),
         };
     this._size = `${doc.width}x${doc.height}`;
+    // a chosen ratio shapes the first frame too, not only later drags
+    this.onOptsChange();
     requestRender();
   },
   /**
@@ -3759,6 +3945,29 @@ export function initInput(canvas) {
   /** a one-shot tool tapped with a finger waits until it is not a pinch */
   let pendingTap = null;
   let wheelPanUntil = 0;
+  /** touches set aside as a resting hand: ignored until they lift */
+  const palms = new Set();
+  /** a pen has touched the canvas: from then on fingers only pan and zoom */
+  let penUsed = false;
+  /** a Safari trackpad pinch in progress: the zoom it started from */
+  let gesture = null;
+
+  /**
+   * The first two pointers down: their distance and midpoint, and the zoom
+   * now. A pinch takes this as its baseline again whenever a pointer comes
+   * or goes, so the fingers left down carry on from where they are.
+   */
+  const basePinch = () => {
+    const [a, b] = [...pointers.values()];
+    return {
+      dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+      zoom: view.zoom,
+      mid: view.eventPos({
+        clientX: (a.clientX + b.clientX) / 2,
+        clientY: (a.clientY + b.clientY) / 2,
+      }),
+    };
+  };
 
   const ctxFor = (e) => {
     const screen = view.eventPos(e);
@@ -3817,7 +4026,11 @@ export function initInput(canvas) {
     }
     drag = { kind: "tool", tool, pointerId };
     state.dragging = true;
-    tool.down?.(ev);
+    // out of canvas memory as the gesture starts: say so, and drop it
+    if (!attempt(() => tool.down?.(ev))) {
+      abortDrag();
+      return;
+    }
     // one-shot tools are done at once; nothing is left to drag
     if (tool.oneShot && drag?.tool === tool) {
       tool.up?.(ev);
@@ -3828,34 +4041,46 @@ export function initInput(canvas) {
 
   canvas.addEventListener("pointerdown", (e) => {
     if (!state.doc) return;
+    const touch = e.pointerType === "touch";
     // palm rejection: a hand resting on the screen while the pen draws is
     // neither a pinch nor a new stroke (nor counted towards the next one)
     const penDrag = !!drag && pointers.get(drag.pointerId)?.pointerType === "pen";
-    if (e.pointerType === "touch" && penDrag) return;
+    if (touch && penDrag) {
+      palms.add(e.pointerId);
+      return;
+    }
+    if (e.pointerType === "pen") {
+      penUsed = true;
+      const hand = [...pointers.values()].filter((p) => p.pointerType === "touch");
+      if (hand.length) {
+        // the hand landed first: what it started (a stroke, a pinch, a tap)
+        // is dropped unrecorded, and it is ignored until it lifts
+        pendingTap = null;
+        pinch = null;
+        if (hand.some((p) => p.pointerId === drag?.pointerId)) abortDrag();
+        for (const p of hand) {
+          pointers.delete(p.pointerId);
+          palms.add(p.pointerId);
+        }
+      }
+    }
     canvas.setPointerCapture?.(e.pointerId);
     pointers.set(e.pointerId, e);
 
-    if (pointers.size === 2) {
-      // two fingers: pinch-zoom and pan instead of drawing
-      const [a, b] = [...pointers.values()];
+    if (pointers.size >= 2) {
+      // two fingers: pinch-zoom and pan instead of drawing (a third one
+      // takes nothing over: the pinch just starts again from here)
       pendingTap = null;
       abortDrag();
-      pinch = {
-        dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
-        zoom: view.zoom,
-        mid: view.eventPos({
-          clientX: (a.clientX + b.clientX) / 2,
-          clientY: (a.clientY + b.clientY) / 2,
-        }),
-      };
+      pinch = basePinch();
       return;
     }
-    if (pointers.size > 2) return;
 
     const ev = ctxFor(e);
     let tool = activeTool();
 
-    if (e.button === 1 || spaceHeld || tool.id === "hand") {
+    // once a pen is in use a finger pans: a resting hand paints nothing
+    if (e.button === 1 || spaceHeld || tool.id === "hand" || (touch && penUsed)) {
       startPan(ev, e.pointerId);
       return;
     }
@@ -3878,16 +4103,11 @@ export function initInput(canvas) {
   });
 
   canvas.addEventListener("pointermove", (e) => {
-    if (!state.doc) return;
+    if (!state.doc || palms.has(e.pointerId)) return;
     if (pointers.has(e.pointerId)) pointers.set(e.pointerId, e);
 
     if (pinch && pointers.size >= 2) {
-      const [a, b] = [...pointers.values()];
-      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-      const mid = view.eventPos({
-        clientX: (a.clientX + b.clientX) / 2,
-        clientY: (a.clientY + b.clientY) / 2,
-      });
+      const { dist, mid } = basePinch();
       // two fingers moving together pan the canvas — first, so the point
       // that was under the fingers is under them again, then zoom about it
       view.pan(mid.x - pinch.mid.x, mid.y - pinch.mid.y);
@@ -3906,12 +4126,21 @@ export function initInput(canvas) {
       return;
     }
     if (drag?.kind === "tool") {
+      const tool = drag.tool;
       // fast strokes: use every sample the browser collected, not one per frame
-      const samples = drag.tool.coalesce && e.getCoalescedEvents ? e.getCoalescedEvents() : null;
-      if (samples && samples.length > 1) {
-        for (const s of samples) drag.tool.move?.(ctxFor(s));
-      } else {
-        drag.tool.move?.(ev);
+      const samples = tool.coalesce && e.getCoalescedEvents ? e.getCoalescedEvents() : null;
+      const moved = attempt(() => {
+        if (samples && samples.length > 1) {
+          for (const s of samples) tool.move?.(ctxFor(s));
+        } else {
+          tool.move?.(ev);
+        }
+      });
+      // out of canvas memory mid-stroke (a retouch dab): said so; the stroke
+      // is dropped as a whole rather than recorded half done
+      if (!moved) {
+        abortDrag();
+        return;
       }
     } else if (!spaceHeld) {
       // tools with on-canvas handles describe the cursor under the pointer
@@ -3922,8 +4151,11 @@ export function initInput(canvas) {
   });
 
   const finish = (e) => {
+    // a resting hand lifting off ends nothing
+    if (palms.delete(e.pointerId)) return;
     pointers.delete(e.pointerId);
-    if (pointers.size < 2) pinch = null;
+    // the fingers still down pinch on from where they are now
+    pinch = pinch && pointers.size >= 2 ? basePinch() : null;
     if (pendingTap && pendingTap.pointerId === e.pointerId) {
       const { tool, ev } = pendingTap;
       pendingTap = null;
@@ -3933,15 +4165,18 @@ export function initInput(canvas) {
     const ev = ctxFor(e);
     const d = drag;
     endDrag();
-    if (d.kind === "tool") d.tool.up?.(ev);
+    // a commit that fails (out of canvas memory) is reported, and the
+    // cursor below is put back all the same
+    if (d.kind === "tool") attempt(() => d.tool.up?.(ev));
     canvas.style.cursor = "";
     applyCursor();
   };
 
   canvas.addEventListener("pointerup", finish);
   canvas.addEventListener("pointercancel", (e) => {
+    if (palms.delete(e.pointerId)) return;
     pointers.delete(e.pointerId);
-    pinch = null;
+    pinch = pinch && pointers.size >= 2 ? basePinch() : null;
     if (pendingTap?.pointerId === e.pointerId) pendingTap = null;
     if (drag && (drag.pointerId === undefined || drag.pointerId === e.pointerId)) abortDrag();
     applyCursor();
@@ -3962,6 +4197,8 @@ export function initInput(canvas) {
     (e) => {
       if (!state.doc) return;
       e.preventDefault();
+      // a Safari pinch already zooms through its gesture events (below)
+      if (gesture && e.ctrlKey) return;
       const at = view.eventPos(e);
       const now = performance.now();
       // trackpads scroll in two dimensions; a sideways component marks a
@@ -3981,6 +4218,34 @@ export function initInput(canvas) {
     },
     { passive: false }
   );
+
+  /* Safari pinches on a trackpad with gesture events, not ctrl+wheel as other
+     browsers do: without these the page would zoom instead of the canvas.
+     (Only WebKit sends them; on a touch screen it sends them for two
+     fingers as well, and those are pinched through the pointers above.) */
+  const stage = view.stage || canvas;
+  stage.addEventListener("gesturestart", (e) => {
+    e.preventDefault();
+    gesture = state.doc && !pointers.size ? { zoom: view.zoom } : null;
+  });
+  stage.addEventListener("gesturechange", (e) => {
+    e.preventDefault();
+    if (!gesture || pointers.size || !Number.isFinite(e.scale)) return;
+    const at = Number.isFinite(e.clientX) ? view.eventPos(e) : undefined;
+    view.setZoom(gesture.zoom * e.scale, at);
+  });
+  stage.addEventListener("gestureend", (e) => {
+    e.preventDefault();
+    gesture = null;
+  });
+
+  // the brush ring follows the size as it changes ([ and ], the options bar)
+  on("opts", ({ tool, key }) => {
+    const shown = drag?.tool || activeTool();
+    if (key !== "size" || tool !== shown.id || !overlay.cursor) return;
+    overlay.cursor = { ...overlay.cursor, r: (opt("size", tool) || 20) / 2 };
+    requestRender();
+  });
 
   // Escape during a drag: drop the stroke / lasso / move without keeping it
   on("abort-gesture", () => {
@@ -4061,6 +4326,8 @@ export function initInput(canvas) {
   window.addEventListener("blur", () => {
     spaceHeld = false;
     pointers.clear();
+    palms.clear();
+    gesture = null;
     pinch = null;
     pendingTap = null;
     abortDrag();
@@ -4099,7 +4366,9 @@ export function switchTool(next, prev) {
   from?.cancel?.();
   from?.deactivate?.();
   to?.activate?.();
-  overlay.cursor = null;
+  // a "tool" event without `prev` only refreshes the options bar ([ and ]
+  // resized the brush): the tool is the same, and so is its brush ring
+  if (prev !== undefined && prev !== next) overlay.cursor = null;
   requestRender();
 }
 

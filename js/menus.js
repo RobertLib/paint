@@ -16,6 +16,7 @@ import {
   icon,
   isPhoneLayout,
   openTab,
+  renameActiveLayer,
   setSidebarOpen,
   sideScroll,
 } from "./ui.js";
@@ -142,10 +143,10 @@ const MENUS = [
       { label: t("Curves…"), keys: `${MOD}M`, icon: "i-curves", run: openCurves, enabled: !!state.doc },
       { label: t("Auto levels"), run: () => openLevels({ auto: true, apply: true }), enabled: !!state.doc },
       { divider: true },
-      { label: t("Auto contrast"), run: () => quickAdjust({ contrast: 18, clarity: 12 }), enabled: !!state.doc },
-      { label: t("Warm up"), run: () => quickAdjust({ temperature: 22, saturation: 8 }), enabled: !!state.doc },
-      { label: t("Cool down"), run: () => quickAdjust({ temperature: -22 }), enabled: !!state.doc },
-      { label: t("Punchy"), run: () => quickAdjust({ contrast: 14, vibrance: 24, clarity: 18 }), enabled: !!state.doc },
+      quickAdjust(t("Auto contrast"), { contrast: 18, clarity: 12 }),
+      quickAdjust(t("Warm up"), { temperature: 22, saturation: 8 }),
+      quickAdjust(t("Cool down"), { temperature: -22 }),
+      quickAdjust(t("Punchy"), { contrast: 14, vibrance: 24, clarity: 18 }),
     ],
   },
   {
@@ -221,11 +222,12 @@ async function switchLanguage(code) {
   location.href = url.toString();
 }
 
-function quickAdjust(values) {
-  if (!A.previewAdjustments(values)) return;
-  emit("adjust", A.adjustValues);
-  openTab("adjust");
-  A.commitAdjustments();
+/**
+ * An Adjust menu preset: applied at once as its own step, named after it.
+ * The Adjust panel is left as it is (on a phone it would cover the result).
+ */
+function quickAdjust(label, values) {
+  return { label, run: () => A.applyAdjustPreset(label, values), enabled: !!state.doc };
 }
 
 function buildMenubar() {
@@ -481,7 +483,8 @@ export function wireDialog(dialog, { canClose = () => true, submit = null } = {}
   );
   if (submit) {
     dialog.addEventListener("keydown", (e) => {
-      if (e.key !== "Enter" || e.isComposing || e.repeat) return;
+      // an Enter that confirms an input method's word is not a submit
+      if (e.key !== "Enter" || e.isComposing || e.keyCode === 229 || e.repeat) return;
       if (e.target.tagName !== "INPUT" || !/^(text|number|search)$/.test(e.target.type)) return;
       e.preventDefault();
       if (!submit.disabled) submit.click();
@@ -835,7 +838,8 @@ const formatSize = (bytes) => {
 
 let estimateId = 0;
 
-function refreshExportPreview() {
+/** `psdSize`: work out the size of a PSD too (asked for with a click). */
+function refreshExportPreview({ psdSize = false } = {}) {
   const doc = state.doc;
   if (!doc) return;
   const scale = exportFormat === "psd" ? 1 : Number($("#exportScale").value) / 100;
@@ -854,11 +858,22 @@ function refreshExportPreview() {
   }
   ctx.drawImage(doc.composite(), 0, 0, preview.width, preview.height);
 
-  $("#exportInfo").textContent = t("{w} × {h} px — calculating size…", { w, h });
   clearTimeout(sizeTimer);
   const format = exportFormat;
   // only the newest estimate may write the line (an old one can finish last)
   const id = ++estimateId;
+  // estimating a PSD means writing the whole file, every layer, on this
+  // thread — too slow to run each time the dialog opens: only on request
+  if (format === "psd" && !psdSize) {
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "link-btn";
+    more.textContent = t("Show file size");
+    more.addEventListener("click", () => refreshExportPreview({ psdSize: true }));
+    $("#exportInfo").replaceChildren(`${t("{w} × {h} px", { w, h })} · `, more);
+    return;
+  }
+  $("#exportInfo").textContent = t("{w} × {h} px — calculating size…", { w, h });
   sizeTimer = setTimeout(async () => {
     let blob = null;
     try {
@@ -1047,7 +1062,15 @@ function initDragDrop() {
   const zone = $("#dropzone");
   let depth = 0;
 
-  const show = (visible) => zone.classList.toggle("is-active", visible);
+  const show = (visible) => {
+    // over an open document a dropped image becomes a new layer
+    if (visible) {
+      $("strong", zone).textContent = state.doc
+        ? t("Drop image to add it as a new layer")
+        : t("Drop image to open");
+    }
+    zone.classList.toggle("is-active", visible);
+  };
 
   window.addEventListener("dragenter", (e) => {
     if (![...e.dataTransfer.types].includes("Files")) return;
@@ -1144,8 +1167,20 @@ function initShortcuts() {
     // which would otherwise reach the browser (⌘S "save page", ⌘O)
     const fileCommand =
       mod && !e.altKey && (letter === "s" || letter === "o" || (letter === "e" && e.shiftKey));
-    if ((onSelect ? SELECT_KEYS.has(e.key) : isTypingTarget(e.target)) && !fileCommand) return;
-    if (modalOpen()) return;
+    // A dialog keeps the keys: no command runs under it — but the file and
+    // zoom keys must not reach the browser either ("save page", page zoom)
+    if (modalOpen()) {
+      const zoomKey = key === "+" || key === "=" || key === "-" || ["0", "1", "+", "-"].includes(phys);
+      if (fileCommand || (mod && !e.altKey && zoomKey)) e.preventDefault();
+      return;
+    }
+    // Enter on the crop's Ratio applies, as the hint says: a closed dropdown
+    // does nothing with it (an open one keeps its keys to itself)
+    const applyKey =
+      e.key === "Enter" &&
+      (state.tool === "crop" || state.tool === "transform") &&
+      !!e.target?.closest?.("#optionsBar");
+    if ((onSelect ? SELECT_KEYS.has(e.key) && !applyKey : isTypingTarget(e.target)) && !fileCommand) return;
     if (onSelect && e.key.length === 1) e.preventDefault();
 
     if (mod) {
@@ -1312,6 +1347,11 @@ function initShortcuts() {
 
     if (letter === "x") {
       swapColors();
+      return;
+    }
+    if (e.key === "F2") {
+      e.preventDefault();
+      renameActiveLayer();
       return;
     }
     // by the character only: Shift + the Slash key is "_" or "-" elsewhere

@@ -1,15 +1,17 @@
 /* ==========================================================================
    Autosave — the open document is written to this browser's IndexedDB a
-   moment after each change, so a closed tab, a crash or a reload never costs
-   the work. Nothing is uploaded. The next visit offers to restore it.
+   moment after each change (and every few seconds while the editing goes on
+   without a pause), so a closed tab, a crash or a reload never costs the
+   work. Nothing is uploaded. The next visit offers to restore it.
 
    Work is kept in two slots: the current session and the one before it.
    Editing another document moves the previous session to the second slot
    instead of overwriting it, so it can still be restored from File › Restore
    previous session. A document that has only been opened (or created) and
-   not edited or renamed yet does not take part in that: it waits in a slot
-   of its own, which the next such document replaces — opening files never
-   pushes real work out of storage.
+   not edited or renamed yet — a filter its landing-page task applied by
+   itself is no edit — does not take part in that: it waits in a slot of its
+   own, which the next such document replaces — opening files never pushes
+   real work out of storage.
 
    A session open in one tab is not offered by the others, and restoring it
    there anyway makes a copy with its own id, so two tabs never write over
@@ -17,7 +19,7 @@
    ========================================================================== */
 
 import { Doc } from "./doc.js";
-import { history, sessionsBusy, settleSessions } from "./history.js";
+import { cancelSessions, history, sessionsBusy, settleSessions } from "./history.js";
 import { t } from "./i18n.js";
 import { emit, on, state } from "./state.js";
 import { idbGetMany, idbReadMany, idbUpdate } from "./store.js";
@@ -31,10 +33,15 @@ export const SLOT_LATEST = "latest";
 const SLOTS = [SLOT_CURRENT, SLOT_PREVIOUS, SLOT_OPENED];
 
 const DELAY = 1500;
+/** Editing that never pauses is still written at least this often. */
+const MAX_WAIT = 12000;
 /** Skip autosave for documents too big to write without stutter. */
 const MAX_PIXELS = 8000 * 8000 * 3;
 
 let timer = 0;
+let idle = 0;
+/** When the oldest change not written yet was made (0: none). */
+let since = 0;
 let saving = null;
 
 /* the user hears once per document why it is not being autosaved — and
@@ -57,6 +64,15 @@ export function sidOf(doc) {
 
 /* documents that have been edited or renamed since they were opened */
 const edited = new WeakSet();
+
+/**
+ * A step in the history of the open document `doc` makes it edited — unless
+ * the app took it by itself (a landing-page task's filter, marked `auto`).
+ * Asked when it is written, by which time such a step carries its mark.
+ */
+function noteEdits(doc) {
+  if (history.stack.some((e) => !e.auto)) edited.add(doc);
+}
 
 /** Every layer and every layer mask is a document-sized bitmap to encode. */
 const tooBig = (doc) =>
@@ -116,7 +132,10 @@ function claim(sid, wait = 0) {
         // held until released (another document opens in this tab)
         return new Promise((release) => held.set(sid, release));
       })
-      .catch((err) => resolve(err?.name !== "AbortError"));
+      // a wait that ran out (TimeoutError) or was cut short: the other tab
+      // still has it. Without a wait only a browser that refuses locks
+      // altogether ends up here
+      .catch(() => resolve(!signal));
   });
 }
 
@@ -167,33 +186,29 @@ function placement(entry, [current, previous, opened]) {
   return out;
 }
 
-/** Write the open document. Resolves true when it is safely stored. */
-async function save() {
-  timer = 0;
-  const doc = state.doc;
-  if (!doc) return false;
-  // a live preview or a stroke holds pixels that are not final yet
-  if (sessionsBusy() || state.dragging) {
-    schedule();
-    return false;
+/**
+ * Write `doc`. Its bitmaps are captured at once (toStorable and the
+ * thumbnail copy them as they are called); the write itself waits for the
+ * one before, so writes land in order. Resolves true when it is stored.
+ */
+function write(doc) {
+  const sid = sidOf(doc);
+  const pristine = !edited.has(doc);
+  let captured;
+  try {
+    captured = Promise.all([doc.toStorable(), thumbnail(doc)]);
+  } catch (err) {
+    captured = Promise.reject(err);
   }
-  if (tooBig(doc)) {
-    const msg = t("This document is too large to be autosaved — save the project to keep your work");
-    warn(doc, "big", msg, "info");
-    return false;
-  }
-  if (saving) {
-    // one write at a time; then write again with the newest state
-    await saving;
-    return save();
-  }
-  saving = (async () => {
+  // (a failure is reported when this write's turn comes)
+  captured.catch(() => {});
+  const before = saving;
+  const done = (async () => {
+    await before;
     try {
-      const sid = sidOf(doc);
-      const data = await doc.toStorable();
-      const thumb = await thumbnail(doc);
+      const [data, thumb] = await captured;
       const entry = { sid, savedAt: Date.now(), thumb, doc: data };
-      if (!edited.has(doc)) entry.pristine = true;
+      if (pristine) entry.pristine = true;
       // the slots are read again on every write — another tab or window may
       // have saved its own document since. Everything moves in the same
       // transaction: either all writes land or none do, so a session is
@@ -210,18 +225,75 @@ async function save() {
       return false;
     }
   })();
-  const ok = await saving;
-  saving = null;
-  return ok;
+  saving = done;
+  done.then(() => {
+    if (saving === done) saving = null;
+  });
+  return done;
 }
 
-function schedule() {
+/** Write the open document. Resolves true when it is safely stored. */
+async function save() {
+  clearTimeout(timer);
+  timer = 0;
+  const doc = state.doc;
+  if (!doc) return false;
+  // a live preview or a stroke holds pixels that are not final yet
+  if (sessionsBusy() || state.dragging) {
+    schedule();
+    return false;
+  }
+  since = 0;
+  if (tooBig(doc)) {
+    const msg = t("This document is too large to be autosaved — save the project to keep your work");
+    warn(doc, "big", msg, "info");
+    return false;
+  }
+  noteEdits(doc);
+  return write(doc);
+}
+
+function schedule(delay = DELAY) {
   clearTimeout(timer);
   timer = setTimeout(() => {
     // write when the browser is idle so a stroke never stutters
-    if (window.requestIdleCallback) requestIdleCallback(save, { timeout: 2000 });
-    else save();
-  }, DELAY);
+    if (!window.requestIdleCallback) save();
+    else if (!idle) {
+      idle = requestIdleCallback(() => {
+        idle = 0;
+        save();
+      }, { timeout: 2000 });
+    }
+  }, delay);
+}
+
+/**
+ * Something changed: write once the editing pauses — or, when it goes on
+ * without one, MAX_WAIT after the oldest change that is not written yet.
+ */
+function changed() {
+  const now = Date.now();
+  if (!since) since = now;
+  schedule(Math.max(0, Math.min(DELAY, since + MAX_WAIT - now)));
+}
+
+/**
+ * The open document is about to be replaced: what it has not written yet is
+ * written now — its pending write would come too late, for the next one.
+ */
+function closing(doc) {
+  if (!timer || doc !== state.doc) return;
+  clearTimeout(timer);
+  timer = 0;
+  since = 0;
+  if (state.dragging || tooBig(doc)) return;
+  // a preview still open (a transform, an adjustment) goes with the
+  // document, which the user agreed to replace — what was done before it
+  // is written all the same
+  if (sessionsBusy()) cancelSessions();
+  noteEdits(doc);
+  // an opened-only document gives its slot to the next one anyway
+  if (edited.has(doc)) write(doc);
 }
 
 async function thumbnail(doc) {
@@ -308,8 +380,10 @@ export async function loadAutosave(slot = SLOT_CURRENT, sid = null, { waitForLoc
   const docSid = own ? entry.sid : newSid();
   if (!own) await claim(docSid);
   sids.set(doc, docSid);
-  // stored work stays work; an opened-only document stays just opened
-  if (!entry.pristine) edited.add(doc);
+  // stored work stays work; an opened-only document stays just opened — and
+  // so does a copy (of a session another tab has open) until it is edited:
+  // the work it copies is stored already
+  if (!entry.pristine && (own || !entry.sid)) edited.add(doc);
   return doc;
 }
 
@@ -325,11 +399,12 @@ export function relativeTime(ts) {
 }
 
 export function initAutosave() {
+  // (whether a step makes the document edited is decided as it is written)
   on("history", () => {
     if (!history.stack.length || !state.doc) return;
-    edited.add(state.doc);
-    schedule();
+    changed();
   });
+  on("doc-closing", ({ doc }) => closing(doc));
   on("doc", ({ reason }) => {
     if (reason !== "open" || !state.doc) return;
     // this tab now has this session open (and no other)
@@ -345,7 +420,7 @@ export function initAutosave() {
   on("doc-renamed", () => {
     if (!state.doc) return;
     edited.add(state.doc);
-    schedule();
+    changed();
   });
   on("flush-autosave", () => flushAutosave());
   // last chance when the tab goes away

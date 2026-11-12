@@ -325,6 +325,24 @@ export function transformMask(mask, w, h, drawFn) {
   return moved;
 }
 
+/**
+ * True when applying the layer's mask would change no pixel: wherever the
+ * layer has something, the mask reveals it fully. Read in strips, stopping
+ * at the first pixel the mask hides.
+ */
+function maskHidesNothing(layer) {
+  const w = layer.width;
+  const h = layer.height;
+  const rows = Math.max(1, Math.floor((256 * 1024) / w));
+  for (let y = 0; y < h; y += rows) {
+    const n = Math.min(rows, h - y);
+    const px = layer.ctx.getImageData(0, y, w, n).data;
+    const m = layer.maskCtx.getImageData(0, y, w, n).data;
+    for (let i = 3; i < px.length; i += 4) if (px[i] !== 0 && m[i] !== 255) return false;
+  }
+  return true;
+}
+
 /* ---------------------------------- text ---------------------------------- */
 
 export const LINE_HEIGHT = 1.25;
@@ -593,6 +611,12 @@ export class Layer {
 let selUid = 0;
 
 /**
+ * Outlines with more edges than this (a magic wand on a grainy photo) are
+ * not stroked as vectors: see Selection.segments.
+ */
+const MAX_ANT_SEGMENTS = 20000;
+
+/**
  * A selection is an 8-bit alpha mask at document size. Geometric selections
  * also remember their shape so marching ants can be drawn as crisp vectors.
  *
@@ -608,7 +632,9 @@ export class Selection {
     this.shape = null; // {type:'rect'|'ellipse', x,y,w,h}
     this._bounds = null;
     this._boundsReady = false;
-    this._segments = null;
+    /** undefined until computed; null when there are too many (see segments) */
+    this._segments = undefined;
+    this._outlineAlpha = 127;
   }
 
   static fromRect(w, h, r) {
@@ -672,6 +698,7 @@ export class Selection {
     s._bounds = this._bounds;
     s._boundsReady = this._boundsReady;
     s._segments = this._segments;
+    s._outlineAlpha = this._outlineAlpha;
     return s;
   }
 
@@ -712,7 +739,7 @@ export class Selection {
     this._boundsReady = false;
     this._cover = null;
     this._coverReady = false;
-    this._segments = null;
+    this._segments = undefined;
     this._path2d = null;
   }
 
@@ -740,14 +767,17 @@ export class Selection {
   }
 
   /**
-   * Boundary segments in document space for marching ants, computed once and
-   * cached. Only used for non-geometric (lasso / wand) selections.
+   * Boundary segments in document space for marching ants — x1, y1, x2, y2
+   * one after another — computed once and cached. Only used for
+   * non-geometric (lasso / wand) selections. Null when there are more than
+   * MAX_ANT_SEGMENTS: stroking that many on every step of the ants would
+   * stall the editor, so such an outline is traced on screen instead (see
+   * render.js).
    */
   get segments() {
-    if (this._segments) return this._segments;
+    if (this._segments !== undefined) return this._segments;
     const b = this.bounds;
-    const segs = [];
-    if (!b) return (this._segments = segs);
+    if (!b) return (this._segments = new Int32Array(0));
 
     const { data } = this.ctx.getImageData(b.x, b.y, b.w, b.h);
     // the outline sits where a pixel is at least half selected — but a
@@ -755,43 +785,63 @@ export class Selection {
     let peak = 0;
     for (let i = 3; i < data.length; i += 4) if (data[i] > peak) peak = data[i];
     const threshold = Math.min(127, Math.max(3, peak >> 1));
+    this._outlineAlpha = threshold;
     const W = b.w;
     const H = b.h;
     const inside = new Uint8Array(W * H);
     for (let i = 0; i < inside.length; i++) inside[i] = data[i * 4 + 3] > threshold ? 1 : 0;
     const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? 0 : inside[y * W + x]);
 
+    const max = MAX_ANT_SEGMENTS * 4;
+    let segs = new Int32Array(1024);
+    let n = 0;
+    /** Add a run; false once there are too many. */
+    const add = (x1, y1, x2, y2) => {
+      if (n === segs.length) {
+        if (n >= max) return false;
+        const grown = new Int32Array(Math.min(n * 2, max));
+        grown.set(segs);
+        segs = grown;
+      }
+      segs[n++] = b.x + x1;
+      segs[n++] = b.y + y1;
+      segs[n++] = b.x + x2;
+      segs[n++] = b.y + y2;
+      return true;
+    };
+
     // collect edges as long runs: every run is one sub-path, so fewer and
-    // longer runs make the dashes march instead of blinking
+    // longer runs make the dashes march instead of blinking (a run goes on
+    // where the inside switches sides along a straight line)
     for (let y = 0; y <= H; y++) {
-      let runStart = -1;
-      let runKind = 0;
+      let start = -1;
       for (let x = 0; x <= W; x++) {
-        const up = at(x, y - 1);
-        const down = at(x, y);
-        const kind = x < W && up !== down ? (down ? 1 : 2) : 0;
-        if (kind !== runKind) {
-          if (runKind) segs.push(b.x + runStart, b.y + y, b.x + x, b.y + y);
-          runStart = x;
-          runKind = kind;
+        const edge = x < W && at(x, y - 1) !== at(x, y);
+        if (edge && start < 0) start = x;
+        else if (!edge && start >= 0) {
+          if (!add(start, y, x, y)) return (this._segments = null);
+          start = -1;
         }
       }
     }
     for (let x = 0; x <= W; x++) {
-      let runStart = -1;
-      let runKind = 0;
+      let start = -1;
       for (let y = 0; y <= H; y++) {
-        const left = at(x - 1, y);
-        const right = at(x, y);
-        const kind = y < H && left !== right ? (right ? 1 : 2) : 0;
-        if (kind !== runKind) {
-          if (runKind) segs.push(b.x + x, b.y + runStart, b.x + x, b.y + y);
-          runStart = y;
-          runKind = kind;
+        const edge = y < H && at(x - 1, y) !== at(x, y);
+        if (edge && start < 0) start = y;
+        else if (!edge && start >= 0) {
+          if (!add(x, start, x, y)) return (this._segments = null);
+          start = -1;
         }
       }
     }
-    return (this._segments = segs);
+    return (this._segments = segs.slice(0, n));
+  }
+
+  /** The alpha above which a pixel is inside the ants' outline. */
+  get outlineAlpha() {
+    if (this._segments === undefined) void this.segments;
+    return this._outlineAlpha;
   }
 }
 
@@ -826,14 +876,19 @@ export class Doc {
     this._allocBuffers();
   }
 
-  /** (Re)create the document-sized scratch buffers used while compositing. */
-  _allocBuffers() {
+  /**
+   * (Re)create the document-sized scratch buffers used while compositing.
+   * The new composite comes first (or is handed in): when the device refuses
+   * it, the old buffers are still there and still work.
+   */
+  _allocBuffers(composite = makeCanvas(this.width, this.height)) {
+    const ctx = ctx2d(composite);
     for (const name of ["_composite", "_tmp", "_below", "_maskTmp", "_maskPrev", "_selTmp"]) {
       if (this[name]) releaseCanvas(this[name]);
       this[name] = null;
     }
-    this._composite = makeCanvas(this.width, this.height);
-    this._compositeCtx = ctx2d(this._composite);
+    this._composite = composite;
+    this._compositeCtx = ctx;
     this.invalidate();
   }
 
@@ -937,7 +992,9 @@ export class Doc {
   /** Bake a layer's mask into its pixels and drop the mask. */
   applyMask(layer) {
     if (!layer.mask) return;
-    if (layer.maskEnabled) {
+    // a mask that hides none of the layer's pixels changes none either: the
+    // text stays editable, as after any edit that leaves every pixel as it was
+    if (layer.maskEnabled && !maskHidesNothing(layer)) {
       const c = layer.ctx;
       c.save();
       c.globalCompositeOperation = "destination-in";
@@ -956,7 +1013,14 @@ export class Doc {
     const top = this.layers[i];
     const bottom = this.layers[i - 1];
     this.applyMask(bottom);
-    bottom.text = null;
+    // a layer that adds nothing (hidden or empty) leaves text below editable,
+    // unless baking its opacity changes the pixels
+    const addsNothing =
+      !top.visible ||
+      top.opacity === 0 ||
+      top.blankVersion === top.pixelVersion ||
+      (!!bottom.text && top.isEmpty());
+    if (!addsNothing || bottom.opacity < 1) bottom.text = null;
     const c = bottom.ctx;
     if (bottom.opacity < 1) {
       // bake the lower layer's opacity in first, so the upper layer is not
@@ -1192,27 +1256,49 @@ export class Doc {
    * parameters into the new frame; without it text layers become pixels.
    */
   _resizeAll(w, h, drawFn, textFn = null, { keepSelection = true } = {}) {
-    for (const layer of this.layers) {
-      const next = makeCanvas(w, h);
-      const c = ctx2d(next);
-      drawFn(c, layer.canvas);
-      layer.adopt(next);
-      if (layer.mask) layer.setMask(transformMask(layer.mask, w, h, drawFn));
+    // every new canvas is drawn before any is swapped in: a device that runs
+    // out of memory half-way leaves the document as it was
+    const made = [];
+    const fresh = (c) => (made.push(c), c);
+    let frames;
+    let sel = null;
+    let composite;
+    try {
+      frames = this.layers.map((layer) => {
+        const canvas = fresh(makeCanvas(w, h));
+        drawFn(ctx2d(canvas), layer.canvas);
+        const mask = layer.mask ? fresh(transformMask(layer.mask, w, h, drawFn)) : null;
+        return { canvas, mask };
+      });
+      // the selection follows the pixels it selects
+      if (keepSelection && this.selection) {
+        sel = new Selection(w, h);
+        fresh(sel.canvas);
+        drawFn(sel.ctx, this.selection.canvas);
+        // (setSelection reads its bounds: that needs memory too)
+        void sel.bounds;
+      }
+      composite = fresh(makeCanvas(w, h));
+      ctx2d(composite);
+    } catch (err) {
+      for (const c of made) releaseCanvas(c);
+      throw err;
+    }
+    this.layers.forEach((layer, i) => {
+      // an empty layer stays empty (and the history needs no copy of it)
+      const blank = layer.blankVersion === layer.pixelVersion;
+      layer.adopt(frames[i].canvas);
+      if (blank) layer.blankVersion = layer.pixelVersion;
+      if (layer.mask) layer.setMask(frames[i].mask);
       if (layer.text) {
         layer.text = textFn ? textFn(cloneText(layer.text)) : null;
       }
-    }
-    // the selection follows the pixels it selects
-    let sel = null;
-    if (keepSelection && this.selection) {
-      sel = new Selection(w, h);
-      drawFn(sel.ctx, this.selection.canvas);
-    }
+    });
     this.width = Math.max(1, Math.round(w));
     this.height = Math.max(1, Math.round(h));
     this.setSelection(sel);
     this.clearFloating();
-    this._allocBuffers();
+    this._allocBuffers(composite);
     // keep text crisp instead of resampled
     for (const layer of this.layers) if (layer.text) layer.renderText();
   }
@@ -1311,9 +1397,12 @@ export class Doc {
     const c = this._composite;
     const buffersFit = c && c.width === w && c.height === h && this._compositeCtx?.canvas === c;
     if (w === this.width && h === this.height && buffersFit) return;
+    // the size changes only once there are buffers for it
+    const composite = makeCanvas(w, h);
+    ctx2d(composite);
     this.width = w;
     this.height = h;
-    this._allocBuffers();
+    this._allocBuffers(composite);
   }
 
   /* ---------------------------- serialization ---------------------------- */

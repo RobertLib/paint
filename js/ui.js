@@ -207,10 +207,16 @@ function buildOptions() {
           </select>
         </div>`);
     } else if (o.type === "button") {
+      // a button that waits for something (Set source) looks like a toggle
+      const pressed = o.pressed ? !!o.pressed() : null;
+      const cls =
+        pressed === null
+          ? `btn${o.primary ? " btn-primary" : " btn-ghost"}`
+          : `opt-toggle${pressed ? " is-on" : ""}`;
       parts.push(
-        `<button class="btn${o.primary ? " btn-primary" : " btn-ghost"}" data-action-btn="${
-          o.label
-        }">${o.icon ? icon(o.icon) : ""}<span>${o.label}</span></button>`
+        `<button class="${cls}" data-action-btn="${o.label}"${
+          pressed === null ? "" : ` aria-pressed="${pressed}"`
+        }>${o.icon ? icon(o.icon) : ""}<span>${o.label}</span></button>`
       );
     }
   }
@@ -690,11 +696,12 @@ function buildLayersPanel() {
     if (toggle) {
       const prop = toggle.dataset.toggleLayer;
       const layer = state.doc.layers[index];
+      // named after what the click does: a locked layer gets unlocked
       A.setLayerProp(
         index,
         prop,
         !layer[prop],
-        prop === "visible" ? t("Layer visibility") : t("Lock layer")
+        prop === "visible" ? t("Layer visibility") : layer.locked ? t("Unlock layer") : t("Lock layer")
       );
       return;
     }
@@ -789,6 +796,16 @@ function buildLayersPanel() {
   });
 }
 
+/** F2 outside the list (a focused row handles its own): rename the active layer. */
+export function renameActiveLayer() {
+  const doc = state.doc;
+  if (!doc?.active) return;
+  // the field appears in the Layers panel: bring it forward
+  openTab("layers");
+  const nameEl = $(`#layerList .layer-item[data-index="${doc.activeIndex}"] .layer-name`);
+  if (nameEl) startRename(nameEl, doc.activeIndex);
+}
+
 function startRename(nameEl, index) {
   const layer = state.doc.layers[index];
   if (!layer) return;
@@ -804,6 +821,8 @@ function startRename(nameEl, index) {
   }
   const item = nameEl.closest(".layer-item");
   const input = document.createElement("input");
+  // typed, so the text-field styles apply (16px on touch screens: no iOS zoom)
+  input.type = "text";
   input.className = "layer-name-input";
   input.value = layer.name;
   input.setAttribute("aria-label", t("Layer name"));
@@ -825,7 +844,7 @@ function startRename(nameEl, index) {
     if (item) item.draggable = true;
     const value = input.value.trim();
     const at = state.doc?.indexOfLayer(id) ?? -1;
-    if (save && value && at >= 0) A.setLayerProp(at, "name", value, t("Rename layer"));
+    if (save && value && at >= 0) A.setLayerProp(at, "name", value, t("Layer rename"));
     syncLayers();
     // back to the row after Enter/Escape — but a click elsewhere keeps the
     // focus where the user put it
@@ -836,6 +855,8 @@ function startRename(nameEl, index) {
   input.addEventListener("keydown", (e) => {
     // typing is the field's own; a command key (⌘S) goes on to the app
     if (!e.metaKey && !e.ctrlKey) e.stopPropagation();
+    // Enter / Escape while an input method is composing belong to the IME
+    if (e.isComposing || e.keyCode === 229) return;
     if (e.key === "Enter") done(true, { refocus: true });
     if (e.key === "Escape") done(false, { refocus: true });
   });
@@ -843,14 +864,21 @@ function startRename(nameEl, index) {
 
 /**
  * Put keyboard focus back on a layer row after the list was rebuilt — or on
- * one of its thumbnails (`pick`: "layer" | "mask") when that had it.
+ * one of its thumbnails (`pick`: "layer" | "mask") or its eye / lock button
+ * (`toggle`: "visible" | "locked") when that had it, so a second Space
+ * toggles back.
  */
-function focusLayer(id, pick = null) {
+function focusLayer(id, pick = null, toggle = null) {
   const doc = state.doc;
   const index = doc?.indexOfLayer(id) ?? -1;
   if (index < 0) return;
   const row = $(`#layerList .layer-item[data-index="${index}"]`);
-  ((pick && row && $(`[data-pick-target="${pick}"]`, row)) || row)?.focus();
+  const inner = pick
+    ? `[data-pick-target="${pick}"]`
+    : toggle
+    ? `[data-toggle-layer="${toggle}"]`
+    : null;
+  ((inner && row && $(inner, row)) || row)?.focus();
 }
 
 function syncLayers() {
@@ -906,11 +934,12 @@ function syncLayers() {
       </div>`);
   }
   // rebuilding the list drops focus: give it back to the same row (or the
-  // same thumbnail in it)
+  // same thumbnail or eye / lock button in it)
   const focused = list.contains(document.activeElement) ? document.activeElement : null;
   const focusedIndex = focused?.closest?.(".layer-item")?.dataset.index;
   const focusedId = focusedIndex !== undefined ? doc.layers[Number(focusedIndex)]?.id : null;
   const focusedPick = focused?.dataset?.pickTarget || null;
+  const focusedToggle = focused?.dataset?.toggleLayer || null;
   list.innerHTML = items.join("");
 
   for (const holder of $$("[data-thumb]", list)) {
@@ -921,7 +950,7 @@ function syncLayers() {
     const layer = doc.layers[Number(holder.dataset.maskThumb)];
     holder.appendChild(maskThumb(layer));
   }
-  if (focusedId) focusLayer(focusedId, focusedPick);
+  if (focusedId) focusLayer(focusedId, focusedPick, focusedToggle);
 
   const active = doc.active;
   if (active) {
@@ -1084,6 +1113,9 @@ function buildTabs() {
     $$(".tab-panel").forEach((p) =>
       p.classList.toggle("is-active", p.dataset.panel === tab.dataset.tab)
     );
+    // an upright phone shows Adjust and Filters in a lower sheet (layout.css)
+    $("#sidebar").dataset.tab = tab.dataset.tab;
+    followSheet();
     if (tab.dataset.tab === "filters") refreshFilterPreviews();
   };
   for (const tab of tabs) tab.addEventListener("click", () => select(tab));
@@ -1126,6 +1158,36 @@ export const isPhoneLayout = () => !!PHONE?.matches;
 export function setSidebarOpen(open) {
   $("#sidebar").classList.toggle("is-open", open);
   $(".panel-toggle")?.setAttribute("aria-expanded", String(open));
+  followSheet();
+}
+
+/** Where the sheet of Adjust and Filters comes up from the bottom (layout.css). */
+const LOWER_SHEET = window.matchMedia?.("(max-width: 760px) and (orientation: portrait)") ?? null;
+LOWER_SHEET?.addEventListener?.("change", () => followSheet());
+
+/** How far the picture went up for the lower sheet, and the view it left. */
+let sheetShift = 0;
+let shiftedView = null;
+
+/**
+ * The lower sheet covers the bottom of the stage: the picture goes up by half
+ * of that, to the middle of what stays in view, and back down when the sheet
+ * goes — unless the view was changed meanwhile (Fit, a zoom).
+ */
+function followSheet() {
+  const sidebar = $("#sidebar");
+  const lower =
+    sidebar.classList.contains("is-open") &&
+    !!LOWER_SHEET?.matches &&
+    (sidebar.dataset.tab === "adjust" || sidebar.dataset.tab === "filters");
+  const shift = lower ? Math.round(sidebar.offsetHeight / 2) : 0;
+  if (shift === sheetShift) return;
+  const kept =
+    shiftedView?.x === view.x && shiftedView?.y === view.y && shiftedView?.zoom === view.zoom;
+  const dy = (kept ? sheetShift : 0) - shift;
+  if (dy) view.pan(0, dy);
+  sheetShift = shift;
+  shiftedView = { x: view.x, y: view.y, zoom: view.zoom };
 }
 
 /* ============================== radio groups ============================== */
@@ -1198,7 +1260,8 @@ function buildChrome() {
     // and the name typed so far is part of what ⌘S / ⇧⌘E save
     if (!e.metaKey && !e.ctrlKey) e.stopPropagation();
     else if (!e.altKey && (e.code === "KeyS" || (e.shiftKey && e.code === "KeyE"))) e.target.blur();
-    if (e.key === "Enter") e.target.blur();
+    // an Enter that confirms an input method's word is not the end of the name
+    if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) e.target.blur();
   });
 
   $("#zoomInBtn").addEventListener("click", () => view.zoomStep(1));

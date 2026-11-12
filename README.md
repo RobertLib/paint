@@ -16,9 +16,10 @@ visibility, locking, drag-to-reorder, rename, duplicate, merge down and flatten.
 **Layer masks** (reveal all, hide all or from the selection; paint black to
 hide and white to reveal; invert, disable, apply, delete).
 
-**Painting** — brush with hardness/opacity/smoothing and pen-pressure support,
-pencil, airbrush, eraser, paint bucket with tolerance and edge expansion, and
-linear/radial gradients.
+**Painting** — brush with hardness/opacity/smoothing and pen-pressure support
+(once a pen has touched the canvas, fingers only pan and zoom, so a resting
+hand leaves no marks), pencil, airbrush, eraser, paint bucket with tolerance
+and edge expansion, and linear/radial gradients.
 
 **Retouching** — blur, sharpen, smudge, clone stamp, healing brush, spot
 healing (fills the painted area from its surroundings with matched texture) and
@@ -48,15 +49,22 @@ channel, auto) and **Curves** (per channel).
 image.
 
 **Files** — opens PNG, JPEG, WebP, GIF, SVG, BMP, AVIF, **HEIC** (natively in
-Safari; elsewhere a decoder is fetched once from jsDelivr, pinned by version and
-integrity hash) and **PSD** — 8-, 16- and 32-bit RGB or grayscale with layers,
+Safari; elsewhere libheif decodes 8-, 10- and 12-bit photos in a worker,
+downloaded from jsDelivr on first use and then kept in the browser's HTTP cache,
+pinned by version and integrity hash) and **PSD** — 8-, 16- and 32-bit RGB or grayscale with layers,
 masks (vector masks as Photoshop rasterised them) and blend modes, including Photoshop's 16/32-bit layer blocks and
 ZIP-compressed channels (converted to 8 bits per channel); clipping masks are baked
 into the clipped layers and fill opacity is folded into opacity; groups are
 flattened, text/shape/smart-object layers come in as pixels, adjustment layers
 and layer effects are not applied; PSB, CMYK, Lab, indexed, bitmap and duotone are not supported.
+An SVG without a width and height opens at its viewBox size (the long edge kept
+between 1000 and 4000 px); one with HTML text (`foreignObject`, as in draw.io
+diagrams) that the browser won't let a page read back is refused instead of
+locking the document against export, autosave and filters.
 Exports PNG, JPEG, WebP with quality, scale and a live size estimate, and
-**layered PSD**. `.paint` project files keep layers, masks and editable text.
+**layered PSD** (its size is estimated on request; editable text goes into it
+as pixels, so the document stays marked unsaved). `.paint` project files keep
+layers, masks and editable text.
 
 **Everything else** — undo/redo history (up to 80 steps within a memory
 budget; a step keeps copies only of the layers it changes, and an edit that
@@ -93,7 +101,11 @@ root via GitHub Pages.
 | `/404.html`, `/sitemap.xml` | generated with the pages |
 
 A landing page hands a dropped file to the editor through IndexedDB (same
-origin, nothing is uploaded) and opens `editor/?task=<task>&lang=<lang>&open=1`.
+origin, nothing is uploaded) under a key of its own and opens
+`editor/?task=<task>&lang=<lang>&open=<key id>` (see `js/site.js` and
+`takeHandoff` in `js/main.js`). When the browser's storage refuses the file,
+it opens `…&open=0` instead and the editor asks for the file again; `open=1`
+still reads the single shared key of older landing pages.
 The task (see `js/tasks.js`) selects the right tool and shows a task bar with
 the next step — e.g. `?task=crop` brings up the crop frame, `?task=blur` offers
 Blur/Pixelate for the selection.
@@ -115,9 +127,10 @@ node scripts/build-site.mjs
 | `scripts/site/lastmod.json` | per-URL content hash and `<lastmod>` date (generated — commit it) |
 
 The generator also writes `sitemap.xml` (with `hreflang` alternates), the
-IndexNow key file, keeps the `modulepreload` list and analytics snippet of
-`editor/index.html` up to date and sets the `id` in `manifest.json` to the
-path of `base` (see below).
+IndexNow key file, keeps the `modulepreload` list (`js/main.js` and every
+module it imports statically, so on-demand modules like `psd.js` stay out) and
+analytics snippet of `editor/index.html` up to date and sets the `id` in
+`manifest.json` to the path of `base` (see below).
 
 Every generated page carries `<meta name="generator" content="paint-studio-site" />`.
 When a slug is renamed or a page or language is dropped, the next build deletes
@@ -145,8 +158,11 @@ Adding a language takes:
 
 - **Analytics** — set `goatcounter` in `scripts/site/config.mjs` to a
   [GoatCounter](https://www.goatcounter.com) site code and rebuild. It is
-  cookie-free, so no consent banner is needed. The editor additionally counts
-  anonymous events (`event/open-png`, `event/export-jpg`, `event/editor-crop`…);
+  cookie-free, so no consent banner is needed. The script is GoatCounter's
+  versioned `count.v5.js`, pinned with an `integrity` hash
+  (`GOATCOUNTER_SRC` in `scripts/build-site.mjs`; a newer version takes both
+  from [count.js versions](https://www.goatcounter.com/help/countjs-versions)).
+  The editor additionally counts anonymous events (`event/open-png`, `event/export-jpg`, `event/editor-crop`…);
   no file names or image data are ever sent.
 - **IndexNow** (Bing, Seznam, Yandex…) — after a deploy run
   `node scripts/indexnow.mjs`. It sends only the pages whose content changed
@@ -169,6 +185,8 @@ Adding a language takes:
    `"/paint/"` — `"./"` would claim the whole account. Check that it changed.
 3. Update the `Sitemap:` line in `robots.txt` — on its own domain the file is
    finally served from the root, where crawlers read it.
+4. The social card prints the address: change `robertlib.github.io/paint` in
+   `og-image.svg` and run `./generate-icons.sh` to regenerate `og-image.png`.
 
 GitHub Pages redirects the old `github.io` address to the custom domain.
 

@@ -97,7 +97,7 @@
         <h2>What HEIC is and why it won’t open</h2>
         <p>HEIC (or HEIF) is the default photo format on iPhones and iPads. It stores the same picture in noticeably less space than JPEG, but support outside Apple devices is patchy: many Windows apps, web upload forms and older phones show an error or a blank thumbnail instead of your photo. JPG is understood by practically everything, so converting is the quickest way to share, print or attach the picture.</p>
         <h2>How the conversion stays on your device</h2>
-        <p>Safari can decode HEIC by itself, so on a Mac, iPhone or iPad the photo opens immediately. Other browsers need a decoder: the first time you open a HEIC file, Paint Studio downloads a decoder library once from the jsDelivr CDN, and the decoding then runs inside your browser. Only the library comes from the network — the photo itself is never uploaded. That matters for pictures of family, of documents or of anything else you would rather not hand to a conversion website.</p>
+        <p>Safari can decode HEIC by itself, so on a Mac, iPhone or iPad the photo opens immediately. Other browsers need a decoder: the first time you open a HEIC file, Paint Studio downloads a decoder library from the jsDelivr CDN, which the browser then usually keeps in its cache, and the decoding runs inside your browser. Only the library comes from the network — the photo itself is never uploaded. That matters for pictures of family, of documents or of anything else you would rather not hand to a conversion website.</p>
         <h2>What is and isn’t converted</h2>
         <p>Only the main still image is converted. Live Photo motion, the depth maps used for portrait effects and the extra frames of a burst are not part of the JPG. Before you download, you can crop, straighten or brighten the photo like any other image. Quality 85–92 keeps phone photos visually unchanged; if you need a smaller file for email, lower the Scale slider as well, since iPhone photos have far more pixels than a screen shows.</p>
       </section>
@@ -105,7 +105,7 @@
       <section class="block faq">
         <h2>Frequently asked questions</h2>
         <h3>Is it safe to convert my iPhone photos here?</h3>
-        <p>Yes. Your photos are decoded and converted inside your browser. In browsers other than Safari, only the HEIC decoder library is downloaded from jsDelivr on first use; the image data itself never leaves your device.</p>
+        <p>Yes. Your photos are decoded and converted inside your browser. In browsers other than Safari, only the HEIC decoder library is downloaded from jsDelivr when it is needed; the image data itself never leaves your device.</p>
         <h3>Can I stop my iPhone from saving HEIC?</h3>
         <p>Yes. On the iPhone, open Settings › Camera › Formats and choose Most Compatible. New photos are then saved as JPEG; photos you have already taken stay HEIC and still need converting.</p>
         <h3>Why does a HEIC file take a moment to open?</h3>

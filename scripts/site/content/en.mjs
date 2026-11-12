@@ -56,7 +56,7 @@ export default {
       },
       {
         h2: "Selections that keep edits in place",
-        p: "Rectangle select, Ellipse select, Lasso and Magic wand create selections you can add to, subtract from, intersect, feather or invert. Everything respects the selection: brushes, fills, filters, adjustments and deleting all stop at its edge. That makes it easy to crop to an exact area, blur a single face, brighten only the foreground or make a background transparent without touching the subject.",
+        p: "Rectangle select, Ellipse select, Lasso and Magic wand create selections — with a feathered edge if you set one — that you can add to, subtract from, intersect or invert. Everything respects the selection: brushes, fills, filters, adjustments and deleting all stop at its edge. That makes it easy to crop to an exact area, blur a single face, brighten only the foreground or make a background transparent without touching the subject.",
       },
       {
         h2: "Crop, resize and transform",
@@ -64,7 +64,7 @@ export default {
       },
       {
         h2: "Opens almost anything, exports what you need",
-        p: "Drop in PNG, JPEG, WebP, GIF, SVG, BMP, AVIF, iPhone HEIC photos or Photoshop PSD files with their layers, or paste a screenshot with <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd>. Export as PNG, JPEG or WebP with a quality slider, a scale slider and a live file-size estimate, save a layered PSD for another editor, or keep a .paint project that preserves every layer for later.",
+        p: "Drop in PNG, JPEG, WebP, GIF, SVG, BMP, AVIF, iPhone HEIC photos or Photoshop PSD files with their layers, or paste a screenshot with <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd>. Export as PNG, JPEG or — where the browser supports it — WebP with a quality slider, a scale slider and a live file-size estimate, save a layered PSD for another editor, or keep a .paint project that preserves every layer for later.",
       },
       {
         h2: "Private, offline and free",
@@ -74,7 +74,7 @@ export default {
     faq: [
       {
         q: "Are my images uploaded anywhere?",
-        a: "No. Paint Studio has no server that receives your files. Images are decoded and edited inside your own browser tab, and exports are created there too, which makes it suitable for personal photos, ID scans and screenshots with private information. The only file-related download is a one-time HEIC decoder library, fetched in browsers that can’t open iPhone photos natively.",
+        a: "No. Paint Studio has no server that receives your files. Images are decoded and edited inside your own browser tab, and exports are created there too, which makes it suitable for personal photos, ID scans and screenshots with private information. The only file-related download is a HEIC decoder library, fetched in browsers that can’t open iPhone photos natively and then usually kept in the browser’s cache.",
       },
       {
         q: "Is Paint Studio really free?",
@@ -82,7 +82,7 @@ export default {
       },
       {
         q: "Does it work offline?",
-        a: "Yes, after your first visit. The editor is a progressive web app: it caches itself in the browser and can be installed to your desktop, dock or home screen. Work in progress is autosaved in the browser’s own storage, and the next time you open Paint Studio it offers to restore it. Very large documents are the exception: once all layers together exceed about 192 megapixels (say, ten layers of a 24-megapixel photo), autosave is skipped, so save a .paint project instead.",
+        a: "Yes, after your first visit. The editor is a progressive web app: it caches itself in the browser and can be installed to your desktop, dock or home screen. Work in progress is autosaved in the browser’s own storage, and the next time you open Paint Studio it offers to restore it. Very large documents are the exception: once all layers and layer masks together exceed about 192 megapixels (say, ten layers of a 24-megapixel photo), autosave is skipped, so save a .paint project instead.",
       },
       {
         q: "Can I use it on a phone, tablet or Chromebook?",
@@ -90,7 +90,7 @@ export default {
       },
       {
         q: "Which file formats can I open and save?",
-        a: "You can open PNG, JPEG, WebP, GIF (first frame only), SVG, BMP, AVIF when your browser decodes it, HEIC/HEIF, 8-, 16- and 32-bit RGB or grayscale PSD files with their layers, plus .paint projects. You can export PNG, JPEG and WebP, a layered PSD, or a .paint project that keeps layers for later editing.",
+        a: "You can open PNG, JPEG, WebP, GIF (first frame only), SVG, BMP, AVIF when your browser decodes it, HEIC/HEIF, 8-, 16- and 32-bit RGB or grayscale PSD files with their layers, plus .paint projects. You can export PNG, JPEG, WebP (in browsers that can encode it), a layered PSD, or a .paint project that keeps layers for later editing.",
       },
       {
         q: "How large can an image be?",
@@ -269,7 +269,7 @@ export default {
       sections: [
         {
           h2: "Quality, scale and format: what shrinks a file most",
-          p: "Three controls decide the file size. <strong>Scale</strong> reduces the pixel dimensions and has by far the biggest effect: at 50% only a quarter of the pixels remain, and the file shrinks accordingly. <strong>Quality</strong> controls how much detail JPEG and WebP discard; going from 100 down to around 80 typically saves a lot of space with little visible change. <strong>Format</strong> matters too — WebP usually produces smaller files than JPEG at similar quality. Start with scale if the image is larger than it will ever be displayed, then fine-tune quality.",
+          p: "Three controls decide the file size. <strong>Scale</strong> reduces the pixel dimensions and has by far the biggest effect: at 50% only a quarter of the pixels remain, and the file shrinks accordingly. <strong>Quality</strong> controls how much detail JPEG and WebP discard; going from 100 down to around 80 typically saves a lot of space with little visible change. <strong>Format</strong> matters too — WebP, where your browser can save it, usually produces smaller files than JPEG at similar quality. Start with scale if the image is larger than it will ever be displayed, then fine-tune quality.",
         },
         {
           h2: "Settings that work for common limits",
@@ -287,7 +287,7 @@ export default {
         },
         {
           q: "Is WebP better than JPEG for small files?",
-          a: "Usually, yes. At similar visual quality WebP files tend to be smaller, and WebP can also keep transparency. JPEG is still the safest choice when the file must open everywhere, for example in older software or strict upload forms.",
+          a: "Usually, yes. At similar visual quality WebP files tend to be smaller, and WebP can also keep transparency. Not every browser can save WebP, though; where it can’t, the editor says so and you pick PNG or JPEG. JPEG is still the safest choice when the file must open everywhere, for example in older software or strict upload forms.",
         },
         {
           q: "How can I get a photo under a size limit like 1 MB?",
@@ -295,7 +295,7 @@ export default {
         },
         {
           q: "Will compressing remove transparency?",
-          a: "Only if you choose JPEG, which can’t store transparency and fills those areas with white. Pick WebP to keep transparency and still get a compact file, or PNG for lossless output.",
+          a: "Only if you choose JPEG, which can’t store transparency and fills those areas with white. Pick WebP to keep transparency and still get a compact file (if your browser can save WebP), or PNG for lossless output.",
         },
       ],
     },
@@ -317,7 +317,7 @@ export default {
       sections: [
         {
           h2: "Which format to convert to",
-          p: "<strong>JPEG</strong> is the universal choice for photos: small files that open on every device, but no transparency. <strong>PNG</strong> is lossless and keeps transparency, which makes it ideal for screenshots, logos, diagrams and anything with sharp edges or text; photos saved as PNG are large. <strong>WebP</strong> supports both quality-based compression and transparency and usually gives the smallest files, though some older software can’t open it. A layered <strong>PSD</strong> is the right choice when someone will keep editing the file in Photoshop or another editor that reads PSD.",
+          p: "<strong>JPEG</strong> is the universal choice for photos: small files that open on every device, but no transparency. <strong>PNG</strong> is lossless and keeps transparency, which makes it ideal for screenshots, logos, diagrams and anything with sharp edges or text; photos saved as PNG are large. <strong>WebP</strong> supports both quality-based compression and transparency and usually gives the smallest files, though some older software can’t open it and not every browser can save it. A layered <strong>PSD</strong> is the right choice when someone will keep editing the file in Photoshop or another editor that reads PSD.",
         },
         {
           h2: "Formats you can open",
@@ -343,7 +343,7 @@ export default {
         },
         {
           q: "Which format should I choose for a website?",
-          a: "Use WebP for photos and graphics whenever your site or platform accepts it, since it is usually the smallest. Use JPEG for photos when you need maximum compatibility, and PNG for logos, icons and screenshots that need crisp edges or transparency.",
+          a: "Use WebP for photos and graphics whenever your site or platform accepts it and your browser can save it, since it is usually the smallest. Use JPEG for photos when you need maximum compatibility, and PNG for logos, icons and screenshots that need crisp edges or transparency.",
         },
       ],
     },
@@ -431,7 +431,7 @@ export default {
         },
         {
           q: "Can I convert JPG to WebP too?",
-          a: "Yes. Open any JPG or PNG and choose WebP in the Export dialog. WebP files are usually smaller than JPEGs at similar quality and can keep transparency, which makes them a good choice for websites.",
+          a: "Yes, in browsers that can encode WebP. Open any JPG or PNG and choose WebP in the Export dialog; if the browser can’t save it, the editor tells you. WebP files are usually smaller than JPEGs at similar quality and can keep transparency, which makes them a good choice for websites.",
         },
       ],
     },
@@ -457,7 +457,7 @@ export default {
         },
         {
           h2: "How the conversion stays on your device",
-          p: "Safari can decode HEIC by itself, so on a Mac, iPhone or iPad the photo opens immediately. Other browsers need a decoder: the first time you open a HEIC file, Paint Studio downloads a decoder library once from the jsDelivr CDN, and the decoding then runs inside your browser. Only the library comes from the network — the photo itself is never uploaded. That matters for pictures of family, of documents or of anything else you would rather not hand to a conversion website.",
+          p: "Safari can decode HEIC by itself, so on a Mac, iPhone or iPad the photo opens immediately. Other browsers need a decoder: the first time you open a HEIC file, Paint Studio downloads a decoder library from the jsDelivr CDN, which the browser then usually keeps in its cache, and the decoding runs inside your browser. Only the library comes from the network — the photo itself is never uploaded. That matters for pictures of family, of documents or of anything else you would rather not hand to a conversion website.",
         },
         {
           h2: "What is and isn’t converted",
@@ -467,7 +467,7 @@ export default {
       faq: [
         {
           q: "Is it safe to convert my iPhone photos here?",
-          a: "Yes. Your photos are decoded and converted inside your browser. In browsers other than Safari, only the HEIC decoder library is downloaded from jsDelivr on first use; the image data itself never leaves your device.",
+          a: "Yes. Your photos are decoded and converted inside your browser. In browsers other than Safari, only the HEIC decoder library is downloaded from jsDelivr when it is needed; the image data itself never leaves your device.",
         },
         {
           q: "Can I stop my iPhone from saving HEIC?",
@@ -505,11 +505,11 @@ export default {
         },
         {
           h2: "Selecting exactly what to hide",
-          p: "Rectangle select is ideal for text, plates and screenshots. Use Ellipse select for faces, the Lasso for irregular shapes, or the Magic wand to pick an area of similar color. Hold <kbd>Shift</kbd> while selecting to add more areas, so you can blur several faces in one go. Feather softens the selection edge, so a blurred patch fades into the photo instead of ending in a hard line. Blur and Pixelate always need a selection; with nothing selected, the editor asks you to select what to hide first.",
+          p: "Rectangle select is ideal for text, plates and screenshots. Use Ellipse select for faces, the Lasso for irregular shapes, or the Magic wand to pick an area of similar color. Hold <kbd>Shift</kbd> while selecting to add more areas, so you can blur several faces in one go. Set Feather in the tool options before you select, and the new selection gets a soft edge, so a blurred patch fades into the photo instead of ending in a hard line. Blur and Pixelate always need a selection; with nothing selected, the editor asks you to select what to hide first.",
         },
         {
           h2: "Blurring a background and other effects",
-          p: "Blur works the other way round too: select your subject with the Lasso, choose Invert selection in the Edit menu and apply Blur to soften everything except the person, for a simple portrait look. For gentle, hand-controlled softening, paint with the Blur brush exactly where you want it, for example over a distracting sign. The Filters panel also offers Soft blur and Pixelate, which apply to the whole image or to the current selection.",
+          p: "Blurring works the other way round too: select your subject with the Lasso, choose Invert selection in the Edit menu, then click Soft blur in the Filters panel — again for a stronger effect — to soften everything except the person, for a simple portrait look. (The task bar’s Blur is made to hide things and would be far too strong here.) For gentle, hand-controlled softening, paint with the Blur brush exactly where you want it, for example over a distracting sign. Soft blur and Pixelate in the Filters panel apply to the active layer, or only inside the selection when there is one.",
         },
       ],
       faq: [
@@ -553,7 +553,7 @@ export default {
         },
         {
           h2: "Editing, moving and layering text",
-          p: "Every piece of text becomes its own text layer in the Layers panel. Click it again with the Text tool to fix a typo or change the wording, and use the Move tool to reposition it. The layer stays editable until something changes its pixels — painting, filters, adjustments including Levels and Curves, the Transform tool, rotating or flipping the image, Merge down, Apply mask, or moving it while a selection is active. After that it is ordinary pixels. To make text readable on a busy photo, add a new layer below it, draw a solid black or white Rectangle and lower that layer’s opacity to create a soft band behind the words.",
+          p: "Every piece of text becomes its own text layer in the Layers panel. Click it again with the Text tool to fix a typo or change the wording, and use the Move tool to reposition it. The layer stays editable until something changes its pixels — painting, filters, adjustments including Levels and Curves, the Transform tool, rotating or flipping the image, Merge down, Apply mask, or moving it while a selection is active. After that it is ordinary pixels. To make text readable on a busy photo, add a new layer — it appears above the active one, so drag it below the text in the Layers panel — draw a solid black or white Rectangle on it and lower that layer’s opacity to create a soft band behind the words.",
         },
         {
           h2: "Memes and watermarks",
@@ -772,7 +772,7 @@ export default {
       steps: [
         "Drop your image — the Magic wand is ready.",
         "Click the background, Shift-click to add more, and press <kbd>Delete</kbd>.",
-        "Refine the edges if needed, then Export as PNG or WebP.",
+        "Refine the edges if needed, then Export as PNG (or WebP, if your browser supports it).",
       ],
       sections: [
         {
@@ -785,7 +785,7 @@ export default {
         },
         {
           h2: "Refining edges and saving",
-          p: "For non-destructive work, use a layer mask instead of deleting: after selecting the background, invert the selection and create a mask from it. The background is hidden rather than erased, and painting black or white on the mask hides or reveals pixels again, so a stray click is easy to fix. The Eraser cleans up anything the wand missed. Trim transparent edges in the Image menu cuts the empty margin around a logo. Export as PNG for compatibility or WebP for a smaller file; JPEG can’t store transparency and fills it with white.",
+          p: "For non-destructive work, use a layer mask instead of deleting: after selecting the background, invert the selection and create a mask from it. The background is hidden rather than erased, and painting black or white on the mask hides or reveals pixels again, so a stray click is easy to fix. The Eraser cleans up anything the wand missed. Trim transparent edges in the Image menu cuts the empty margin around a logo. Export as PNG for compatibility or WebP for a smaller file where the browser supports it; JPEG can’t store transparency and fills it with white.",
         },
       ],
       faq: [
@@ -931,7 +931,7 @@ export default {
         },
         {
           q: "How do I save my painting?",
-          a: "Use Save project in the File menu to keep a .paint file with all layers, so you can continue later. To share the picture, click Export and choose PNG, JPEG or WebP; you can also save a layered PSD. Unsaved work is autosaved in your browser too, unless the document is extremely large (more than about 192 megapixels across all layers).",
+          a: "Use Save project in the File menu to keep a .paint file with all layers, so you can continue later. To share the picture, click Export and choose PNG, JPEG or WebP; you can also save a layered PSD. Unsaved work is autosaved in your browser too, unless the document is extremely large (more than about 192 megapixels across all layers and masks).",
         },
         {
           q: "Is it suitable for kids?",

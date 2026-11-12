@@ -668,6 +668,52 @@ html {
   }
 }
 
+/* Adjust and Filters preview on the picture, which the sheet would hide on a
+   phone held upright: there it comes up from the bottom instead, as wide as
+   the stage, and leaves the top of the picture and the task bar in view. The
+   colour panel has no part in them: only its close button stays, at the end
+   of the tabs. */
+@media (max-width: 760px) and (orientation: portrait) {
+  .workspace .sidebar[data-tab="adjust"],
+  .workspace .sidebar[data-tab="filters"] {
+    top: auto;
+    left: calc(var(--w-rail) + var(--safe-l));
+    width: auto;
+    height: min(46%, 420px);
+    border-left: 0;
+    border-top: 1px solid var(--stroke);
+  }
+
+  .workspace .sidebar[data-tab="adjust"]:not(.is-open),
+  .workspace .sidebar[data-tab="filters"]:not(.is-open) {
+    transform: translateY(101%);
+  }
+
+  .sidebar[data-tab="adjust"] .color-panel,
+  .sidebar[data-tab="filters"] .color-panel {
+    position: absolute;
+    top: 3px;
+    right: var(--safe-r);
+    min-height: 0;
+    border: 0;
+    z-index: 1;
+  }
+
+  .sidebar[data-tab="adjust"] .color-panel .panel-head > :not(.sidebar-close),
+  .sidebar[data-tab="filters"] .color-panel .panel-head > :not(.sidebar-close),
+  .sidebar[data-tab="adjust"] .color-body,
+  .sidebar[data-tab="filters"] .color-body,
+  .sidebar[data-tab="adjust"] .panel-hint,
+  .sidebar[data-tab="filters"] .panel-hint {
+    display: none;
+  }
+
+  .sidebar[data-tab="adjust"] .tabs,
+  .sidebar[data-tab="filters"] .tabs {
+    padding-right: 46px;
+  }
+}
+
 @media (max-width: 520px) {
   .brand {
     display: none;

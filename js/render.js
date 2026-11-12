@@ -4,7 +4,7 @@
    view canvas. Tools describe overlays declaratively via `overlay`.
    ========================================================================== */
 
-import { makeCanvas } from "./doc.js";
+import { makeCanvas, releaseCanvas } from "./doc.js";
 import { on, state } from "./state.js";
 import { view } from "./viewport.js";
 
@@ -155,6 +155,114 @@ function ants(ctx, path, dash = 5, { clip = false } = {}) {
   ctx.restore();
 }
 
+/* --------------------------- ants traced on screen ------------------------ */
+
+/** The selection's outline on screen, kept while the view stays as it is. */
+const traced = { key: "", edges: null, buf: null, stripes: null };
+
+function releaseTraced() {
+  releaseCanvas(traced.edges);
+  releaseCanvas(traced.buf);
+  traced.key = "";
+  traced.edges = traced.buf = traced.stripes = null;
+}
+
+/**
+ * Trace the outline of `sel` as it is on screen (CSS pixels) into
+ * traced.edges: opaque where an inside pixel touches an outside one. Detail
+ * finer than a screen pixel is averaged away, as it would not show anyway.
+ */
+function traceOutline(sel, w, h) {
+  if (traced.edges?.width !== w || traced.edges?.height !== h) {
+    releaseTraced();
+    traced.edges = makeCanvas(w, h);
+    traced.buf = makeCanvas(w, h);
+  }
+  const c = traced.edges.getContext("2d", { willReadFrequently: true });
+  c.clearRect(0, 0, w, h);
+  // only the part of the view the selection covers (and a pixel around it)
+  const b = sel.bounds;
+  const z = view.zoom;
+  const x0 = Math.max(0, Math.floor(view.x + b.x * z) - 1);
+  const y0 = Math.max(0, Math.floor(view.y + b.y * z) - 1);
+  const rw = Math.min(w, Math.ceil(view.x + (b.x + b.w) * z) + 1) - x0;
+  const rh = Math.min(h, Math.ceil(view.y + (b.y + b.h) * z) + 1) - y0;
+  if (rw <= 0 || rh <= 0) return;
+  c.save();
+  c.beginPath();
+  c.rect(x0, y0, rw, rh);
+  c.clip();
+  c.imageSmoothingEnabled = z < 1;
+  c.imageSmoothingQuality = "high";
+  c.setTransform(z, 0, 0, z, view.x, view.y);
+  c.drawImage(sel.canvas, 0, 0);
+  c.restore();
+  const img = c.getImageData(x0, y0, rw, rh);
+  const d = img.data;
+  const limit = sel.outlineAlpha;
+  const inside = new Uint8Array(rw * rh);
+  for (let i = 0; i < inside.length; i++) inside[i] = d[i * 4 + 3] > limit ? 1 : 0;
+  // (the edge of the view is no edge of the selection)
+  for (let y = 0, i = 0; y < rh; y++) {
+    for (let x = 0; x < rw; x++, i++) {
+      const edge =
+        inside[i] === 1 &&
+        ((x > 0 && !inside[i - 1]) ||
+          (x < rw - 1 && !inside[i + 1]) ||
+          (y > 0 && !inside[i - rw]) ||
+          (y < rh - 1 && !inside[i + rw]));
+      d[i * 4 + 3] = edge ? 255 : 0;
+    }
+  }
+  c.putImageData(img, x0, y0);
+}
+
+/** Diagonal black and white stripes: dashes of 5 along any straight edge. */
+function stripePattern(ctx) {
+  const n = 10;
+  const tile = makeCanvas(n, n);
+  const tc = tile.getContext("2d");
+  const img = tc.createImageData(n, n);
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const j = (y * n + x) * 4;
+      const white = (x + y) % n >= n / 2;
+      img.data[j] = img.data[j + 1] = img.data[j + 2] = white ? 255 : 0;
+      img.data[j + 3] = white ? 242 : 230;
+    }
+  }
+  tc.putImageData(img, 0, 0);
+  return ctx.createPattern(tile, "repeat");
+}
+
+/**
+ * Marching ants for an outline with too many edges to stroke on every step
+ * (a magic wand on a grainy photo). The outline is traced once per view, and
+ * each step only moves stripes through it — the same cost however intricate
+ * the outline is.
+ */
+function tracedAnts(ctx, sel) {
+  const w = Math.ceil(view.w);
+  const h = Math.ceil(view.h);
+  const key = `${sel.uid}|${view.zoom}|${view.x}|${view.y}|${w}x${h}`;
+  if (traced.key !== key) {
+    traceOutline(sel, w, h);
+    traced.key = key;
+  }
+  const bc = traced.buf.getContext("2d");
+  traced.stripes ||= stripePattern(bc);
+  traced.stripes.setTransform(new DOMMatrix().translateSelf(Math.round(antPhase), 0));
+  bc.globalCompositeOperation = "copy";
+  bc.drawImage(traced.edges, 0, 0);
+  bc.globalCompositeOperation = "source-in";
+  bc.fillStyle = traced.stripes;
+  bc.fillRect(0, 0, w, h);
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(traced.buf, 0, 0, w, h);
+  ctx.restore();
+}
+
 /* ---------------------------------- draw --------------------------------- */
 
 function draw(now = 0) {
@@ -205,9 +313,12 @@ function draw(now = 0) {
     ctx.restore();
 
     if (overlay.crop) drawCrop(ctx, overlay.crop);
-    if (doc.selection && !overlay.crop && !overlay.transform) {
-      ants(ctx, selectionPath(doc.selection), 5, { clip: true });
-    }
+    const sel = overlay.crop || overlay.transform ? null : doc.selection;
+    // an outline with too many edges to stroke on every step (see segments)
+    const intricate = !!sel && !sel.shape && !sel.segments;
+    if (intricate) tracedAnts(ctx, sel);
+    else if (sel) ants(ctx, selectionPath(sel), 5, { clip: true });
+    if (!intricate && traced.edges) releaseTraced();
     if (overlay.floatFrame) drawFloatFrame(ctx, overlay.floatFrame);
     if (overlay.transform) drawTransform(ctx, overlay.transform);
 

@@ -18,7 +18,13 @@
    - A shell that cannot be cached completely fails the install: the worker
      before keeps running with its complete cache, and the next visit retries. */
 
-const CACHE = "paint-studio-v6";
+const CACHE = "paint-studio-v7";
+/**
+ * Every version of CACHE starts with this. Cache Storage belongs to the
+ * origin, and robertlib.github.io is shared by all of the account's project
+ * sites: only this app's own old caches may ever be deleted.
+ */
+const CACHE_PREFIX = "paint-studio-";
 const NAV_TIMEOUT = 4000;
 
 const SHELL = [
@@ -71,7 +77,9 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE).map((k) => caches.delete(k)))
+      )
       .then(() => self.clients.claim())
   );
 });
@@ -113,7 +121,21 @@ async function offlineRedirect(url) {
   return Response.error();
 }
 
-/** Pages (client ids) that were served from the cache: their files come from it too. */
+/**
+ * Pages (client ids) that were served from the cache: their files come from it too.
+ *
+ * Best effort, and in practice only for the files a page loads as it starts.
+ * The set lives in this worker's memory, which is gone once the browser stops
+ * the idle worker (after about 30 s in Chrome), and a new version of the
+ * worker starts without it; a module the page imports later (psd.js,
+ * heic.js) is then fetched network-first and may come from a newer deploy.
+ * Keeping the set in storage would not make that safe either: the cache is
+ * refreshed one file at a time, so even a cached psd.js need not match the
+ * page, and an update replaces the whole cache under open pages anyway. What
+ * catches it is loadModule() in js/actions.js: a module that no longer links
+ * against the code already running asks for a reload. (One that still links
+ * but behaves differently is not caught — the remaining, small risk.)
+ */
 const pinned = new Set();
 
 /**

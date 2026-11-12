@@ -1411,6 +1411,7 @@ export async function writePSD(doc) {
   // flattened composite on white, for viewers that ignore layers
   const flat = doc.renderFlat({ background: "#ffffff" });
   const [R, G, B] = planesOf(flat, { x: 0, y: 0, w: W, h: H });
+  releaseCanvas(flat);
   w.u16(1);
   const packed = [R, G, B].map((p) => packPlane(p, W, H));
   // all row counts first, then all data

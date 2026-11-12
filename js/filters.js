@@ -129,7 +129,30 @@ export function applyAdjustments(src, values, region = null) {
     const blurred = blurCanvas(part, sig);
     img = blurred.getContext("2d").getImageData(area.x - a.x, area.y - a.y, area.w, area.h);
     releaseCanvas(blurred);
+    const d = img.data;
+    const own = src.getContext("2d").getImageData(area.x, area.y, area.w, area.h).data;
+    // a canvas holds 8-bit premultiplied colour: a visible pixel the blur
+    // gave little weight (a thin line, a lone dot) comes back with a coarse
+    // colour, so then the exact blur of the bytes is used instead
+    let coarse = false;
+    for (let i = 3; i < d.length; i += 4) {
+      if (d[i] * 4 < own[i]) {
+        coarse = true;
+        break;
+      }
+    }
+    if (coarse) {
+      const exact = gaussData(part.getContext("2d").getImageData(0, 0, a.w, a.h).data, a.w, a.h, sig);
+      for (let y = 0; y < area.h; y++) {
+        const from = ((area.y - a.y + y) * a.w + area.x - a.x) * 4;
+        d.set(exact.subarray(from, from + area.w * 4), y * area.w * 4);
+      }
+    }
     if (!whole) releaseCanvas(part);
+    // softness blurs the colour only (weighted by alpha, so no transparent
+    // surroundings bleed in): every pixel keeps its own alpha, so a cut-out
+    // gets no halo and what was transparent stays transparent
+    for (let i = 3; i < d.length; i += 4) d[i] = own[i];
   } else {
     img = src.getContext("2d").getImageData(area.x, area.y, area.w, area.h);
   }

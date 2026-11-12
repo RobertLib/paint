@@ -47,7 +47,7 @@ export default {
       },
       {
         h2: "Výběry, které hlídají každý zásah",
-        p: "Obdélníkový výběr, Eliptický výběr, Laso a Kouzelná hůlka vymezí oblast, se kterou chcete pracovat. Výběr můžete vytvořit nový, přidat k němu, odečíst z něj nebo ponechat jen průnik, nastavit mu prolnutí okraje a invertovat ho. Malování, výplň, mazání, korekce i filtry se pak zastaví přesně na jeho hranici. Zesvětlíte tak jen oblohu nebo rozmažete jediný obličej, aniž byste museli složitě stavět masku.",
+        p: "Obdélníkový výběr, Eliptický výběr, Laso a Kouzelná hůlka vymezí oblast, se kterou chcete pracovat. Výběr můžete vytvořit nový, přidat k němu, odebrat z něj nebo ponechat jen průnik a také ho invertovat; s nastaveným prolnutím okraje dostane nový výběr měkkou hranu. Malování, výplň, mazání, korekce i filtry se pak zastaví přesně na jeho hranici. Zesvětlíte tak jen oblohu nebo rozmažete jediný obličej, aniž byste museli složitě stavět masku.",
       },
       {
         h2: "Štětce, tvary a text",
@@ -58,7 +58,7 @@ export default {
         p: "Bodová retuš odstraní smítko, pupínek nebo tenký drát jediným tahem: po puštění tlačítka se místo vyplní strukturou z okolí. Retušovací štětec kopíruje texturu z místa, které si sami zvolíte, ale zachová barvu a jas cíle. Razítko kopíruje přesně. Zesvětlit / ztmavit pracuje zvlášť se stíny, středními tóny a světly. Doplňují je nástroje Rozmazání, Zaostření a Rozmazání prstem. Všechny respektují aktivní vrstvu i výběr.",
       },
       {
-        h2: "Korekce a filtry s živým náhledem",
+        h2: "Korekce a filtry se živým náhledem",
         p: "Panel Korekce nabízí 15 posuvníků: expozici, jas, kontrast, světla, stíny, gamu, sytost, živost, teplotu, nádech, posun odstínu, zřetelnost, změkčení, zrno a vinětaci. Každou změnu hned vidíte na fotce. Pro přesnou práci s tóny jsou tu Úrovně… s histogramem a Křivky… pro jednotlivé kanály. Panel Filtry obsahuje 21 filtrů, například Odstíny šedi, Sépie, Vintage, Duotón nebo Kresba tužkou, každý s náhledem přímo z vaší fotky.",
       },
       {
@@ -67,7 +67,7 @@ export default {
       },
       {
         h2: "Od fotek z iPhonu po soubory PSD",
-        p: "Otevřete PNG, JPEG, WebP, GIF (jen první snímek), SVG, BMP, AVIF (pokud ho prohlížeč umí dekódovat), fotky z iPhonu ve formátu HEIC i soubory PSD z Photoshopu včetně vrstev. Obrázek stačí přetáhnout do okna, vybrat z disku nebo vložit ze schránky klávesami <kbd>Ctrl</kbd>+<kbd>V</kbd>. Exportovat můžete do PNG, JPEG a WebP s volbou kvality a měřítka a s odhadem velikosti souboru ještě před stažením, nebo do vrstveného PSD. Rozpracovanou práci uložíte jako projekt <code>.paint</code>.",
+        p: "Otevřete PNG, JPEG, WebP, GIF (jen první snímek), SVG, BMP, AVIF (pokud ho prohlížeč umí dekódovat), fotky z iPhonu ve formátu HEIC i soubory PSD z Photoshopu včetně vrstev. Obrázek stačí přetáhnout do okna, vybrat z disku nebo vložit ze schránky klávesami <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd>. Exportovat můžete do PNG, JPEG a – v prohlížečích, které to umí – WebP s volbou kvality a měřítka a s odhadem velikosti souboru ještě před stažením, nebo do vrstveného PSD. Rozpracovanou práci uložíte jako projekt <code>.paint</code>.",
       },
       {
         h2: "Soukromí, offline a automatické ukládání",
@@ -77,15 +77,15 @@ export default {
     faq: [
       {
         q: "Nahrávají se moje fotky někam?",
-        a: "Ne. Paint Studio nemá serverovou část. Obrázek se načte do plátna přímo ve vaší záložce prohlížeče a každá úprava proběhne na vašem zařízení, nic se neodesílá ani neukládá jinde. Jedinou výjimkou je dekodér formátu HEIC: mimo Safari si ho prohlížeč při prvním použití jednou stáhne z CDN jsDelivr. Samotná fotka ale zůstává u vás.",
+        a: "Ne. Paint Studio nemá serverovou část. Obrázek se načte do plátna přímo ve vaší záložce prohlížeče a každá úprava proběhne na vašem zařízení, nic se neodesílá ani neukládá jinde. Jedinou výjimkou je dekodér formátu HEIC: mimo Safari si ho prohlížeč při prvním použití stáhne z CDN jsDelivr a obvykle si ho pak ponechá v mezipaměti. Samotná fotka ale zůstává u vás.",
       },
       {
         q: "Je Paint Studio opravdu zdarma?",
-        a: "Ano, úplně. Nepotřebujete účet, editor nemá zkušební dobu, nezobrazuje reklamy a na exportované obrázky nepřidává vodoznak. Žádná funkce není schovaná za placením. Projekt má otevřený zdrojový kód pod licencí MIT, takže si ho můžete prohlédnout na GitHubu, nebo si ho dokonce upravit podle sebe.",
+        a: "Ano, úplně. Nepotřebujete účet, editor nemá zkušební dobu, nezobrazuje reklamy a na exportované obrázky nepřidává vodoznak. Žádná funkce není zpoplatněná. Projekt má otevřený zdrojový kód pod licencí MIT, takže si ho můžete prohlédnout na GitHubu, nebo si ho dokonce upravit podle sebe.",
       },
       {
         q: "Funguje editor bez internetu?",
-        a: "Po první návštěvě ano. Aplikace se uloží do mezipaměti prohlížeče, takže se načte i bez připojení, a můžete si ji nainstalovat na plochu nebo do docku jako aplikaci (PWA). Rozpracovaný obrázek se průběžně ukládá do úložiště prohlížeče a při dalším otevření vám ho editor nabídne k obnovení. Výjimkou jsou velmi velké dokumenty: když všechny vrstvy dohromady přesáhnou zhruba 192 megapixelů (třeba deset vrstev 24megapixelové fotky), automatické ukládání se vynechá – takovou práci si proto ukládejte jako projekt <code>.paint</code>.",
+        a: "Po první návštěvě ano. Aplikace se uloží do mezipaměti prohlížeče, takže se načte i bez připojení, a můžete si ji nainstalovat na plochu nebo do docku jako aplikaci (PWA). Rozpracovaný obrázek se průběžně ukládá do úložiště prohlížeče a při dalším otevření vám ho editor nabídne k obnovení. Výjimkou jsou velmi velké dokumenty: když všechny vrstvy a masky dohromady přesáhnou zhruba 192 megapixelů (třeba deset vrstev 24megapixelové fotky), automatické ukládání se vynechá – takovou práci si proto ukládejte jako projekt <code>.paint</code>.",
       },
       {
         q: "Dá se používat na mobilu nebo tabletu?",
@@ -101,7 +101,7 @@ export default {
       },
       {
         q: "Jaké má klávesové zkratky?",
-        a: "Zkratky odpovídají zvyklostem z jiných editorů: jednotlivé klávesy přepínají nástroje, <kbd>Ctrl</kbd>+<kbd>Z</kbd> vrací krok zpět (až 80 kroků, u velkých fotek méně), mezerník s tažením posouvá plátno a kolečko myši přibližuje až na 3200 %. Kompletní přehled zobrazíte v editoru klávesou <kbd>?</kbd>. K dispozici je také tmavý a světlý motiv, který se řídí nastavením systému, dokud si ho sami nezvolíte.",
+        a: "Zkratky odpovídají zvyklostem z jiných editorů: jednotlivé klávesy přepínají nástroje, <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Z</kbd> vrací krok zpět (až 80 kroků, u velkých fotek méně), mezerník s tažením posouvá plátno a kolečko myši přibližuje až na 3200 %. Kompletní přehled zobrazíte v editoru klávesou <kbd>?</kbd>. K dispozici je také tmavý a světlý motiv, který se řídí nastavením systému, dokud si ho sami nezvolíte.",
       },
       {
         q: "Je editor v češtině?",
@@ -133,11 +133,11 @@ export default {
         },
         {
           h2: "Kompozice podle pravidla třetin",
-          p: "Při úpravě rámečku se zobrazí mřížka, která obraz dělí na třetiny. Hlavní motiv – oči na portrétu, maják nebo osamělý strom – umístěte na některý z průsečíků čar a horizont na horní či dolní vodorovnou linku místo doprostřed. Fotka tak působí vyváženěji a živěji. Rámeček můžete uchopit uprostřed a posouvat ho, aniž by se měnila jeho velikost. Je-li fotka nakřivo, nejdřív ji srovnejte volným otočením a teprve potom ořízněte, jinak by v rozích zůstala prázdná místa.",
+          p: "Při úpravě rámečku se zobrazí mřížka, která obraz dělí na třetiny. Hlavní motiv – oči na portrétu, maják nebo osamělý strom – umístěte na některý z průsečíků čar a horizont na horní či dolní vodorovnou linku místo doprostřed. Fotka tak působí vyváženěji a živěji. Rámeček můžete uchopit uprostřed a posouvat ho, aniž by se měnila jeho velikost. Je-li fotka nakřivo, nejdřív ji srovnejte nástrojem Transformace a teprve potom ořízněte, jinak by v rozích zůstala prázdná místa.",
         },
         {
           h2: "Ořez neubírá kvalitu, jen plochu",
-          p: "Oříznutím se zbylé pixely nijak nepřepočítávají ani nerozmazávají, obrázek jen přijde o část plochy. Silný ořez malé fotky ale znamená málo pixelů – na displeji to nevadí, při tisku už ano. O kvalitě výsledného souboru rozhoduje až export: JPEG se hodí pro fotky, PNG pro snímky obrazovky a grafiku s ostrými hranami. Pokud jste ořízli víc, než jste chtěli, vraťte krok zpět klávesami <kbd>Ctrl</kbd>+<kbd>Z</kbd> a rámeček nastavte znovu.",
+          p: "Oříznutím se zbylé pixely nijak nepřepočítávají ani nerozmazávají, obrázek jen přijde o část plochy. Silný ořez malé fotky ale znamená málo pixelů – na displeji to nevadí, při tisku už ano. O kvalitě výsledného souboru rozhoduje až export: JPEG se hodí pro fotky, PNG pro snímky obrazovky a grafiku s ostrými hranami. Pokud jste ořízli víc, než jste chtěli, vraťte krok zpět klávesami <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Z</kbd> a rámeček nastavte znovu.",
         },
       ],
       faq: [
@@ -147,7 +147,7 @@ export default {
         },
         {
           q: "Můžu oříznout obrázek podle výběru?",
-          a: "Ano. Označte oblast nástrojem Obdélníkový výběr nebo jiným výběrem a v nabídce Obrázek zvolte Oříznout podle výběru. Plátno se zmenší přesně na ohraničení výběru. Hodí se to, když už výběr máte hotový z předchozí úpravy.",
+          a: "Ano. Označte oblast nástrojem Obdélníkový výběr nebo jiným nástrojem výběru a v nabídce Obrázek zvolte Oříznout podle výběru. Plátno se zmenší přesně na ohraničení výběru. Hodí se to, když už výběr máte hotový z předchozí úpravy.",
         },
         {
           q: "Oříznu fotku i na mobilu?",
@@ -155,7 +155,7 @@ export default {
         },
         {
           q: "V jakém formátu oříznutou fotku uložit?",
-          a: "Pro fotky zvolte v dialogu „Exportovat obrázek“ formát JPEG s kvalitou kolem 80–90, pro snímky obrazovky a grafiku PNG. WebP dává při podobné kvalitě menší soubory a hodí se na web. Odhad velikosti souboru uvidíte ještě před kliknutím na Stáhnout.",
+          a: "Pro fotky zvolte v dialogu „Exportovat obrázek“ formát JPEG s kvalitou kolem 80–90, pro snímky obrazovky a grafiku PNG. WebP (pokud ho váš prohlížeč umí uložit) dává při podobné kvalitě menší soubory a hodí se na web. Odhad velikosti souboru uvidíte ještě před kliknutím na Stáhnout.",
         },
       ],
     },
@@ -280,7 +280,7 @@ export default {
         },
         {
           h2: "JPEG, nebo WebP?",
-          p: "JPEG otevře každý program, telefon i úřední formulář, proto je nejjistější volbou pro e-mail a přílohy. WebP dává při stejné kvalitě obvykle menší soubor a umí průhlednost, takže se hodí na web a do e-shopu, některé starší programy ho ale neotevřou. PNG je bezztrátový – na fotky zbytečně velký, u snímků obrazovky s textem ale bývá ostřejší a často i menší než JPEG. Formát přepnete v témže dialogu a odhad velikosti se hned přepočítá.",
+          p: "JPEG otevře každý program, telefon i úřední formulář, proto je nejjistější volbou pro e-mail a přílohy. WebP dává při stejné kvalitě obvykle menší soubor a umí průhlednost, takže se hodí na web a do e-shopu, některé starší programy ho ale neotevřou a ne každý prohlížeč ho umí uložit. PNG je bezztrátový – na fotky zbytečně velký, u snímků obrazovky s textem ale bývá ostřejší a často i menší než JPEG. Formát přepnete v témže dialogu a odhad velikosti se hned přepočítá.",
         },
         {
           h2: "Jak se vejít do limitu přílohy",
@@ -298,7 +298,7 @@ export default {
         },
         {
           q: "Proč je soubor pořád moc velký?",
-          a: "Nejčastěji kvůli vysokému rozlišení – samotné snížení kvality u velké fotky nestačí. Snižte měřítko, případně přepněte formát na WebP. Pozor také na PNG: u fotek dává mnohem větší soubory než JPEG.",
+          a: "Nejčastěji kvůli vysokému rozlišení – samotné snížení kvality u velké fotky nestačí. Snižte měřítko, případně přepněte formát na WebP, pokud ho váš prohlížeč umí uložit. Pozor také na PNG: u fotek dává mnohem větší soubory než JPEG.",
         },
         {
           q: "Zmenším více fotek najednou?",
@@ -329,11 +329,11 @@ export default {
         },
         {
           h2: "Jaký formát vybrat",
-          p: "<strong>JPEG</strong> je pro fotky: malý soubor a univerzální podpora, ale bez průhlednosti – průhledná místa se vyplní bílou. <strong>PNG</strong> je bezztrátový a průhlednost zachová, proto se hodí pro loga, ikony, snímky obrazovky a grafiku s textem. <strong>WebP</strong> umí obojí a dává menší soubory, vhodné pro web; starší programy ho ale nemusí otevřít. <strong>PSD</strong> zvolte, když chcete v práci pokračovat ve Photoshopu nebo jiném grafickém programu, který vrstvy z PSD načte.",
+          p: "<strong>JPEG</strong> je pro fotky: malý soubor a univerzální podpora, ale bez průhlednosti – průhledná místa se vyplní bílou. <strong>PNG</strong> je bezztrátový a průhlednost zachová, proto se hodí pro loga, ikony, snímky obrazovky a grafiku s textem. <strong>WebP</strong> umí obojí a dává menší soubory, vhodné pro web; starší programy ho ale nemusí otevřít a uložit ho umí jen některé prohlížeče. <strong>PSD</strong> zvolte, když chcete v práci pokračovat ve Photoshopu nebo jiném grafickém programu, který vrstvy z PSD načte.",
         },
         {
           h2: "Převod bez odesílání souborů",
-          p: "Mnoho online převodníků soubor nahraje na svůj server, převede ho tam a pošle zpět. Tady se nic takového neděje: obrázek se dekóduje a znovu zakóduje ve vaší záložce prohlížeče. Nemusíte proto řešit, kdo získá přístup k vašim dokumentům, fotkám dětí nebo pracovním podkladům. Rychlost převodu proto nezávisí na připojení a po první návštěvě převodník funguje i offline. Jedinou výjimkou je HEIC mimo Safari, kde si prohlížeč při prvním použití jednou stáhne dekodér.",
+          p: "Mnoho online převodníků soubor nahraje na svůj server, převede ho tam a pošle zpět. Tady se nic takového neděje: obrázek se dekóduje a znovu zakóduje ve vaší záložce prohlížeče. Nemusíte proto řešit, kdo získá přístup k vašim dokumentům, fotkám dětí nebo pracovním podkladům. Rychlost převodu proto nezávisí na připojení a po první návštěvě převodník funguje i offline. Jedinou výjimkou je HEIC mimo Safari, kde si prohlížeč při prvním použití stáhne dekodér; bez připojení ho pak použije, jen pokud mu zůstal v mezipaměti.",
         },
       ],
       faq: [
@@ -343,7 +343,7 @@ export default {
         },
         {
           q: "Umí převodník HEIC a AVIF?",
-          a: "HEIC z iPhonu otevře: Safari ho dekóduje samo, v jiných prohlížečích se jednou stáhne dekodér a převod pak běží lokálně. AVIF otevřete, pokud ho podporuje váš prohlížeč. Uložit do HEIC ani AVIF ale nejde, výstupem je PNG, JPEG, WebP nebo PSD.",
+          a: "HEIC z iPhonu otevře: Safari ho dekóduje samo, v jiných prohlížečích se stáhne dekodér a převod pak běží lokálně. AVIF otevřete, pokud ho podporuje váš prohlížeč. Uložit do HEIC ani AVIF ale nejde, výstupem je PNG, JPEG, WebP nebo PSD.",
         },
         {
           q: "Převedu i více souborů najednou?",
@@ -351,7 +351,7 @@ export default {
         },
         {
           q: "Do jakého formátu uložit obrázek s průhledným pozadím?",
-          a: "Do PNG, nebo do WebP, pokud chcete menší soubor. Oba formáty průhlednost zachovají. JPEG průhlednost uložit neumí a prázdná místa vyplní bílou barvou, takže logo by dostalo bílý obdélník kolem sebe.",
+          a: "Do PNG, nebo do WebP, pokud chcete menší soubor a váš prohlížeč WebP umí uložit. Oba formáty průhlednost zachovají. JPEG průhlednost uložit neumí a prázdná místa vyplní bílou barvou, takže logo by dostalo bílý obdélník kolem sebe.",
         },
       ],
     },
@@ -396,7 +396,7 @@ export default {
         },
         {
           q: "Dá se převést i snímek obrazovky ze schránky?",
-          a: "Ano. Snímek vložte přímo ze schránky klávesami <kbd>Ctrl</kbd>+<kbd>V</kbd> (na Macu <kbd>⌘</kbd>+<kbd>V</kbd>) a exportujte ho jako JPEG, nemusíte ho předtím ukládat jako soubor. Než ho pošlete dál, můžete v editoru třeba rozmazat citlivé údaje.",
+          a: "Ano. Snímek vložte přímo ze schránky klávesami <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd> a exportujte ho jako JPEG, nemusíte ho předtím ukládat jako soubor. Než ho pošlete dál, můžete v editoru třeba rozmazat citlivé údaje.",
         },
       ],
     },
@@ -468,7 +468,7 @@ export default {
         },
         {
           h2: "Jak převod funguje a proč zůstane soukromý",
-          p: "V Safari dekóduje HEIC přímo prohlížeč. V Chromu, Edgi nebo Firefoxu si editor při prvním použití jednou stáhne knihovnu dekodéru z CDN jsDelivr a samotné dekódování pak proběhne lokálně ve vašem zařízení. Stahuje se tedy jen program, fotka se nikam neodesílá. U velké fotky může první otevření chvilku trvat. Po dekódování se otevře dialog „Exportovat obrázek“ s předvoleným JPEG, kde nastavíte kvalitu a měřítko.",
+          p: "V Safari dekóduje HEIC přímo prohlížeč. V Chromu, Edgi nebo Firefoxu si editor při prvním použití stáhne knihovnu dekodéru z CDN jsDelivr, kterou si prohlížeč obvykle ponechá v mezipaměti, a samotné dekódování pak proběhne lokálně ve vašem zařízení. Stahuje se tedy jen program, fotka se nikam neodesílá. U velké fotky může první otevření chvilku trvat. Po dekódování se otevře dialog „Exportovat obrázek“ s předvoleným JPEG, kde nastavíte kvalitu a měřítko.",
         },
         {
           h2: "Co se při převodu nepřenese",
@@ -478,7 +478,7 @@ export default {
       faq: [
         {
           q: "Nahraje se moje fotka z iPhonu na server?",
-          a: "Ne. Stahuje se pouze knihovna dekodéru, a to jen mimo Safari a jednou při prvním použití. Fotka samotná se dekóduje i převede přímo ve vašem prohlížeči a nikam se neodesílá. Proto je převod vhodný i pro soukromé snímky a fotky dokladů.",
+          a: "Ne. Stahuje se pouze knihovna dekodéru, a to jen mimo Safari. Fotka samotná se dekóduje i převede přímo ve vašem prohlížeči a nikam se neodesílá. Proto je převod vhodný i pro soukromé snímky a fotky dokladů.",
         },
         {
           q: "Jak převést HEIC na JPG ve Windows?",
@@ -486,7 +486,7 @@ export default {
         },
         {
           q: "Funguje převod HEIC i bez internetu?",
-          a: "V Safari ano, protože HEIC dekóduje sám prohlížeč a editor po první návštěvě funguje offline. V ostatních prohlížečích je při prvním převodu potřeba připojení, aby se mohla stáhnout knihovna dekodéru.",
+          a: "V Safari ano, protože HEIC dekóduje sám prohlížeč a editor po první návštěvě funguje offline. V ostatních prohlížečích je při prvním převodu potřeba připojení, aby se stáhla knihovna dekodéru; bez internetu pak převod funguje, jen dokud ji prohlížeč drží v mezipaměti.",
         },
         {
           q: "Zůstane fotka v plném rozlišení?",
@@ -517,11 +517,11 @@ export default {
         },
         {
           h2: "Rozmazání, nebo pixelizace?",
-          p: "Rozmazání působí jemněji a na fotce méně ruší – hodí se pro kolemjdoucí v pozadí nebo detaily, které nemají odvádět pozornost. Pixelizace vytvoří typické čtverečky a na první pohled dává najevo, že bylo něco záměrně skryto, což se hodí u snímků obrazovky s osobními údaji nebo u fotek do inzerátu. Když výběru nastavíte prolnutí okraje, rozmazaná oblast plynule přejde do okolí a nebude mít ostrou hranu. Rozmazání i pixelizace z lišty potřebují výběr – když žádný není, editor vás nejdřív vyzve, abyste označili, co chcete skrýt.",
+          p: "Rozmazání působí jemněji a na fotce méně ruší – hodí se pro kolemjdoucí v pozadí nebo detaily, které nemají odvádět pozornost. Pixelizace vytvoří typické čtverečky a na první pohled dává najevo, že bylo něco záměrně skryto, což se hodí u snímků obrazovky s osobními údaji nebo u fotek do inzerátu. Když ještě před označením nastavíte v liště nástroje prolnutí okraje, rozmazaná oblast plynule přejde do okolí a nebude mít ostrou hranu. Rozmazání i pixelizace z lišty potřebují výběr – když žádný není, editor vás nejdřív vyzve, abyste označili, co chcete skrýt.",
         },
         {
           h2: "Rozostřené pozadí a jemné rozmazání štětcem",
-          p: "Nástroj Rozmazání funguje jako štětec: přejíždíte jím po fotce a obraz pod ním měkne. Hodí se k jemnému změkčení rušivého pozadí nebo drobných detailů. V panelu Filtry najdete také filtry Jemné rozostření a Pixelizace pro celý obrázek nebo výběr. Pro efekt rozostřeného pozadí obtáhněte postavu nástrojem Laso, výběr invertujte a rozmažte vše kolem. Výsledek uložte jako JPEG nebo PNG – rozmazání se zapíše do pixelů a ze staženého souboru už nejde odstranit.",
+          p: "Nástroj Rozmazání funguje jako štětec: přejíždíte jím po fotce a obraz pod ním měkne. Hodí se k jemnému změkčení rušivého pozadí nebo drobných detailů. V panelu Filtry najdete také filtry Jemné rozostření a Pixelizace, které působí na celou aktivní vrstvu, nebo jen uvnitř výběru. Pro efekt rozostřeného pozadí obtáhněte postavu nástrojem Laso, v nabídce Úpravy zvolte Invertovat výběr a v panelu Filtry klikněte na Jemné rozostření, pro silnější efekt i vícekrát. Rozmazání z lišty je určené ke skrývání údajů a na pozadí by bylo příliš silné. Výsledek uložte jako JPEG nebo PNG – rozmazání se zapíše do pixelů a ze staženého souboru už nejde odstranit.",
         },
       ],
       faq: [
@@ -557,7 +557,7 @@ export default {
       steps: [
         "Přetáhněte fotku sem, nebo ji vyberte z disku.",
         "Nástrojem Text klikněte do obrázku a napište nápis.",
-        "Potvrďte klávesami <kbd>Ctrl</kbd>+<kbd>Enter</kbd>, nástrojem Přesun nápis umístěte a obrázek exportujte.",
+        "Potvrďte klávesami <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Enter</kbd>, nástrojem Přesun nápis umístěte a obrázek exportujte.",
       ],
       sections: [
         {
@@ -570,7 +570,7 @@ export default {
         },
         {
           h2: "Meme, popisky a vodoznak",
-          p: "Na meme napište krátký text velkým písmem Impact k hornímu a dolnímu okraji obrázku, bílá barva se dobře čte na většině fotek. Popisek k fotce působí čistěji menším písmem v rohu. Pro vodoznak napište jméno nebo adresu webu a krytí snižte na 30–50 %, aby nápis nepřekrýval motiv. Na pestrém pozadí pomůže, když pod text přidáte novou vrstvu a nástrojem Obdélník na ni nakreslíte poloprůhledný podklad.",
+          p: "Na meme napište krátký text velkým písmem Impact k hornímu a dolnímu okraji obrázku, bílá barva se dobře čte na většině fotek. Popisek k fotce působí čistěji menším písmem v rohu. Pro vodoznak napište jméno nebo adresu webu a krytí snižte na 30–50 %, aby nápis nepřekrýval motiv. Na pestrém pozadí pomůže poloprůhledný podklad: přidejte novou vrstvu (vznikne nad aktivní vrstvou), v panelu Vrstvy ji přetáhněte pod text, nakreslete na ni nástrojem Obdélník plnou tmavou nebo světlou plochu a vrstvě snižte krytí.",
         },
       ],
       faq: [
@@ -580,7 +580,7 @@ export default {
         },
         {
           q: "Můžu text později změnit?",
-          a: "Ano. Text je na vlastní textové vrstvě, stačí na něj znovu kliknout nástrojem Text a nápis upravit. Změnu potvrďte klávesami <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (na Macu <kbd>⌘</kbd>+<kbd>Enter</kbd>). Upravitelnost končí, jakmile se změní pixely vrstvy – třeba malováním, filtrem, korekcí, nástrojem Transformace, otočením či překlopením obrázku nebo příkazem Sloučit dolů.",
+          a: "Ano. Text je na vlastní textové vrstvě, stačí na něj znovu kliknout nástrojem Text a nápis upravit. Změnu potvrďte klávesami <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Enter</kbd>. Upravitelnost končí, jakmile se změní pixely vrstvy – třeba malováním, filtrem, korekcí, nástrojem Transformace, otočením či překlopením obrázku nebo příkazem Sloučit dolů.",
         },
         {
           q: "Jaká písma jsou k dispozici?",
@@ -611,7 +611,7 @@ export default {
       sections: [
         {
           h2: "Odstíny šedi, Noir, nebo Sépie?",
-          p: "Odstíny šedi převedou barvy na šedou podle jejich jasu – výsledek je klidný a sedí portrétům i dokumentárním snímkům. Noir přidá výrazný kontrast s hlubokou černou a jasnou bílou, takže vynikne architektura, ulice nebo dramatická obloha. Sépie dá fotce teplý hnědavý tón starých tisků a funguje u rodinných a svatebních fotek. Převod je jeden krok historie, takže ho tlačítkem v liště nebo klávesami <kbd>Ctrl</kbd>+<kbd>Z</kbd> snadno vrátíte a zkusíte jinou variantu.",
+          p: "Odstíny šedi převedou barvy na šedou podle jejich jasu – výsledek je klidný a sedí portrétům i dokumentárním snímkům. Noir přidá výrazný kontrast s hlubokou černou a jasnou bílou, takže vynikne architektura, ulice nebo dramatická obloha. Sépie dá fotce teplý hnědavý tón starých tisků a funguje u rodinných a svatebních fotek. Převod je jeden krok historie, takže ho tlačítkem v liště nebo klávesami <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Z</kbd> snadno vrátíte a zkusíte jinou variantu.",
         },
         {
           h2: "Jak černobílou fotku doladit",
@@ -619,7 +619,7 @@ export default {
         },
         {
           h2: "Barevný akcent: černobílá fotka s jednou barvou",
-          p: "Filtr se použije jen uvnitř výběru, pokud nějaký existuje. Toho využijete pro efekt barevného akcentu. Krokem zpět vraťte fotce barvy, označte objekt, který má zůstat barevný (třeba červený deštník nebo kytici), nástrojem Laso nebo Kouzelná hůlka, výběr invertujte a v panelu Filtry klikněte na Odstíny šedi. Všechno kolem zešedne a vybraný objekt si barvu ponechá. Prolnutí okraje u nástroje výběru zajistí, že přechod nebude příliš ostrý.",
+          p: "Filtr se použije jen uvnitř výběru, pokud nějaký existuje. Toho využijete pro efekt barevného akcentu. Krokem zpět vraťte fotce barvy, označte objekt, který má zůstat barevný (třeba červený deštník nebo kytici), nástrojem Laso nebo Kouzelná hůlka, v nabídce Úpravy zvolte Invertovat výběr a v panelu Filtry klikněte na Odstíny šedi. Všechno kolem zešedne a vybraný objekt si barvu ponechá. Prolnutí okraje u nástroje výběru zajistí, že přechod nebude příliš ostrý.",
         },
       ],
       faq: [
@@ -629,7 +629,7 @@ export default {
         },
         {
           q: "Jde vrátit barvy zpátky?",
-          a: "V editoru ano: převod je jeden krok historie, takže ho vrátíte tlačítkem v liště nebo klávesami <kbd>Ctrl</kbd>+<kbd>Z</kbd>. Ve staženém JPEG nebo PNG už barevná informace není, proto si originál ponechte.",
+          a: "V editoru ano: převod je jeden krok historie, takže ho vrátíte tlačítkem v liště nebo klávesami <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Z</kbd>. Ve staženém JPEG nebo PNG už barevná informace není, proto si originál ponechte.",
         },
         {
           q: "Proč černobílá fotka vypadá šedě a ploše?",
@@ -645,7 +645,7 @@ export default {
         "Invertujte barvy fotky či obrázku a vytvořte negativ jedním kliknutím. Hodí se na naskenované negativy, tmavé snímky obrazovky i efekt rentgenu. Zdarma.",
       h1: "Invertovat barvy obrázku",
       lead:
-        "Po otevření se na obrázek rovnou použije filtr Inverze: světlá místa ztmavnou, tmavá zesvětlí a každá barva se změní na doplňkovou. Průhlednost zůstává zachovaná.",
+        "Po otevření se na obrázek rovnou použije filtr Inverze: světlá místa ztmavnou, tmavá se zesvětlí a každá barva se změní na doplňkovou. Průhlednost zůstává zachovaná.",
       card: "Invertovat barvy",
       cardText: "Negativ fotky, skenu nebo snímku obrazovky",
       steps: [
@@ -664,7 +664,7 @@ export default {
         },
         {
           h2: "Inverze jen části obrázku",
-          p: "Filtr pracuje uvnitř výběru, pokud nějaký existuje. Automatickou inverzi po otevření tedy vraťte krokem zpět, označte oblast nástrojem Obdélníkový výběr nebo Laso a v panelu Filtry klikněte na filtr Inverze. Takto převedete třeba jen tmavý panel ve snímku obrazovky nebo jedno okno aplikace a zbytek necháte, jak je. Pro jemný přechod mezi invertovanou a původní částí nastavte výběru prolnutí okraje ještě před použitím filtru.",
+          p: "Filtr pracuje uvnitř výběru, pokud nějaký existuje. Automatickou inverzi po otevření tedy vraťte krokem zpět, označte oblast nástrojem Obdélníkový výběr nebo Laso a v panelu Filtry klikněte na filtr Inverze. Takto převedete třeba jen tmavý panel ve snímku obrazovky nebo jedno okno aplikace a zbytek necháte, jak je. Pro jemný přechod mezi invertovanou a původní částí nastavte v liště nástroje prolnutí okraje ještě předtím, než oblast označíte.",
         },
       ],
       faq: [
@@ -687,7 +687,7 @@ export default {
     "photo-filters": {
       title: "Filtry na fotky online zdarma",
       description:
-        "Filtry na fotky online: 21 efektů s živým náhledem z vaší fotky – Vintage, Sépie, Duotón, Kresba tužkou a další. Lze je kombinovat. Zdarma, bez registrace.",
+        "Filtry na fotky online: 21 efektů se živým náhledem z vaší fotky – Vintage, Sépie, Duotón, Kresba tužkou a další. Lze je kombinovat. Zdarma, bez registrace.",
       h1: "Filtry na fotky online",
       lead:
         "Panel Filtry ukazuje každý z 21 filtrů jako živou miniaturu vaší fotky, takže výsledek vidíte dřív, než kliknete. Jedno kliknutí filtr použije, další kliknutí přidá další.",
@@ -701,7 +701,7 @@ export default {
       sections: [
         {
           h2: "Přehled všech 21 filtrů",
-          p: "<strong>Barvy a nálada:</strong> Živé barvy, Vybledlé, Teplé, Studené, Vintage a Duotón, který fotku přebarví do dvou tónů podle hlavní a vedlejší barvy v panelu Barva. <strong>Černobílé a tónované:</strong> Odstíny šedi, Noir a Sépie. <strong>Grafické efekty:</strong> Inverze, Posterizace, Práh, Solarizace, Reliéf, Detekce hran, Kresba tužkou a Pixelizace. <strong>Ostrost a světlo:</strong> Jemné rozostření, Zaostření, Záře a Vinětace. Každý filtr je jeden krok historie, takže ho klávesami <kbd>Ctrl</kbd>+<kbd>Z</kbd> hned vrátíte.",
+          p: "<strong>Barvy a nálada:</strong> Živé barvy, Vybledlé, Teplé, Studené, Vintage a Duotón, který fotku přebarví do dvou tónů podle hlavní a vedlejší barvy v panelu Barva. <strong>Černobílé a tónované:</strong> Odstíny šedi, Noir a Sépie. <strong>Grafické efekty:</strong> Inverze, Posterizace, Práh, Solarizace, Reliéf, Detekce hran, Kresba tužkou a Pixelizace. <strong>Ostrost a světlo:</strong> Jemné rozostření, Zaostření, Záře a Vinětace. Každý filtr je jeden krok historie, takže ho klávesami <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Z</kbd> hned vrátíte.",
         },
         {
           h2: "Kombinování filtrů",
@@ -709,7 +709,7 @@ export default {
         },
         {
           h2: "Filtr jen na část fotky",
-          p: "Pokud existuje výběr, filtr se použije jen uvnitř něj. Rozmažte tak pozadí filtrem Jemné rozostření, zatímco postava zůstane ostrá, nebo pixelizujte jen displej telefonu na fotce. Výběr vytvoříte nástroji Obdélníkový výběr, Eliptický výběr, Laso nebo Kouzelná hůlka a výběr můžete i invertovat, když je snazší označit to, co se měnit nemá. Nastavte výběru prolnutí okraje, aby filtr do okolí přecházel plynule a nevznikla viditelná hrana.",
+          p: "Pokud existuje výběr, filtr se použije jen uvnitř něj. Rozmažte tak pozadí filtrem Jemné rozostření, zatímco postava zůstane ostrá, nebo pixelizujte jen displej telefonu na fotce. Výběr vytvoříte nástroji Obdélníkový výběr, Eliptický výběr, Laso nebo Kouzelná hůlka a v nabídce Úpravy ho můžete i invertovat, když je snazší označit to, co se měnit nemá. Ještě před označením nastavte v liště nástroje prolnutí okraje, aby filtr do okolí přecházel plynule a nevznikla viditelná hrana.",
         },
       ],
       faq: [
@@ -732,10 +732,10 @@ export default {
     "brighten-photo": {
       title: "Zesvětlit fotku online – jas a kontrast",
       description:
-        "Zesvětlete tmavou fotku a vyrovnejte barvy: expozice, stíny, kontrast, teplota a další posuvníky s živým náhledem, Úrovně i Křivky. Zdarma a bez nahrávání.",
+        "Zesvětlete tmavou fotku a vyrovnejte barvy: expozice, stíny, kontrast, teplota a další posuvníky se živým náhledem, Úrovně i Křivky. Zdarma a bez nahrávání.",
       h1: "Zesvětlit tmavou fotku",
       lead:
-        "Panel Korekce nabízí 15 posuvníků s živým náhledem, od expozice po vinětaci. Tmavou fotku z oslavy nebo snímek proti světlu vytáhnete během pár vteřin.",
+        "Panel Korekce nabízí 15 posuvníků se živým náhledem, od expozice po vinětaci. Tmavou fotku z oslavy nebo snímek proti světlu vytáhnete během pár vteřin.",
       card: "Zesvětlit fotku",
       cardText: "Expozice, stíny, kontrast, Úrovně a Křivky",
       steps: [
@@ -786,7 +786,7 @@ export default {
       steps: [
         "Přetáhněte obrázek s jednobarevným pozadím sem.",
         "Nástrojem Kouzelná hůlka klikněte do pozadí a stiskněte <kbd>Delete</kbd>.",
-        "Klikněte na Exportovat a uložte obrázek jako PNG nebo WebP.",
+        "Klikněte na Exportovat a uložte obrázek jako PNG (nebo WebP, pokud to prohlížeč umí).",
       ],
       sections: [
         {
@@ -795,7 +795,7 @@ export default {
         },
         {
           h2: "Čisté okraje s maskou vrstvy",
-          p: "Mazání je destruktivní: smazané pixely vrátíte jen krokem zpět. Šetrnější cestou je maska vrstvy, na které pozadí místo smazání jen skryjete. Malováním černou barvou na masku skrýváte, bílou zase odkrýváte, takže přehnaný zásah do okraje produktu nebo do vlasů snadno opravíte. Masku přidáte v nabídce Vrstva, a to i rovnou z výběru. Až budete spokojení, masku použijte, nebo ji ponechte – export uloží to, co vidíte na plátně.",
+          p: "Mazání je destruktivní: smazané pixely vrátíte jen krokem zpět. Šetrnější cestou je maska vrstvy, na které pozadí místo smazání jen skryjete. Malováním černou barvou na masku skrýváte, bílou zase odkrýváte, takže přehnaný zásah do okraje produktu nebo do vlasů snadno opravíte. Máte-li vybrané pozadí, zvolte nejdřív v nabídce Úpravy příkaz Invertovat výběr, aby byl vybraný objekt, a pak v nabídce Vrstva příkaz Přidat masku z výběru – pozadí se skryje. Až budete spokojení, masku použijte, nebo ji ponechte – export uloží to, co vidíte na plátně.",
         },
         {
           h2: "Formát, oříznutí a co nečekat",
@@ -813,7 +813,7 @@ export default {
         },
         {
           q: "Jak odstranit pozadí z fotky člověka?",
-          a: "Automatické vystřižení postavy editor neumí, funkce umělé inteligence nemá. Postavu můžete obtáhnout nástrojem Laso, výběr invertovat a pozadí smazat, nebo ho skrýt maskou vrstvy a okraje dočistit štětcem. U vlasů je to práce na delší dobu, u jednoduchých tvarů je zvládnutelná rychle.",
+          a: "Automatické vystřižení postavy editor neumí, funkce umělé inteligence nemá. Postavu můžete obtáhnout nástrojem Laso, výběr invertovat (Úpravy › Invertovat výběr) a pozadí smazat, nebo ho skrýt maskou vrstvy a okraje dočistit štětcem. U vlasů je to práce na delší dobu, u jednoduchých tvarů je zvládnutelná rychle.",
         },
         {
           q: "Jak vytvořit podpis s průhledným pozadím?",
@@ -858,7 +858,7 @@ export default {
         },
         {
           q: "Můžu zjistit barvu z webové stránky?",
-          a: "Ano, přes snímek obrazovky. Ve Windows ho do schránky uložíte klávesami <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>, na Macu <kbd>⌘</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>4</kbd>. Pak ho sem vložte klávesami <kbd>Ctrl</kbd>+<kbd>V</kbd> (na Macu <kbd>⌘</kbd>+<kbd>V</kbd>) a nástrojem Kapátko klikněte na požadovanou barvu.",
+          a: "Ano, přes snímek obrazovky. Ve Windows ho do schránky uložíte klávesami <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>, na Macu <kbd>⌘</kbd>+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>4</kbd>. Pak ho sem vložte klávesami <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd> a nástrojem Kapátko klikněte na požadovanou barvu.",
         },
         {
           q: "Proč se kód barvy liší od originálu?",
@@ -899,7 +899,7 @@ export default {
       faq: [
         {
           q: "Jak nakreslit šipku do obrázku?",
-          a: "Vyberte nástroj Šipka a v panelu Barva nastavte barvu, třeba červenou. Pak táhněte od místa, kde má šipka začínat, k místu, na které má ukazovat. Nepovedenou šipku vrátíte klávesami <kbd>Ctrl</kbd>+<kbd>Z</kbd> a nakreslíte znovu.",
+          a: "Vyberte nástroj Šipka a v panelu Barva nastavte barvu, třeba červenou. Pak táhněte od místa, kde má šipka začínat, k místu, na které má ukazovat. Nepovedenou šipku vrátíte klávesami <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Z</kbd> a nakreslíte znovu.",
         },
         {
           q: "Jak zakrýt část snímku obrazovky?",
@@ -956,7 +956,7 @@ export default {
         },
         {
           q: "Kde najdu obrázek, když zavřu okno?",
-          a: "Editor průběžně ukládá práci do úložiště prohlížeče a při další návštěvě ve stejném prohlížeči vám ji nabídne k obnovení. Velmi velké dokumenty, jejichž vrstvy mají dohromady přes 192 megapixelů, se ale automaticky neukládají. Na jiném zařízení práci mít nebudete – pro přenos nebo zálohu uložte projekt <code>.paint</code> přes nabídku Soubor.",
+          a: "Editor průběžně ukládá práci do úložiště prohlížeče a při další návštěvě ve stejném prohlížeči vám ji nabídne k obnovení. Velmi velké dokumenty, jejichž vrstvy a masky mají dohromady přes 192 megapixelů, se ale automaticky neukládají. Na jiném zařízení práci mít nebudete – pro přenos nebo zálohu uložte projekt <code>.paint</code> přes nabídku Soubor.",
         },
       ],
     },

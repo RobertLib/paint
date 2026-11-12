@@ -11,7 +11,9 @@
    - structural edits (layers, masks, geometry) keep bitmaps only of the
      layers they change. A layer they leave alone is recorded by its content
      version: history is linear, so whenever such a step is undone or redone
-     that layer is back at exactly that version and needs no copy;
+     that layer is back at exactly that version and needs no copy. Geometry
+     that gives the same pixels when run again keeps no copy of its result,
+     and flips and quarter turns, undone by their inverse, keep none at all;
    - whole bitmaps are kept in a shared, reference-counted store keyed by
      (layer id, content version), so a bitmap is held once however many
      entries need it;
@@ -206,6 +208,10 @@ class History {
     emit("history", this);
   }
 
+  /**
+   * Record a step: { label, bytes, undo(), redo(), dispose()? } — and `auto`
+   * when the app took it by itself, not the user (see autosave.js).
+   */
   push(entry) {
     // drop anything the user had undone past this point
     while (this.stack.length - 1 > this.index) this._drop(this.stack.pop());
@@ -225,10 +231,16 @@ class History {
     emit("history", this);
   }
 
+  /**
+   * Undo the latest step. One that fails — the device out of memory — leaves
+   * the document as it was (every step makes what it needs before it changes
+   * anything) and the history where it was; the error is passed on. Redo too.
+   */
   undo() {
     if (!this.canUndo) return false;
-    const entry = this.stack[this.index--];
+    const entry = this.stack[this.index];
     entry.undo();
+    this.index--;
     markDirty(true);
     emit("history", this);
     emit("doc", { reason: "undo", label: entry.label });
@@ -237,8 +249,9 @@ class History {
 
   redo() {
     if (!this.canRedo) return false;
-    const entry = this.stack[++this.index];
+    const entry = this.stack[this.index + 1];
     entry.redo();
+    this.index++;
     markDirty(true);
     emit("history", this);
     emit("doc", { reason: "redo", label: entry.label });
@@ -621,39 +634,67 @@ function unlink(rec) {
 }
 
 /**
- * Make `layer` match a record, copying bitmaps only where they differ. With
- * `take` (a rollback: the record is discarded afterwards) the record's own
- * bitmaps are handed to the layer instead of copied.
+ * The bitmaps `layer` needs to match a record, copying only where they
+ * differ — made before anything changes, so a device that runs out of
+ * memory fails here with the document as it was. With `take` (a rollback:
+ * the record is discarded afterwards) the record's own bitmaps are handed
+ * over instead of copied.
  */
-function applyLayer(layer, rec, take = false) {
-  const sizeOk = layer.canvas.width === rec.w && layer.canvas.height === rec.h;
-  if (layer.pixelVersion !== rec.pv || !sizeOk) {
-    let canvas = null;
-    if (rec.blank) canvas = makeCanvas(rec.w, rec.h);
-    else if (take && rec._canvas && !rec._copied) canvas = rec._canvas;
-    else if (rec.pk && take) {
-      canvas = takeCanvas(rec.pk);
-      rec.pk = null;
-    } else if (rec.pk && stored(rec.pk)) canvas = copyCanvas(stored(rec.pk));
-    if (!canvas) {
-      console.error("[paint] history: the pixels of a layer are missing");
-      if (!sizeOk) canvas = makeCanvas(rec.w, rec.h);
+function prepareLayer(layer, rec, take = false) {
+  const prep = { canvas: null, mask: null, made: [] };
+  const make = (c) => {
+    prep.made.push(c);
+    ctx2d(c);
+    return c;
+  };
+  try {
+    const sizeOk = layer.canvas.width === rec.w && layer.canvas.height === rec.h;
+    if (layer.pixelVersion !== rec.pv || !sizeOk) {
+      let canvas = null;
+      if (rec.blank) canvas = make(makeCanvas(rec.w, rec.h));
+      else if (take && rec._canvas && !rec._copied) canvas = rec._canvas;
+      else if (rec.pk && take) {
+        canvas = takeCanvas(rec.pk);
+        rec.pk = null;
+      } else if (rec.pk && stored(rec.pk)) canvas = make(copyCanvas(stored(rec.pk)));
+      if (!canvas) {
+        console.error("[paint] history: the pixels of a layer are missing");
+        if (!sizeOk) canvas = make(makeCanvas(rec.w, rec.h));
+      }
+      prep.canvas = canvas;
     }
-    if (canvas) layer.restorePixels(canvas, rec.pv);
-  }
-  if (rec.blank) layer.blankVersion = rec.pv;
-  if (rec.hasMask) {
     const m = layer.mask;
-    if (!m || layer.maskVersion !== rec.mv || m.width !== rec.w || m.height !== rec.h) {
+    if (rec.hasMask && (!m || layer.maskVersion !== rec.mv || m.width !== rec.w || m.height !== rec.h)) {
       let canvas = null;
       if (take && rec._mask && !rec._copied) canvas = rec._mask;
       else if (rec.mk && take) {
         canvas = takeCanvas(rec.mk);
         rec.mk = null;
-      } else if (rec.mk && stored(rec.mk)) canvas = copyCanvas(stored(rec.mk));
-      if (canvas) layer.restoreMask(canvas, rec.mv);
-      else console.error("[paint] history: the mask of a layer is missing");
+      } else if (rec.mk && stored(rec.mk)) canvas = make(copyCanvas(stored(rec.mk)));
+      if (!canvas) console.error("[paint] history: the mask of a layer is missing");
+      prep.mask = canvas;
     }
+  } catch (err) {
+    dropPrepared(prep);
+    throw err;
+  }
+  return prep;
+}
+
+/** Free what prepareLayer made for a change that does not happen after all. */
+function dropPrepared(prep) {
+  for (const c of prep?.made || []) releaseCanvas(c);
+}
+
+/**
+ * Make `layer` match a record with the bitmaps prepareLayer made for it.
+ * Needs no memory of its own, so it cannot fail half-way.
+ */
+function applyLayer(layer, rec, prep) {
+  if (prep.canvas) layer.restorePixels(prep.canvas, rec.pv);
+  if (rec.blank) layer.blankVersion = rec.pv;
+  if (rec.hasMask) {
+    if (prep.mask) layer.restoreMask(prep.mask, rec.mv);
   } else if (layer.mask) {
     layer.restoreMask(null, nextVersion());
   }
@@ -729,6 +770,17 @@ function unpackSelection(data) {
   s.shape = data.shape ? { ...data.shape } : null;
   data.ref = weakRef(s);
   return s;
+}
+
+/** Two packed selections with the same pixels (their shapes aside). */
+function samePacked(p, q) {
+  if (p === q) return true;
+  if (p.w !== q.w || p.h !== q.h) return false;
+  if (JSON.stringify(p.b) !== JSON.stringify(q.b)) return false;
+  if (!p.alpha || !q.alpha) return !p.alpha && !q.alpha;
+  if (p.alpha.length !== q.alpha.length) return false;
+  for (let i = 0; i < p.alpha.length; i++) if (p.alpha[i] !== q.alpha[i]) return false;
+  return true;
 }
 
 function captureSelection(sel) {
@@ -842,26 +894,83 @@ function releaseDoc(snap) {
  * The document's name is not part of it: renaming is no step of its own.
  */
 function restoreDoc(doc, snap, take = false) {
-  doc.setSize(snap.width, snap.height);
   const byId = new Map(doc.layers.map((l) => [l.id, l]));
-  doc.layers = snap.layers.map((rec) => {
-    let layer = byId.get(rec.id);
-    if (!layer) {
-      layer = new Layer(1, 1, { name: rec.name });
-      layer.id = rec.id;
-      layer.pixelVersion = -1;
-      layer.maskVersion = -1;
+  // everything that needs memory comes first: a device that runs out of it
+  // fails here, with the document still as it was
+  const plan = [];
+  let sel;
+  try {
+    for (const rec of snap.layers) {
+      let layer = byId.get(rec.id);
+      if (!layer) {
+        layer = new Layer(1, 1, { name: rec.name });
+        layer.id = rec.id;
+        layer.pixelVersion = -1;
+        layer.maskVersion = -1;
+      }
+      plan.push({ layer, rec, prep: prepareLayer(layer, rec, take) });
     }
-    applyLayer(layer, rec, take);
+    sel = selectionOf(snap.sel);
+    doc.setSize(snap.width, snap.height);
+  } catch (err) {
+    for (const p of plan) dropPrepared(p.prep);
+    throw err;
+  }
+  doc.layers = plan.map(({ layer, rec, prep }) => {
+    applyLayer(layer, rec, prep);
     return layer;
   });
   doc.activeIndex = Math.max(0, Math.min(snap.activeIndex, doc.layers.length - 1));
-  doc.selection = selectionOf(snap.sel);
+  doc.selection = sel;
+  afterRestoreDoc(doc);
+}
+
+/** The document was brought back to a snapshot: let everything catch up. */
+function afterRestoreDoc(doc) {
   doc.clearFloating();
   doc.invalidate();
   emit("layers", doc);
   emit("selection", doc);
   emit("doc", { reason: "restore" });
+}
+
+/**
+ * The document after geometry that is redone by running it again (see
+ * editDoc): what it is, without a copy of any bitmap.
+ */
+function describeDoc(doc) {
+  return {
+    width: doc.width,
+    height: doc.height,
+    activeIndex: doc.activeIndex,
+    sel: captureSelection(doc.selection),
+    layers: doc.layers.map(describeLayer),
+  };
+}
+
+/**
+ * Run geometry again — the edit itself (redo) or its inverse (undo) — on the
+ * state it was made from, which history being linear guarantees, and give
+ * the result what the pixels cannot carry: the content versions, text and
+ * selection of `snap`. The geometry leaves the document as it was when it
+ * fails (Doc#_resizeAll makes every canvas first).
+ */
+function replay(doc, fn, snap) {
+  const sel = selectionOf(snap.sel);
+  fn(doc);
+  const recs = new Map(snap.layers.map((r) => [r.id, r]));
+  for (const layer of doc.layers) {
+    const rec = recs.get(layer.id);
+    if (!rec) continue;
+    layer.pixelVersion = rec.pv;
+    layer.maskVersion = rec.mv;
+    if (rec.blank) layer.blankVersion = rec.pv;
+    layer.text = cloneText(rec.text);
+    layer.version = nextVersion();
+  }
+  doc.activeIndex = Math.max(0, Math.min(snap.activeIndex, doc.layers.length - 1));
+  doc.selection = sel;
+  afterRestoreDoc(doc);
 }
 
 /**
@@ -876,24 +985,32 @@ export function beginEdit({ changes = null } = {}) {
   const edit = {
     /**
      * Record the edit. If that fails (out of memory) the document is put
-     * back as it was and the error is passed on.
+     * back as it was and the error is passed on. `again` / `inverse`: see
+     * editDoc.
      */
-    commit(label) {
+    commit(label, { again = null, inverse = null } = {}) {
       if (done) return;
       let after;
       try {
-        finishBefore(doc, before);
-        after = captureAfter(doc, before);
+        if (!inverse) finishBefore(doc, before);
+        after = again ? describeDoc(doc) : captureAfter(doc, before);
       } catch (err) {
         edit.rollback();
         throw err;
+      }
+      // undone by its inverse: no old bitmap is needed (the selection is)
+      if (inverse) {
+        for (const rec of before.layers) {
+          releaseLayer(rec);
+          unlink(rec);
+        }
       }
       done = true;
       history.push({
         label,
         bytes: 0,
-        undo: () => restoreDoc(doc, before),
-        redo: () => restoreDoc(doc, after),
+        undo: () => (inverse ? replay(doc, inverse, before) : restoreDoc(doc, before)),
+        redo: () => (again ? replay(doc, again, after) : restoreDoc(doc, after)),
         dispose: () => {
           releaseDoc(before);
           releaseDoc(after);
@@ -930,8 +1047,14 @@ export function beginEdit({ changes = null } = {}) {
  *
  * When `fn` throws, the document is put back as it was, nothing is recorded
  * and the error is passed on.
+ *
+ * Geometry that gives the same pixels when it runs again on the same state
+ * (whole-pixel offsets: crop, canvas size) says so with `repeat`: redo runs
+ * it again instead of keeping a copy of every layer. With `inverse`, a
+ * function that undoes it exactly (flip, quarter turns), the step keeps no
+ * bitmap at all. Both must leave the document as it was when they fail.
  */
-export function editDoc(label, fn, { changes = null } = {}) {
+export function editDoc(label, fn, { changes = null, repeat = false, inverse = null } = {}) {
   settleSessions();
   const doc = state.doc;
   if (!doc) return undefined;
@@ -944,7 +1067,7 @@ export function editDoc(label, fn, { changes = null } = {}) {
     throw err;
   }
   // (a commit that fails puts the document back itself)
-  edit.commit(label);
+  edit.commit(label, { again: repeat || inverse ? fn : null, inverse });
   return result;
 }
 
@@ -970,8 +1093,17 @@ export function beginLayerEdit(layer = state.doc?.active) {
 
   const apply = (rec, sel, take = false) => {
     const l = doc.layers.find((x) => x.id === id);
-    if (l) applyLayer(l, rec, take);
-    doc.selection = selectionOf(sel);
+    // (what needs memory first, see restoreDoc)
+    const prep = l ? prepareLayer(l, rec, take) : null;
+    let s;
+    try {
+      s = selectionOf(sel);
+    } catch (err) {
+      dropPrepared(prep);
+      throw err;
+    }
+    if (l) applyLayer(l, rec, prep);
+    doc.selection = s;
     doc.clearFloating();
     doc.invalidate();
     emit("layers", doc);
@@ -1042,7 +1174,7 @@ export function beginLayerEdit(layer = state.doc?.active) {
 /**
  * Record a selection-only change (no pixels touched) — cheap: selections are
  * immutable and kept compactly. Nothing is recorded when `fn` leaves the
- * selection as it was.
+ * selection as it was or replaces it with an identical one.
  */
 export function editSelection(label, fn) {
   settleSessions();
@@ -1064,6 +1196,14 @@ export function editSelection(label, fn) {
     doc.selection = before;
     emit("selection", doc);
     throw err;
+  }
+  if (b && a && samePacked(b.data, a.data)) {
+    // the same selection again (Select all twice): keep the one there was
+    releaseSelection(b);
+    releaseSelection(a);
+    doc.selection = before;
+    emit("selection", doc);
+    return;
   }
   const apply = (s) => {
     doc.selection = selectionOf(s);

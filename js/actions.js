@@ -69,7 +69,7 @@ const outOfMemory = (err) =>
  * editPixels have already put the document back as it was; the user is told
  * so instead of nothing happening. Returns false after a failure.
  */
-function attempt(fn) {
+export function attempt(fn) {
   try {
     fn();
     return true;
@@ -120,6 +120,8 @@ const toastUpdated = () =>
  * the autosave (a landing-page task must not be applied to it again).
  */
 export function setDocument(doc, { fit = true, reason = "open", restored = false } = {}) {
+  // the autosave writes what the outgoing document has not stored yet
+  if (state.doc && state.doc !== doc) emit("doc-closing", { doc: state.doc });
   dropSessions();
   overlay.crop = null;
   overlay.marquee = null;
@@ -170,8 +172,10 @@ export function clampSize(width, height) {
 
 const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "webp", "gif", "bmp", "svg", "avif", "ico", "tif", "tiff"]);
 
-const extOf = (file) => (file.name.match(/\.([^.]+)$/)?.[1] || "").toLowerCase();
+// (a pasted Blob has no name)
+const extOf = (file) => ((file.name || "").match(/\.([^.]+)$/)?.[1] || "").toLowerCase();
 const isHeic = (file) => /^image\/hei[cf]/.test(file.type) || ["heic", "heif"].includes(extOf(file));
+const isSvg = (file) => file.type === "image/svg+xml" || extOf(file) === "svg";
 const isPsd = (file) =>
   extOf(file) === "psd" || file.type === "image/vnd.adobe.photoshop" || file.type === "application/x-photoshop";
 
@@ -198,7 +202,103 @@ async function looksLikeHeic(file) {
   }
 }
 
+/** An SVG that would taint every canvas it is drawn into (see decodeSvg). */
+class UnreadableSvgError extends Error {
+  constructor() {
+    super("The SVG cannot be read back from a canvas");
+    this.name = "UnreadableSvgError";
+  }
+}
+
+const unreadableSvg = () =>
+  t("This browser won't let the editor read this SVG — it contains HTML text (foreignObject). Export it as PNG from the app that made it");
+
+/** Whether pixels drawn from `img` can be read back (it does not taint). */
+function readable(img) {
+  const c = makeCanvas(1, 1);
+  try {
+    ctx2d(c).drawImage(img, 0, 0, 1, 1);
+    c.getContext("2d").getImageData(0, 0, 1, 1);
+    return true;
+  } catch (err) {
+    if (err?.name === "SecurityError") return false;
+    throw err;
+  } finally {
+    releaseCanvas(c);
+  }
+}
+
+const dataUrl = (blob) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+
+/**
+ * The size to give an SVG whose width or height is missing or relative (%,
+ * auto), or null when it needs none: browsers fit such an SVG into 300 × 150
+ * (a viewBox of 0 0 1000 1000 opens as 150 × 150) or give it no size at all.
+ * The viewBox sets the shape, and its own size is used when it makes a
+ * sensible picture — the long edge is kept between 1000 and 4000 px. Without
+ * a viewBox the content is in pixels: what is missing becomes 1200 × 900.
+ */
+function svgSize(root) {
+  const given = (name) => {
+    const m = /^\s*\+?(\d*\.?\d+(?:e[+-]?\d+)?)\s*(px|pt|pc|mm|cm|in|em|ex|rem)?\s*$/i.exec(root.getAttribute(name) || "");
+    return !!m && Number(m[1]) > 0;
+  };
+  const hasW = given("width");
+  const hasH = given("height");
+  if (hasW && hasH) return null;
+  const [, , vw, vh] = (root.getAttribute("viewBox") || "").trim().split(/[\s,]+/).map(Number);
+  if (vw > 0 && vh > 0 && Number.isFinite(vw) && Number.isFinite(vh)) {
+    // one length given: the browser takes the other from the viewBox's shape
+    if (hasW || hasH) return null;
+    const long = Math.max(vw, vh);
+    const k = Math.min(4000, Math.max(1000, long)) / long;
+    return { width: Math.max(1, Math.round(vw * k)), height: Math.max(1, Math.round(vh * k)) };
+  }
+  return { width: hasW ? null : 1200, height: hasH ? null : 900 };
+}
+
+/**
+ * Decode an SVG file. Its size is made explicit first (see svgSize). An SVG
+ * with HTML in a <foreignObject> — the text labels of every draw.io diagram —
+ * taints any canvas it is drawn into: that canvas can never be read again,
+ * so export, autosave and filters would fail for good. It is drawn on a
+ * scratch canvas first; Chrome taints it when it comes from a blob: URL but
+ * not from a data: URL, so that is tried next, and an SVG that taints either
+ * way (Safari) is refused before it reaches the document.
+ */
+async function decodeSvg(file) {
+  let text = await file.text();
+  const xml = new DOMParser().parseFromString(text, "image/svg+xml");
+  const root = xml.documentElement;
+  // (not well-formed: left as it is, for the browser to take or refuse)
+  const size = root?.localName === "svg" && !xml.querySelector("parsererror") ? svgSize(root) : null;
+  if (size) {
+    if (size.width) root.setAttribute("width", String(size.width));
+    if (size.height) root.setAttribute("height", String(size.height));
+    text = new XMLSerializer().serializeToString(xml);
+  }
+  const svg = new Blob([text], { type: "image/svg+xml" });
+  const url = URL.createObjectURL(svg);
+  let img;
+  try {
+    img = await loadImage(url);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+  if (readable(img)) return img;
+  img = await loadImage(await dataUrl(svg));
+  if (readable(img)) return img;
+  throw new UnreadableSvgError();
+}
+
 async function decodeFile(file) {
+  if (isSvg(file)) return decodeSvg(file);
   const url = URL.createObjectURL(file);
   try {
     return await loadImage(url);
@@ -211,13 +311,8 @@ async function decodeFile(file) {
   emit("busy", t("Decoding HEIC photo…"));
   try {
     const { decodeHeic } = await loadModule(() => import("./heic.js"));
-    const png = await decodeHeic(file);
-    const pngUrl = URL.createObjectURL(png);
-    try {
-      return await loadImage(pngUrl);
-    } finally {
-      URL.revokeObjectURL(pngUrl);
-    }
+    // an ImageBitmap, closed once it is drawn (openImageFile)
+    return await decodeHeic(file);
   } finally {
     emit("busy", null);
   }
@@ -231,8 +326,9 @@ export async function openImageFile(file, { asLayer = false } = {}) {
     toast(t("That file is not an image"), "err");
     return false;
   }
+  let img = null;
   try {
-    const img = await decodeFile(file);
+    img = await decodeFile(file);
     const name = file.name.replace(/\.[^.]+$/, "") || t("Image");
     if (asLayer && state.doc) {
       placeImage(img, name);
@@ -250,6 +346,7 @@ export async function openImageFile(file, { asLayer = false } = {}) {
     console.error(err);
     if (err instanceof UpdatedError) toastUpdated();
     else if (outOfMemory(err)) toast(t("Not enough memory on this device for that — nothing was changed"), "err");
+    else if (err instanceof UnreadableSvgError) toast(unreadableSvg(), "err");
     else {
       // heic.js tells a decoder that could not be downloaded (kind "download")
       // from one that could not read the photo (kind "decode")
@@ -263,6 +360,9 @@ export async function openImageFile(file, { asLayer = false } = {}) {
       );
     }
     return false;
+  } finally {
+    // a decoded HEIC photo (an ImageBitmap) holds its pixels until closed
+    img?.close?.();
   }
 }
 
@@ -311,6 +411,10 @@ async function openPsdFile(file) {
     console.error(err);
     if (err instanceof UpdatedError) {
       toastUpdated();
+      return false;
+    }
+    if (outOfMemory(err)) {
+      toast(t("Not enough memory on this device for that — nothing was changed"), "err");
       return false;
     }
     const msg = PSD_ERRORS.has(err?.message) ? t(err.message) : t("The file could not be read");
@@ -388,6 +492,7 @@ export function placeImage(img, name = t("Image")) {
 }
 
 async function imageFromBlob(blob) {
+  if (isSvg(blob)) return decodeSvg(blob);
   const url = URL.createObjectURL(blob);
   try {
     return await loadImage(url);
@@ -408,7 +513,7 @@ export async function pasteImage(source) {
     return true;
   } catch (err) {
     console.error(err);
-    toast(t("Nothing usable on the clipboard"), "err");
+    toast(err instanceof UnreadableSvgError ? unreadableSvg() : t("Nothing usable on the clipboard"), "err");
     return false;
   }
 }
@@ -481,6 +586,9 @@ function selectionCanvas({ layer = null } = {}) {
 
 const EXT = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", psd: "psd" };
 
+/** An image or project extension at the end of a typed file name. */
+const TYPED_EXT = /\.(png|jpe?g|webp|psd|paint|gif|bmp|avif|heic|heif|svg)\s*$/i;
+
 /**
  * The export size for a scale, kept within what this device can encode (the
  * scale slider goes to 400 %, which a big photo cannot reach).
@@ -515,6 +623,8 @@ export function exportCanvas({ scale = 1, format = "image/png" } = {}) {
   const c = ctx2d(out);
   c.imageSmoothingQuality = "high";
   c.drawImage(flat, 0, 0, w, h);
+  // the full-size copy goes now, not whenever GC gets to it
+  releaseCanvas(flat);
   return out;
 }
 
@@ -528,7 +638,14 @@ export async function exportBlob({ format = "image/png", quality = 0.92, scale =
   }
   const canvas = exportCanvas({ scale, format });
   if (!canvas) return null;
-  return new Promise((r) => canvas.toBlob(r, format, quality));
+  return new Promise((r) => {
+    try {
+      canvas.toBlob(r, format, quality);
+    } finally {
+      // toBlob copies the pixels when it is called: the canvas can go now
+      releaseCanvas(canvas);
+    }
+  });
 }
 
 /** Browsers without a WebP (or other) encoder silently hand back a PNG. */
@@ -578,9 +695,11 @@ export async function exportImage({
     return false;
   }
   const ext = EXT[format] || "png";
-  download(blob, `${sanitize(name)}.${ext}`);
-  // a layered PSD keeps the work; a flat PNG/JPEG/WebP does not
-  if (format === "psd") markDirty(false);
+  // a name typed with its extension ("photo.jpg") must not get a second one
+  download(blob, `${sanitize(String(name || "").replace(TYPED_EXT, ""))}.${ext}`);
+  // a layered PSD keeps the work — but not editable text, which it can only
+  // hold as pixels; a flat PNG/JPEG/WebP never does
+  if (format === "psd" && !doc.layers.some((layer) => layer.text)) markDirty(false);
   const size = format === "psd" ? { w: doc.width, h: doc.height } : exportSize(scale);
   toast(t("Exported {w} × {h} {fmt}", { w: size.w, h: size.h, fmt: ext.toUpperCase() }), "ok");
   track(`export-${ext}`);
@@ -734,7 +853,12 @@ export async function openProjectFile(file) {
     return true;
   } catch (err) {
     console.error(err);
-    toast(t("That is not a valid .paint project"), "err");
+    toast(
+      outOfMemory(err)
+        ? t("Not enough memory on this device for that — nothing was changed")
+        : t("That is not a valid .paint project"),
+      "err"
+    );
     return false;
   } finally {
     emit("busy", null);
@@ -1123,8 +1247,11 @@ export function updateTextLayer(id, text) {
       editDoc(
         t("Edit text"),
         () => {
+          // the name follows the text until the user gives the layer another
+          if (!layer.text || layer.name === textName(layer.text.value)) {
+            layer.name = textName(text.value);
+          }
           layer.text = { ...text, color: { ...text.color } };
-          layer.name = textName(text.value);
           layer.renderText();
         },
         { changes: [layer] }
@@ -1282,13 +1409,15 @@ export function duplicateSelectionToLayer() {
 /*
  * Geometry gives every layer (and mask) a new canvas and leaves the old ones
  * untouched, so editDoc keeps those as they are instead of copying them
- * first ({ changes: [] }).
+ * first ({ changes: [] }). Whole-pixel offsets come out the same when run
+ * again (`repeat`: no copy of the result), and flips and quarter turns are
+ * undone by their inverse (`inverse`: no copy at all).
  */
 
 export function cropTo(rect) {
   const doc = state.doc;
   if (!doc) return;
-  if (!attempt(() => editDoc(t("Crop"), () => doc.crop(rect), { changes: [] }))) return;
+  if (!attempt(() => editDoc(t("Crop"), () => doc.crop(rect), { changes: [], repeat: true }))) return;
   emit("layers", doc);
   emit("doc", { reason: "geometry" });
   view.fit();
@@ -1303,6 +1432,11 @@ export function cropToSelection() {
   const b = doc?.selection?.bounds;
   if (!b) {
     toast(t("Make a selection first"), "err");
+    return;
+  }
+  // a crop that keeps the whole canvas would only drop the selection
+  if (b.x === 0 && b.y === 0 && b.w === doc.width && b.h === doc.height) {
+    toast(t("The selection covers the whole canvas — nothing to crop"), "info");
     return;
   }
   cropTo(b);
@@ -1361,7 +1495,7 @@ export function resizeCanvas(width, height, anchor = "center") {
   if (w === doc.width && h === doc.height) return;
   if (scaled) toast(t("That is larger than this device supports — using {w} × {h}", { w, h }), "info");
   const resized = attempt(() =>
-    editDoc(t("Canvas size"), () => doc.resizeCanvas(w, h, anchor), { changes: [] })
+    editDoc(t("Canvas size"), () => doc.resizeCanvas(w, h, anchor), { changes: [], repeat: true })
   );
   if (!resized) return;
   emit("layers", doc);
@@ -1375,8 +1509,9 @@ export function rotate(dir) {
   const doc = state.doc;
   if (!doc) return;
   const label = dir === 180 ? t("Rotate 180°") : t("Rotate 90°");
+  const turn = (d) => (d === 180 ? doc.rotate180() : doc.rotate90(d));
   const turned = attempt(() =>
-    editDoc(label, () => (dir === 180 ? doc.rotate180() : doc.rotate90(dir)), { changes: [] })
+    editDoc(label, () => turn(dir), { changes: [], inverse: () => turn(dir === 180 ? 180 : -dir) })
   );
   if (!turned) return;
   emit("layers", doc);
@@ -1390,7 +1525,9 @@ export function flip(axis) {
   const doc = state.doc;
   if (!doc) return;
   const label = axis === "h" ? t("Flip horizontal") : t("Flip vertical");
-  if (!attempt(() => editDoc(label, () => doc.flip(axis), { changes: [] }))) return;
+  // (a flip is its own inverse)
+  const mirror = () => doc.flip(axis);
+  if (!attempt(() => editDoc(label, mirror, { changes: [], inverse: mirror }))) return;
   emit("layers", doc);
   requestRender();
 }
@@ -1428,6 +1565,11 @@ function ensureAdjustSession() {
   if (!target) return null;
   if (target.locked) {
     toast(t("This layer is locked"), "err");
+    return null;
+  }
+  // a hidden layer would change unseen (painting refuses it too)
+  if (!doc.active.visible) {
+    toast(t("This layer is hidden — show it to edit it"), "info");
     return null;
   }
   if (target.isMask) {
@@ -1528,8 +1670,11 @@ export function previewAdjustments(values) {
   return true;
 }
 
-/** Bake the preview in as one undo step. Quiet when called by settle(). */
-function finishAdjustments({ quiet = false } = {}) {
+/**
+ * Bake the preview in as one undo step ("Adjustments" unless a preset names
+ * it). Quiet when called by settle().
+ */
+function finishAdjustments({ quiet = false, label = null } = {}) {
   const session = adjustSession;
   if (!session) return false;
   if (!hasAdjustments(adjustValues)) {
@@ -1546,13 +1691,13 @@ function finishAdjustments({ quiet = false } = {}) {
   // changed no pixel records nothing)
   let recorded = false;
   attempt(() => {
-    recorded = session.edit.commit(t("Adjustments"), state.doc?.selection?.coverBounds || null);
+    recorded = session.edit.commit(label || t("Adjustments"), state.doc?.selection?.coverBounds || null);
   });
   resetAdjustValues();
   emit("layers", state.doc);
   requestRender();
   if (!recorded) return false;
-  if (!quiet) toast(t("Adjustments applied"), "ok");
+  if (!quiet) toast(label ? t("{label} applied", { label }) : t("Adjustments applied"), "ok");
   track("adjust");
   return true;
 }
@@ -1576,6 +1721,18 @@ export function commitAdjustments() {
 
 export function resetAdjustments() {
   rollbackAdjustments();
+}
+
+/**
+ * A one-click preset (Adjust › Warm up…), applied at once as its own undo
+ * step named `label`. A preview still open in the panel is kept as its own
+ * step first, so the preset never takes over the sliders the user moved.
+ */
+export function applyAdjustPreset(label, values) {
+  if (!state.doc) return false;
+  settleSessions();
+  if (!previewAdjustments(values)) return false;
+  return finishAdjustments({ label });
 }
 
 registerSession({
@@ -1632,6 +1789,11 @@ export function beginPreview(label) {
   if (!target) return null;
   if (target.locked) {
     toast(t("This layer is locked"), "err");
+    return null;
+  }
+  // a hidden layer (or its mask) would change unseen
+  if (!doc.active.visible) {
+    toast(t("This layer is hidden — show it to edit it"), "info");
     return null;
   }
   const edit = beginPixelEdit(target);
@@ -1778,6 +1940,11 @@ export async function applyFilter(id, params = {}) {
     toast(t("This layer is locked"), "err");
     return false;
   }
+  // a hidden layer (or its mask) would change unseen
+  if (!doc.active.visible) {
+    toast(t("This layer is hidden — show it to edit it"), "info");
+    return false;
+  }
   const effect = EFFECTS.find((e) => e.id === id);
   if (!effect) return false;
   // effects keep transparent pixels transparent: an empty area stays as it
@@ -1870,21 +2037,17 @@ function previewBase(doc, w, h, scale) {
   const cached = thumbBases.get(doc);
   if (cached?.key === key) return cached.canvas;
   if (cached) releaseCanvas(cached.canvas);
+  const canvas = thumbCrop(composite, w, h, scale);
+  thumbBases.set(doc, { key, canvas });
+  return canvas;
+}
+
+/** The middle of a document-sized picture, scaled by `scale` to fill w × h. */
+function thumbCrop(src, w, h, scale) {
   const canvas = makeCanvas(w, h);
   const sw = w / scale;
   const sh = h / scale;
-  ctx2d(canvas).drawImage(
-    composite,
-    (doc.width - sw) / 2,
-    (doc.height - sh) / 2,
-    sw,
-    sh,
-    0,
-    0,
-    w,
-    h
-  );
-  thumbBases.set(doc, { key, canvas });
+  ctx2d(canvas).drawImage(src, (src.width - sw) / 2, (src.height - sh) / 2, sw, sh, 0, 0, w, h);
   return canvas;
 }
 
@@ -1893,16 +2056,22 @@ export function filterPreview(id, w, h) {
   const doc = state.doc;
   if (!doc) return makeCanvas(w, h);
   const scale = Math.max(w / doc.width, h / doc.height);
+  const opts = { primary: state.primary, secondary: state.secondary, preview: true };
+  if (id && scale > 1) {
+    // a picture smaller than the thumbnail: the effect runs at its real size
+    // (radii and blocks as applying it gives) and the result is enlarged
+    const src = copyCanvas(doc.composite());
+    const out = applyEffect(id, src, opts);
+    const thumb = thumbCrop(out, w, h, scale);
+    if (out !== src) releaseCanvas(out);
+    releaseCanvas(src);
+    return thumb;
+  }
   // effects may work in place: each gets its own copy of the shared base
   const base = copyCanvas(previewBase(doc, w, h, scale));
   if (!id) return base;
-  return applyEffect(id, base, {
-    primary: state.primary,
-    secondary: state.secondary,
-    preview: true,
-    // radii are in document pixels: shrink them with the thumbnail
-    scale: Math.min(1, scale),
-  });
+  // radii are in document pixels: shrink them with the thumbnail
+  return applyEffect(id, base, { ...opts, scale });
 }
 
 /* ================================= history ================================ */
@@ -1927,21 +2096,26 @@ export function undo() {
     requestRender();
     return;
   }
-  if (!refitIfResized(() => history.undo())) toast(t("Nothing to undo"), "info");
+  // (a step that cannot be undone — out of memory — changes nothing)
+  let undone = true;
+  if (attempt(() => (undone = refitIfResized(() => history.undo()))) && !undone) {
+    toast(t("Nothing to undo"), "info");
+  }
   requestRender();
 }
 
 export function redo() {
   if (state.dragging) return;
-  const could = history.canRedo;
-  cancelSessions();
-  // finishing an open text box records it, which ends the redo branch: the
-  // user saw something to redo, so no "nothing to redo" for that
+  // nothing to redo: a live preview stays as it is
   if (!history.canRedo) {
-    if (!could) toast(t("Nothing to redo"), "info");
+    toast(t("Nothing to redo"), "info");
     requestRender();
     return;
   }
-  refitIfResized(() => history.redo());
+  // a live preview (free transform, adjustment, open text box) is newer
+  // work than anything undone: it is kept, and recording it ends the redo
+  // branch — the user saw something to redo, so no "nothing to redo" then
+  if (!attempt(settleSessions)) return;
+  if (history.canRedo) attempt(() => refitIfResized(() => history.redo()));
   requestRender();
 }

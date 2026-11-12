@@ -138,12 +138,15 @@ export function hsvToRgb(h, s, v) {
 
 /**
  * Squared RGBA distance used by fill / magic wand, normalized so that
- * tolerance 0..100 maps onto 0..1.
+ * tolerance 0..100 maps onto 0..1. Colours are compared premultiplied: a
+ * nearly transparent pixel is close to transparent whatever its hue, so the
+ * faint fringe of a soft coloured stroke no longer stops a fill; opaque
+ * pixels compare exactly as before.
  */
 export function colorDelta(r1, g1, b1, a1, r2, g2, b2, a2) {
-  const dr = (r1 - r2) / 255;
-  const dg = (g1 - g2) / 255;
-  const db = (b1 - b2) / 255;
+  const dr = (r1 * a1 - r2 * a2) / 65025;
+  const dg = (g1 * a1 - g2 * a2) / 65025;
+  const db = (b1 * a1 - b2 * a2) / 65025;
   const da = (a1 - a2) / 255;
   return Math.sqrt((dr * dr + dg * dg + db * db + da * da) / 4);
 }

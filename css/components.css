@@ -879,7 +879,9 @@ input[type="radio"]:checked::after {
   font-weight: 550;
 }
 
-.layer-name-input {
+/* a text field like the others, but sized for the row: input.layer-name-input
+   outranks the size of input[type="text"] */
+input.layer-name-input {
   width: 100%;
   height: 20px;
   padding: 0 4px;
@@ -1450,10 +1452,12 @@ kbd {
 
 /* -------------------------------- toasts --------------------------------- */
 
+/* above the zoom bar (the status bar, the HUD's 14px inset and up to 42px of
+   bar on a touch screen): a toast over it took the taps meant for zooming */
 .toasts {
   position: fixed;
   left: 50%;
-  bottom: calc(46px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--h-status) + 64px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   /* sized by the messages, not by the half of the screen right of left: 50%
      (which made every toast wrap on a phone) */
@@ -1483,6 +1487,14 @@ kbd {
 
 .toasts:not(:popover-open) {
   display: none;
+}
+
+/* on a phone the panels button sits on top of the zoom bar: held upright,
+   the screen is narrow enough for a toast to reach it — clear it too */
+@media (max-width: 760px) and (orientation: portrait) {
+  .toasts {
+    bottom: calc(var(--h-status) + 106px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 .busy[popover] {
@@ -1681,6 +1693,11 @@ kbd {
 
 .link-btn:hover {
   color: var(--text);
+}
+
+/* inside a line of text (Export › PSD: "Show file size") */
+.panel-hint .link-btn {
+  padding: 0;
 }
 
 
@@ -1982,6 +1999,11 @@ kbd {
 
   .select {
     background-position: calc(100% - 13px) 15px, calc(100% - 9px) 15px;
+  }
+
+  /* the layer rename field keeps the 16px, in a row only a little taller */
+  input.layer-name-input {
+    height: 26px;
   }
 }
 

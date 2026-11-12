@@ -90,14 +90,14 @@
 
       <section class="block steps">
         <h2>Jak na to</h2>
-        <ol><li>Přetáhněte obrázek s jednobarevným pozadím sem.</li><li>Nástrojem Kouzelná hůlka klikněte do pozadí a stiskněte <kbd>Delete</kbd>.</li><li>Klikněte na Exportovat a uložte obrázek jako PNG nebo WebP.</li></ol>
+        <ol><li>Přetáhněte obrázek s jednobarevným pozadím sem.</li><li>Nástrojem Kouzelná hůlka klikněte do pozadí a stiskněte <kbd>Delete</kbd>.</li><li>Klikněte na Exportovat a uložte obrázek jako PNG (nebo WebP, pokud to prohlížeč umí).</li></ol>
       </section>
 
       <section class="block prose">
         <h2>Jak odstranit pozadí nástrojem Kouzelná hůlka</h2>
         <p>Kouzelná hůlka vybere souvislou oblast podobné barvy. Klikněte do pozadí; pokud výběr zasahuje do objektu, snižte toleranci, a když kolem objektu zůstávají zbytky, toleranci zvyšte. Kliknutím se stisknutou klávesou <kbd>Shift</kbd> přidáte další místo, třeba pozadí uvnitř písmene O, s klávesou <kbd>Alt</kbd> naopak část z výběru uberete. Pak stiskněte <kbd>Delete</kbd> nebo tlačítko v liště a pozadí zmizí. Zbylé drobnosti dočistíte nástrojem Guma.</p>
         <h2>Čisté okraje s maskou vrstvy</h2>
-        <p>Mazání je destruktivní: smazané pixely vrátíte jen krokem zpět. Šetrnější cestou je maska vrstvy, na které pozadí místo smazání jen skryjete. Malováním černou barvou na masku skrýváte, bílou zase odkrýváte, takže přehnaný zásah do okraje produktu nebo do vlasů snadno opravíte. Masku přidáte v nabídce Vrstva, a to i rovnou z výběru. Až budete spokojení, masku použijte, nebo ji ponechte – export uloží to, co vidíte na plátně.</p>
+        <p>Mazání je destruktivní: smazané pixely vrátíte jen krokem zpět. Šetrnější cestou je maska vrstvy, na které pozadí místo smazání jen skryjete. Malováním černou barvou na masku skrýváte, bílou zase odkrýváte, takže přehnaný zásah do okraje produktu nebo do vlasů snadno opravíte. Máte-li vybrané pozadí, zvolte nejdřív v nabídce Úpravy příkaz Invertovat výběr, aby byl vybraný objekt, a pak v nabídce Vrstva příkaz Přidat masku z výběru – pozadí se skryje. Až budete spokojení, masku použijte, nebo ji ponechte – export uloží to, co vidíte na plátně.</p>
         <h2>Formát, oříznutí a co nečekat</h2>
         <p>Průhlednost uloží jen PNG a WebP, JPEG by prázdná místa vyplnil bílou. Před uložením použijte v nabídce Obrázek příkaz Oříznout průhledné okraje – plátno se zmenší přesně na objekt, což se hodí u log a podpisů vkládaných do dokumentů. Editor nemá umělou inteligenci, která by sama rozpoznala osobu nebo zvíře. U portrétu na pestrém pozadí proto počítejte s ruční prací s nástrojem Laso a maskou vrstvy.</p>
       </section>
@@ -109,7 +109,7 @@
         <h3>Proč má uložený obrázek zase bílé pozadí?</h3>
         <p>Nejspíš jste ho uložili jako JPEG, který průhlednost nepodporuje a vyplní ji bílou. V dialogu „Exportovat obrázek“ zvolte PNG nebo WebP. Šachovnice v editoru jen znázorňuje průhlednost, do souboru se neukládá.</p>
         <h3>Jak odstranit pozadí z fotky člověka?</h3>
-        <p>Automatické vystřižení postavy editor neumí, funkce umělé inteligence nemá. Postavu můžete obtáhnout nástrojem Laso, výběr invertovat a pozadí smazat, nebo ho skrýt maskou vrstvy a okraje dočistit štětcem. U vlasů je to práce na delší dobu, u jednoduchých tvarů je zvládnutelná rychle.</p>
+        <p>Automatické vystřižení postavy editor neumí, funkce umělé inteligence nemá. Postavu můžete obtáhnout nástrojem Laso, výběr invertovat (Úpravy › Invertovat výběr) a pozadí smazat, nebo ho skrýt maskou vrstvy a okraje dočistit štětcem. U vlasů je to práce na delší dobu, u jednoduchých tvarů je zvládnutelná rychle.</p>
         <h3>Jak vytvořit podpis s průhledným pozadím?</h3>
         <p>Podepište se černě na bílý papír, vyfoťte ho za dobrého světla a otevřete zde. Nástrojem Kouzelná hůlka s vyšší tolerancí klikněte do bílé plochy, smažte ji a ořízněte průhledné okraje. Podpis se přitom nikam neodesílá a uložený PNG vložíte do dokumentu.</p>
       </section>

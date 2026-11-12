@@ -89,7 +89,8 @@ async function takeHandoff() {
   const id = params.get("open");
   // ?open=1 with the one shared key: landing pages from before per-drop keys
   // (an older service worker may still serve them from its cache)
-  const key = id === "1" ? HANDOFF_KEY : handoffKey(id);
+  // (?open=0: the landing page could not store the file — see boot())
+  const key = id === "1" ? HANDOFF_KEY : id === "0" ? null : handoffKey(id);
   if (!key) return null;
   const entry = await idbGet(key);
   await idbDelete(key);
@@ -224,6 +225,20 @@ async function boot() {
         action: { label: t("Show"), onClick: () => emit("show-sessions") },
       });
     }
+  }
+  if (params.get("open") === "0") {
+    // the landing page could not store the file it was given (storage
+    // blocked or full): say so instead of leaving the user to wonder
+    // (without a document the welcome screen is up, with its own "Open
+    // image" — and a modal dialog leaves a toast's button unclickable)
+    const action = state.doc
+      ? { label: t("Open image…"), onClick: () => document.getElementById("imageInput").click() }
+      : null;
+    emit("toast", {
+      msg: t("The file could not be handed over to the editor — open it again"),
+      kind: "err",
+      action,
+    });
   }
   if (task) startTask(task, { restored });
 

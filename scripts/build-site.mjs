@@ -117,9 +117,16 @@ const THEME_SCRIPT = `<script>
 const THEME_COLOR = `<meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />`;
 
+/* GoatCounter's versioned script, which never changes once published
+   (https://www.goatcounter.com/help/countjs-versions), pinned with its
+   integrity hash: a changed file is refused instead of run. Update both
+   together, from that page. */
+const GOATCOUNTER_SRC = "https://gc.zgo.at/count.v5.js";
+const GOATCOUNTER_INTEGRITY = "sha384-atnOLvQb9t+jTSipvd75X2yginT4PjVbqDdlJAmxMm+wYElFmeR6EmLP5bYeoRVQ";
+
 function analytics() {
   if (!SITE.goatcounter) return "";
-  return `<script data-goatcounter="https://${SITE.goatcounter}.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>`;
+  return `<script data-goatcounter="https://${SITE.goatcounter}.goatcounter.com/count" async src="${GOATCOUNTER_SRC}" integrity="${GOATCOUNTER_INTEGRITY}" crossorigin="anonymous"></script>`;
 }
 
 /* -------------------------------- template -------------------------------- */
@@ -543,13 +550,35 @@ ${entries.join("\n")}
 
 /* --------------------------- editor/index.html ---------------------------- */
 
+/**
+ * The modules the editor loads as it starts: js/main.js and everything it
+ * imports statically, transitively — paths relative to js/, those in js/
+ * first, then the ones in its subfolders, each group sorted. Modules loaded
+ * on demand with import() (psd.js, heic.js) are not followed: preloading
+ * them would download them on every visit.
+ */
+function editorModules() {
+  const JS = join(ROOT, "js");
+  // `import … from "./x.js"`, `import "./x.js"` and `export … from "./x.js"`
+  // at the start of a line; never `import(` or `import.meta`
+  const STATIC =
+    /^[ \t]*(?:import[ \t]*(?:[\w$*{},\s]*?\bfrom[ \t]*)?|export[ \t]*(?:\*(?:[ \t]+as[ \t]+[\w$]+)?|\{[^}]*\})[ \t]*from[ \t]*)["'](\.{1,2}\/[^"']+)["']/gm;
+  const seen = new Set();
+  const visit = (file) => {
+    if (seen.has(file)) return;
+    seen.add(file);
+    const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const [, spec] of code.matchAll(STATIC)) visit(join(dirname(file), spec));
+  };
+  visit(join(JS, "main.js"));
+  return [...seen]
+    .map((file) => relative(JS, file).split("\\").join("/"))
+    .sort((a, b) => a.split("/").length - b.split("/").length || (a < b ? -1 : a > b ? 1 : 0));
+}
+
 /** Keep the editor's modulepreload list and analytics snippet in sync. */
 function patchEditor() {
-  const modules = readdirSync(join(ROOT, "js"))
-    .filter((f) => f.endsWith(".js") && !["site.js", "heic.js", "psd.js"].includes(f))
-    .sort()
-    .map((f) => `    <link rel="modulepreload" href="../js/${f}" />`);
-  modules.push(`    <link rel="modulepreload" href="../js/lang/cs.js" />`);
+  const modules = editorModules().map((f) => `    <link rel="modulepreload" href="../js/${f}" />`);
   let html = EDITOR_HTML.replace(
     /<!-- modulepreload:start -->[\s\S]*?<!-- modulepreload:end -->/,
     `<!-- modulepreload:start -->\n${modules.join("\n")}\n    <!-- modulepreload:end -->`

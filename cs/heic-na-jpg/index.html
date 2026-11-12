@@ -97,7 +97,7 @@
         <h2>Co je HEIC a proč ho převádět</h2>
         <p>HEIC (také HEIF) je formát, do kterého iPhone a iPad ve výchozím nastavení ukládají fotky. Při stejné kvalitě zabírá obvykle méně místa než JPEG, jenže si s ním neporadí každý: Windows bez příslušného rozšíření ho neotevřou a řada webových formulářů, e-shopů i fotosběrných služeb ho nepřijme. JPG naopak funguje všude. Převod je proto nejjednodušší cesta, jak fotku z iPhonu poslat e-mailem, nahrát na úřad nebo dát vytisknout.</p>
         <h2>Jak převod funguje a proč zůstane soukromý</h2>
-        <p>V Safari dekóduje HEIC přímo prohlížeč. V Chromu, Edgi nebo Firefoxu si editor při prvním použití jednou stáhne knihovnu dekodéru z CDN jsDelivr a samotné dekódování pak proběhne lokálně ve vašem zařízení. Stahuje se tedy jen program, fotka se nikam neodesílá. U velké fotky může první otevření chvilku trvat. Po dekódování se otevře dialog „Exportovat obrázek“ s předvoleným JPEG, kde nastavíte kvalitu a měřítko.</p>
+        <p>V Safari dekóduje HEIC přímo prohlížeč. V Chromu, Edgi nebo Firefoxu si editor při prvním použití stáhne knihovnu dekodéru z CDN jsDelivr, kterou si prohlížeč obvykle ponechá v mezipaměti, a samotné dekódování pak proběhne lokálně ve vašem zařízení. Stahuje se tedy jen program, fotka se nikam neodesílá. U velké fotky může první otevření chvilku trvat. Po dekódování se otevře dialog „Exportovat obrázek“ s předvoleným JPEG, kde nastavíte kvalitu a měřítko.</p>
         <h2>Co se při převodu nepřenese</h2>
         <p>Převádí se jen hlavní snímek. Pohyb z Live Photo, hloubková mapa z portrétního režimu ani další snímky ze sekvence se do JPG nedostanou – JPEG je ostatně uložit neumí. Pro běžné použití to nevadí, výsledkem je obyčejná fotka, jak ji vidíte v aplikaci Fotky. Kvalitu 85–90 zvolte, když chcete zachovat detaily, pro e-mail a sociální sítě stačí 70–80. Je-li soubor zbytečně velký, snižte v témže dialogu měřítko.</p>
       </section>
@@ -105,11 +105,11 @@
       <section class="block faq">
         <h2>Časté dotazy</h2>
         <h3>Nahraje se moje fotka z iPhonu na server?</h3>
-        <p>Ne. Stahuje se pouze knihovna dekodéru, a to jen mimo Safari a jednou při prvním použití. Fotka samotná se dekóduje i převede přímo ve vašem prohlížeči a nikam se neodesílá. Proto je převod vhodný i pro soukromé snímky a fotky dokladů.</p>
+        <p>Ne. Stahuje se pouze knihovna dekodéru, a to jen mimo Safari. Fotka samotná se dekóduje i převede přímo ve vašem prohlížeči a nikam se neodesílá. Proto je převod vhodný i pro soukromé snímky a fotky dokladů.</p>
         <h3>Jak převést HEIC na JPG ve Windows?</h3>
         <p>Otevřete tuto stránku v Chromu, Edgi nebo Firefoxu a fotku HEIC přetáhněte do pole pro obrázek. Nemusíte instalovat žádné rozšíření pro Windows ani jiný program. Po dekódování nastavíte kvalitu a JPG stáhnete jako běžný soubor.</p>
         <h3>Funguje převod HEIC i bez internetu?</h3>
-        <p>V Safari ano, protože HEIC dekóduje sám prohlížeč a editor po první návštěvě funguje offline. V ostatních prohlížečích je při prvním převodu potřeba připojení, aby se mohla stáhnout knihovna dekodéru.</p>
+        <p>V Safari ano, protože HEIC dekóduje sám prohlížeč a editor po první návštěvě funguje offline. V ostatních prohlížečích je při prvním převodu potřeba připojení, aby se stáhla knihovna dekodéru; bez internetu pak převod funguje, jen dokud ji prohlížeč drží v mezipaměti.</p>
         <h3>Zůstane fotka v plném rozlišení?</h3>
         <p>Na počítači zůstanou běžné fotky z iPhonu se 12 nebo 24 megapixely v plném rozlišení. Snímky ve 48 megapixelech (8064 × 6048 px) editor při otevření nepatrně zmenší, protože dokument může mít nejvýš 8000 px na stranu. Safari na iPhonu a iPadu ale zvládne plátno jen asi do 16,7 megapixelu, takže tam v plném rozlišení zůstanou 12megapixelové snímky a větší se zmenší. Kvalitu JPEG pak určíte posuvníkem.</p>
       </section>

@@ -41,12 +41,20 @@ function privacyFilter(id) {
 /** The filter this task applied last, while it is still the latest step. */
 let taskFilter = null;
 
-async function applyTaskFilter(id) {
-  if (await A.applyFilter(id)) taskFilter = { label: effectName(id), entry: history.stack[history.index] };
+async function applyTaskFilter(id, { auto = false } = {}) {
+  if (!(await A.applyFilter(id))) return;
+  const entry = history.stack[history.index];
+  // applied on open, not by the user: to the autosave the document is still
+  // only opened (it pushes no stored work out)
+  if (auto) entry.auto = true;
+  taskFilter = { label: effectName(id), entry };
 }
 
 /** Swap the filter a task applied for another one, as a single step. */
 async function swapFilter(to) {
+  // a live preview (the Adjust sliders) is kept as its own step first: undo
+  // would only cancel it, and the check must see the real last step
+  A.settle();
   const last = history.stack[history.index];
   if (taskFilter && last && last === taskFilter.entry) A.undo();
   await applyTaskFilter(to);
@@ -255,11 +263,11 @@ async function run(task) {
   if (applied) return;
   applied = true;
   if (task.tool) setTool(task.tool);
-  // a phone's panel sheet would cover a result the task already shows (the
-  // black-and-white photo and its Noir / Sepia bar): pick the tab, keep it shut
-  if (task.panel) openTab(task.panel, { reveal: !(task.filter && isPhoneLayout()) });
+  // a phone's panel sheet would cover the photo and the task bar with the
+  // next steps: pick the tab, keep it shut — the panels button opens it there
+  if (task.panel) openTab(task.panel, { reveal: !isPhoneLayout() });
   showBar(task);
-  if (task.filter) await applyTaskFilter(task.filter);
+  if (task.filter) await applyTaskFilter(task.filter, { auto: true });
   task.run?.();
 }
 
